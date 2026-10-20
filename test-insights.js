@@ -63,4 +63,10 @@ let rv = I.weekReview(wkd, today, S.DEFAULT_PARAMS, {});
 assert.ok(rv.missed.some(x=>/1 of 7 sessions missed.*Wrestling/.test(x)), rv.missed); assert.ok(rv.missed.some(x=>/Screen time/.test(x))); assert.ok(rv.focus.some(x=>/screens/.test(x)));
 assert.ok(rv.well.some(x=>/Nutrition 100/.test(x))); assert.ok(I.reviewText(rv).startsWith('What went well: '));
 assert.deepEqual(I.weekReview([], today, {}, {}).missed, ['No days logged this week']);
+// sections
+let sx = I.sections(undefined); assert.deepEqual(sx, {morning:false,nutrition:false,training:false,evening:false});
+sx = I.sections(v2({})); assert.ok(sx.morning && sx.nutrition && sx.training && sx.evening);
+sx = I.sections(v2({energy:'', screen:''})); assert.deepEqual(sx, {morning:false,nutrition:true,training:true,evening:false});
+sx = I.sections(v2({sessions:[{done:true,rpe:'',mins:60}]})); assert.equal(sx.training,false);
+assert.ok(I.sections(full(0)).morning); // legacy day: no wellness needed
 console.log('All insights tests passed');

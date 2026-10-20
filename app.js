@@ -137,35 +137,49 @@ const V = {
   ${r.locked?`<p>7-day trend: ${lockMsg(r)}</p>`:`<p>7-day trend: <b>${r.delta==null?'—':(r.delta>0?'+':'')+r.delta+' lbs/wk'}</b></p><p>${r.trend.emoji} ${esc(r.trend.label)}</p>`}${cutWarn()}${weightChart()}</div>${wellCard(false)}`;
  },
  log() {
-  const d = V._date || today(), ex = S.entries.find(x=>x.date===d), e = JSON.parse(JSON.stringify(ex || {date:d, v:2, nutrition:null, training:null, family:null, sleep:'', screen:'', weight:'', notes:''}));
+  const d = V._date || today(), ex = S.entries.find(x=>x.date===d), e = blankOr(ex, d);
   const legacy = ex && !Array.isArray(ex.sessions) && ex.v !== 2;
-  if (!legacy && !Array.isArray(e.sessions)) { e.sessions = Profile.sessionsFor(S.profile && S.profile.schedule, d) || []; e.v = 2; }
+  const k = V._keep && V._keep.date === d ? V._keep : null; // unsaved taps in other sections survive a section save
+  if (k) { ['nutrition','training','family',...Scoring.WELL_KEYS].forEach(f => { if (k[f] != null && k[f] !== '') e[f] = k[f]; });
+    (k.sessions||[]).forEach((x,i) => { if (e.sessions && e.sessions[i] && x.done != null) e.sessions[i].done = x.done; }); }
+  V._keep = null;
   const opt10 = (v) => `<option value="">—</option>${[1,2,3,4,5,6,7,8,9,10].map(n=>`<option ${+v===n?'selected':''}>${n}</option>`).join('')}`;
-  const sessHTML = () => legacy ? yn('training','Training session completed?') : `<label>Training today</label>${e.sessions.length ? e.sessions.map((x,i)=>`<div class="sess"><p style="margin:8px 0 6px"><b>Did you complete session ${i+1}${x.label?' ('+esc(x.label)+')':''}?</b></p>
-     <div class="yn" data-k="sess" data-i="${i}"><button class="y ${x.done===true?'on':''}" data-val="1">✅ Yes</button><button class="n ${x.done===false?'on':''}" data-val="0">❌ No</button></div>
-     <div class="row sx" id="sx_${i}" style="${x.done===true?'':'display:none'}"><div style="flex:1"><label>Effort (RPE 1–10) *</label><select data-srpe="${i}">${opt10(x.rpe)}</select></div>
-     <div style="flex:1"><label>Minutes *</label><input data-smin="${i}" type="number" inputmode="numeric" min="1" max="600" step="5" value="${esc(x.mins)}"></div></div></div>`).join('') : '<p class="hint">🛌 Rest day: training counts 100% when you rest.</p>'}
-   <details class="opt" ${e.extra&&e.extra.label?'open':''}><summary>➕ Extra session (not on your schedule)</summary>
-    <label for="f_xlabel">What was it?</label><input id="f_xlabel" maxlength="40" placeholder="e.g. Open mat" value="${esc(e.extra&&e.extra.label)}">
-    <div class="row"><div style="flex:1"><label>Effort (RPE 1–10)</label><select id="f_xrpe">${opt10(e.extra&&e.extra.rpe)}</select></div><div style="flex:1"><label>Minutes</label><input id="f_xmin" type="number" inputmode="numeric" min="1" max="600" step="5" value="${esc(e.extra&&e.extra.mins)}"></div></div>
-    <p class="muted">Logged and added to your load. Doesn't change the training %.</p></details>
-   <p class="muted">RPE: 1 very easy, 3 moderate, 5 hard, 7 very hard, 10 max. Load = RPE × minutes.</p>`;
   const yn = (k,l) => `<label>${l}</label><div class="yn" data-k="${k}"><button class="y ${e[k]===true?'on':''}" data-val="1">✅ Yes</button><button class="n ${e[k]===false?'on':''}" data-val="0">❌ No</button></div>`;
   const step = (k,l,st) => `<label>${l}</label><div class="step"><button data-step="${k}" data-d="-${st}">−</button><input id="f_${k}" type="number" inputmode="decimal" step="${st}" min="0" max="24" value="${esc(e[k])}"><button data-step="${k}" data-d="${st}">+</button></div>`;
   const chips = (k, vals) => `<div class="chips">${vals.map(v=>`<button data-chip="${k}" data-val="${v}" class="${+e[k]===v&&e[k]!==''?'on':''}">${v}h</button>`).join('')}</div>`;
-  const wd = [1,4].includes(new Date(d+'T12:00').getDay());
-  V._e = Object.assign({}, e);
+  const wd = [1,4].includes(new Date(d+'T12:00').getDay()), st = Insights.sections(ex), nDone = Object.values(st).filter(Boolean).length, left = missingToday(ex);
+  const head = (key, title) => `<div class="row" style="margin:0 0 4px"><h3 style="margin:0">${title}</h3><span class="secok ${st[key]?'on':''}" id="ok_${key}">${st[key]?'✓ Done':'…'}</span></div>${V._flash===key?'<p class="saved">💾 Saved</p>':''}`;
+  const sbtn = (key, l) => `<button class="btn sm" data-save="${key}">💾 ${l}</button>`;
+  const sessCard = () => legacy ? `${yn('training','Training session completed?')}${sbtn('training','Save training')}` :
+    (e.sessions.length ? e.sessions.map((x,i)=>{ const ok = ex && ex.sessions && ex.sessions[i] && ex.sessions[i].done != null && (ex.sessions[i].done === false || (ex.sessions[i].rpe > 0 && ex.sessions[i].mins > 0));
+      return `<div class="sess"><p style="margin:8px 0 6px"><b>Did you complete session ${i+1}${x.label?' ('+esc(x.label)+')':''}?</b> ${ok?'<span class="secok on">✓</span>':''}</p>
+     <div class="yn" data-k="sess" data-i="${i}"><button class="y ${x.done===true?'on':''}" data-val="1">✅ Yes</button><button class="n ${x.done===false?'on':''}" data-val="0">❌ No</button></div>
+     <div class="row sx" id="sx_${i}" style="${x.done===true?'':'display:none'}"><div style="flex:1"><label>Effort (RPE 1–10) *</label><select data-srpe="${i}">${opt10(x.rpe)}</select></div>
+     <div style="flex:1"><label>Minutes *</label><input data-smin="${i}" type="number" inputmode="numeric" min="1" max="600" step="5" value="${esc(x.mins)}"></div></div>${sbtn('sess-'+i,'Save session '+(i+1))}${V._flash==='sess-'+i?'<p class="saved">💾 Saved</p>':''}</div>`; }).join('') : '<p class="hint">🛌 Rest day: training counts 100% when you rest.</p>') +
+    `<details class="opt" ${e.extra&&e.extra.label?'open':''}><summary>➕ Extra session (not on your schedule)</summary>
+    <label for="f_xlabel">What was it?</label><input id="f_xlabel" maxlength="40" placeholder="e.g. Open mat" value="${esc(e.extra&&e.extra.label)}">
+    <div class="row"><div style="flex:1"><label>Effort (RPE 1–10)</label><select id="f_xrpe">${opt10(e.extra&&e.extra.rpe)}</select></div><div style="flex:1"><label>Minutes</label><input id="f_xmin" type="number" inputmode="numeric" min="1" max="600" step="5" value="${esc(e.extra&&e.extra.mins)}"></div></div>
+    <p class="muted">Logged and added to your load. Doesn't change the training %. Clear all three fields and save to remove it.</p>${sbtn('extra','Save extra session')}${V._flash==='extra'?'<p class="saved">💾 Saved</p>':''}</details>
+   <p class="muted">RPE: 1 very easy, 3 moderate, 5 hard, 7 very hard, 10 max. Load = RPE × minutes.</p>`;
+  V._e = JSON.parse(JSON.stringify(e)); V._legacy = legacy; V._flash = null;
   return `${d===today()?day1Banner(true):''}<div class="card"><label>Date</label><input id="f_date" type="date" value="${d}" max="${today()}">
-  ${yn('nutrition','Nutrition plan followed?')}${sessHTML()}
-  ${step('sleep','Sleep last night (hours)',0.5)}${chips('sleep',[6,7,7.5,8,8.5,9])}${step('screen','Recreational screen time (hours)',0.5)}${chips('screen',[0,1,2,3,4])}
-  ${yn('family','Quality time with family/friends?')}
-  <h3 style="margin:18px 0 0">How do you feel today? *</h3>
-  ${Insights.WELL.map(([k,l,lo,hi])=>`<label>${l} <span class="muted">(${lo} … ${hi})</span></label><div class="sc" data-k="${k}">${[1,2,3,4,5].map(n=>`<button class="${+e[k]===n?'on':''}" data-val="${n}">${n}</button>`).join('')}</div>`).join('')}
-  <label>Weight (lbs) ${wd?'<span style="color:#ff9800">— weigh-in day! ⚖️</span>':'<span class="muted">(Mon/Thu mornings)</span>'}</label>
-  <input id="f_weight" type="number" inputmode="decimal" step="0.1" value="${esc(e.weight)}">
-  <label>Notes (injuries, illness, soreness, energy, mood)</label><textarea id="f_notes" rows="3">${esc(e.notes)}</textarea>
-  <button class="btn" id="saveLog">💾 Save day</button>
-  ${S.entries.some(x=>x.date===d)?'<button class="btn alt" id="delLog">Delete this day</button>':''}</div>
+   <p id="progress" style="margin:10px 0 0;font-weight:700">${nDone===4?'✅ ':''}${nDone} of 4 sections done</p>
+   <p class="muted" id="stillToLog" style="margin:4px 0 0">${left.length?'Still to log: '+left.join(', '):'All done for this day 🎉'}</p></div>
+  <div class="card" id="sec_morning">${head('morning','🌅 Morning')}
+   ${step('sleep','Sleep last night (hours) *',0.5)}${chips('sleep',[6,7,7.5,8,8.5,9])}
+   <label>Weight (lbs) ${wd?'<span style="color:#ff9800">— weigh-in day! ⚖️ Weigh in before eating.</span>':'<span class="muted">(Mon/Thu mornings)</span>'}</label>
+   <input id="f_weight" type="number" inputmode="decimal" step="0.1" value="${esc(e.weight)}">
+   <p style="margin:14px 0 0"><b>How do you feel? *</b></p>
+   ${Insights.WELL.map(([k,l,lo,hi])=>`<label>${l} <span class="muted">(${lo} … ${hi})</span></label><div class="sc" data-k="${k}">${[1,2,3,4,5].map(n=>`<button class="${+e[k]===n?'on':''}" data-val="${n}">${n}</button>`).join('')}</div>`).join('')}
+   ${sbtn('morning','Save morning')}</div>
+  <div class="card" id="sec_nutrition">${head('nutrition','🍽️ Nutrition')}${yn('nutrition','Nutrition plan followed today?')}${sbtn('nutrition','Save nutrition')}</div>
+  <div class="card" id="sec_training">${head('training','🥊 Training')}${sessCard()}</div>
+  <div class="card" id="sec_evening">${head('evening','🌙 Evening')}
+   ${step('screen','Recreational screen time (hours) *',0.5)}${chips('screen',[0,1,2,3,4])}
+   ${yn('family','Quality time with family/friends? *')}
+   <label>Notes (injuries, illness, soreness, energy, mood)</label><textarea id="f_notes" rows="3">${esc(e.notes)}</textarea>
+   ${sbtn('evening','Save evening')}
+   ${ex?'<button class="btn alt" id="delLog">Delete this day</button>':''}</div>
   <div class="card"><h3>Recent entries</h3><table><tr><th>Date</th><th>N</th><th>T</th><th>Sl</th><th>Sc</th><th>F</th><th>Wt</th><th>✓</th></tr>
   ${S.entries.slice().sort((a,b)=>a.date<b.date?1:-1).slice(0,V._all?1e9:21).map(x=>`<tr data-date="${x.date}"><td><a href="#" data-edit="${x.date}">${x.date.slice(5)}</a></td><td>${x.nutrition==null?'—':x.nutrition?'Y':'N'}</td><td>${trainTxt(x)}</td><td>${x.sleep??''}</td><td>${x.screen??''}</td><td>${x.family==null?'—':x.family?'Y':'N'}</td><td>${x.weight||''}</td><td>${Insights.isComplete(x)?'✅':'…'}</td></tr>`).join('')}</table>
   <p class="muted">Tap a date to view or edit that day.</p>${S.entries.length>21&&!V._all?`<button class="btn alt" id="showAll">Show all ${S.entries.length} days</button>`:''}</div>`;
@@ -257,7 +271,7 @@ const V = {
   <p><b>First week:</b> the score, weight trend and bonus unlock 7 days after you finish Setup. Only days since then count.</p>
   <p><b>Day 1:</b> your sign-up day is Day 1. Finish that day's log that night. Trends unlock after 7 days.</p>
   <p><b>Profile:</b> on first open, sign up with your name (required) and optional team, weight, fight date and safety details. Edit it anytime in Setup → Edit profile. Your starting weight becomes your first weigh-in. The Dashboard shows your fight countdown and lbs to go.</p>
-  <p><b>Daily log (about 30 sec):</b> tap Log. Nutrition = followed your plan (macros, timing, hydration). <b>Training:</b> for each session on your schedule today, answer "Did you complete session N?" and, if yes, its effort (RPE 1–10) and minutes (both required). Rest days need nothing. Add an unscheduled extra session if you did one. Sleep = hours slept last night. Screen = recreational screen time only (not film study or school). Family/Friends = real quality time without heavy screens. <b>How you feel</b> (required daily, 1–5): Energy (5 = fresh), Soreness (5 = no soreness), Mood (5 = great), Stress (5 = no stress).</p>
+  <p><b>Daily log (about 30 sec):</b> tap Log. It's split into 4 cards, each with its own Save: 🌅 <b>Morning</b> (sleep, weight on Mon/Thu, how you feel), 🍽️ <b>Nutrition</b>, 🥊 <b>Training</b> (save each session on its own, plus any extra session) and 🌙 <b>Evening</b> (screen time, family/friends, notes). Each card shows ✓ Done when it's complete, and the top line shows "X of 4 sections done" plus what's still to log. Nutrition = followed your plan (macros, timing, hydration). <b>Training:</b> for each session on your schedule today, answer "Did you complete session N?" and, if yes, its effort (RPE 1–10) and minutes (both required). Rest days need nothing. Add an unscheduled extra session if you did one. Sleep = hours slept last night. Screen = recreational screen time only (not film study or school). Family/Friends = real quality time without heavy screens. <b>How you feel</b> (required daily, 1–5): Energy (5 = fresh), Soreness (5 = no soreness), Mood (5 = great), Stress (5 = no stress).</p>
   <p><b>Training schedule:</b> set at sign-up (once or twice a day, then Rest / 1 / 2 sessions per weekday with optional labels). Edit it in Setup → Edit profile & training schedule. Saving it updates this week's and future Weekly Outlines.</p>
   <p><b>Reminders:</b> Setup → Reminders → pick a morning (5:00–10:00) and evening (18:00–23:00) time in 30-min steps → tap <i>Add reminders to my calendar</i>. <b>On iPhone</b> Safari opens a calendar preview: tap <b>Add All</b>. This works from the home-screen app too. You get a daily morning and evening alarm, a Mon/Thu weigh-in, and a Sunday 6 PM weekly-report reminder, even when the app is closed. Alternatives: <i>Subscribe (webcal)</i> (then turn off "Remove Alerts" in Settings → Calendar → Accounts → Subscribed Calendars) or <i>Share / save the calendar file</i>. The app also shows a banner if today's morning or evening items aren't logged after those times.</p>
   <p><b>Weight:</b> weigh Monday & Thursday mornings: fasted, after the bathroom, same scale, minimal clothing.</p>
@@ -279,6 +293,34 @@ const V = {
  }
 };
 let cur = 'dash';
+function blankOr(ex, d) { const e = JSON.parse(JSON.stringify(ex || {date:d, v:2, nutrition:null, training:null, family:null, sleep:'', screen:'', weight:'', notes:''}));
+  if (!(ex && !Array.isArray(ex.sessions) && ex.v !== 2) && !Array.isArray(e.sessions)) { e.sessions = Profile.sessionsFor(S.profile && S.profile.schedule, d) || []; e.v = 2; }
+  return e; }
+function saveSection(sec) { const d = $('#f_date').value || today(), ex = S.entries.find(x=>x.date===d), b = blankOr(ex, d), u = V._e, nv = id => { const v = $(id).value; return v===''?'':+v; };
+  if (sec === 'morning') { const sl = nv('#f_sleep'), w = nv('#f_weight');
+    if (sl === '' || sl < 0 || sl > 24) return alert('Morning: enter sleep hours (0–24).');
+    if (w !== '' && (w < 60 || w > 400)) return alert('Morning: weight should be between 60 and 400 lbs.');
+    const miss = Insights.WELL.filter(([k]) => !(u[k] >= 1)).map(x=>x[1]); if (miss.length) return alert('Morning: rate ' + miss.join(', ') + ' (1–5).');
+    b.sleep = sl; b.weight = w; Scoring.WELL_KEYS.forEach(k => b[k] = u[k]); }
+  else if (sec === 'nutrition') { if (u.nutrition == null) return alert('Nutrition: tap Yes or No.'); b.nutrition = u.nutrition; }
+  else if (sec === 'training') { if (u.training == null) return alert('Training: tap Yes or No.'); b.training = u.training; }
+  else if (sec.startsWith('sess-')) { const i = +sec.slice(5), x = u.sessions[i], r = document.querySelector(`[data-srpe="${i}"]`).value, m = document.querySelector(`[data-smin="${i}"]`).value;
+    if (x.done == null) return alert(`Session ${i+1}: tap Yes or No.`);
+    if (x.done && !(+r > 0 && +m > 0)) return alert(`Session ${i+1}: add effort (RPE) and minutes.`);
+    b.sessions[i] = { label: b.sessions[i] ? b.sessions[i].label : x.label, done: x.done, rpe: x.done ? +r : '', mins: x.done ? +m : '' }; }
+  else if (sec === 'extra') { const xl = $('#f_xlabel').value.trim(), xr = $('#f_xrpe').value, xm = $('#f_xmin').value;
+    if (!xl && !xr && !xm) b.extra = null; else { if (!(+xr > 0 && +xm > 0)) return alert('Extra session: add effort (RPE) and minutes.'); b.extra = { label: xl || 'Extra session', rpe:+xr, mins:+xm }; } }
+  else if (sec === 'evening') { const sc = nv('#f_screen');
+    if (sc === '' || sc < 0 || sc > 24) return alert('Evening: enter screen hours (0–24).'); if (u.family == null) return alert('Evening: tap Yes or No for family/friends.');
+    b.screen = sc; b.family = u.family; b.notes = $('#f_notes').value.trim(); }
+  if (Array.isArray(b.sessions)) { b.v = 2; b.training = b.sessions.some(x => x.done == null) ? null : Scoring.trainingPct(b) === 100; }
+  upsert([b]);
+  // keep unsaved inputs from other sections across the re-render
+  const vals = {}; document.querySelectorAll('#view input[id],#view select[id],#view textarea[id],#view [data-srpe],#view [data-smin]').forEach(el => { const key = el.id || (el.dataset.srpe!=null?'srpe'+el.dataset.srpe:'smin'+el.dataset.smin); vals[key] = el.value; });
+  V._keep = Object.assign({}, u, { date:d }); V._date = d; V._flash = sec; const y = window.scrollY; show('log');
+  const own = { morning:['f_sleep','f_weight'], evening:['f_screen','f_notes'], extra:['f_xlabel','f_xrpe','f_xmin'] }[sec] || (sec.startsWith('sess-') ? ['srpe'+sec.slice(5),'smin'+sec.slice(5)] : []);
+  Object.entries(vals).forEach(([key,v]) => { if (key === 'f_date' || own.includes(key)) return; const el = key.startsWith('srpe') ? document.querySelector(`[data-srpe="${key.slice(4)}"]`) : key.startsWith('smin') ? document.querySelector(`[data-smin="${key.slice(4)}"]`) : document.getElementById(key); if (el) el.value = v; });
+  window.scrollTo(0, y); }
 function refreshCut() { const b = $('#cutBox'); if (!b) return; const lw = res().latestWeight, sw = $('#p_startWeight');
   b.innerHTML = planBox(lw ? lw.weight : sw && sw.value, $('#p_targetWeight').value, $('#p_fightDate').value); }
 function refreshSched() { const sc = V._sched; if (!sc || !$('#schedCard')) return;
@@ -287,7 +329,7 @@ function refreshSched() { const sc = V._sched; if (!sc || !$('#schedCard')) retu
     [0,1].forEach(j => { const inp = document.querySelector(`[data-sl="${i}-${j}"]`); inp.value = d.labels[j] || ''; inp.style.display = d.n > j ? '' : 'none'; }); }); }
 function show(v) { if (!S.profile && v !== 'help') v = 'profile';
   if (v === 'profile' && !V._sched) V._sched = JSON.parse(JSON.stringify((S.profile && S.profile.schedule) || Profile.scheduleFromWeek(S.weeks[S.weekIdx])));
-  if (v !== 'profile') V._sched = null; cur = v; $('#view').innerHTML = V[v](); document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.v===(v==='profile'?'setup':v)));
+  if (v !== 'profile') V._sched = null; if (v !== 'log') V._keep = null; cur = v; $('#view').innerHTML = V[v](); document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.v===(v==='profile'?'setup':v)));
   $('#title').textContent = 'Fight Readiness' + (S.fighter ? ' — ' + S.fighter : ''); if (v === 'profile') { refreshSched(); refreshCut(); } window.scrollTo(0,0); }
 function upsert(list) { list.forEach(e => { const i = S.entries.findIndex(x=>x.date===e.date); if (i>=0) S.entries[i]=e; else S.entries.push(e); }); S.entries.sort((a,b)=>a.date<b.date?-1:1); save(); }
 function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text],{type})); a.download = name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 1000); }
@@ -324,20 +366,10 @@ document.addEventListener('click', async ev => {
   if (t.dataset.chip) { $('#f_'+t.dataset.chip).value = t.dataset.val; t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t)); return; }
   if (t.dataset.step) { const i = $('#f_'+t.dataset.step); i.value = Math.max(0, Math.min(24, (+i.value||0) + +t.dataset.d)); return; }
   if (t.dataset.edit) { ev.preventDefault(); V._date = t.dataset.edit; return show('log'); }
+  if (t.dataset.save) return saveSection(t.dataset.save);
   if (t.dataset.send || t.id === 'weeklyBtn') return sendWeekly();
   const w = S.weeks[S.weekIdx];
   switch (t.id) {
-    case 'saveLog': { const e = V._e; e.date = $('#f_date').value || today();
-      ['sleep','screen','weight'].forEach(k => { const v = $('#f_'+k).value; e[k] = v===''?'':+v; }); e.notes = $('#f_notes').value.trim();
-      if (Array.isArray(e.sessions)) { e.v = 2;
-        e.sessions.forEach((x,i) => { const r = document.querySelector(`[data-srpe="${i}"]`).value, m = document.querySelector(`[data-smin="${i}"]`).value; x.rpe = r===''?'':+r; x.mins = m===''?'':+m; if (x.done !== true) { x.rpe = ''; x.mins = ''; } });
-        const bad = e.sessions.findIndex(x => x.done === true && !(x.rpe > 0 && x.mins > 0)); if (bad >= 0) return alert(`Session ${bad+1}: add effort (RPE) and minutes.`);
-        const xl = $('#f_xlabel').value.trim(), xr = $('#f_xrpe').value, xm = $('#f_xmin').value;
-        e.extra = xl || xr || xm ? { label: xl || 'Extra session', rpe: xr===''?'':+xr, mins: xm===''?'':+xm } : null;
-        e.training = e.sessions.some(x => x.done == null) ? null : Scoring.trainingPct(e) === 100; }
-      if (e.nutrition==null && e.training==null && e.family==null && e.sleep==='' && e.screen==='' && e.weight==='' && !e.notes && !Insights.dayWellness(e) && !(e.sessions||[]).some(x=>x.done!=null) && !e.extra) return alert('Nothing to save yet.');
-      upsert([e]); V._date = null; const left = e.date===today() ? missingToday(e) : [];
-      alert(left.length ? 'Saved ✔ Still to log today: ' + left.join(', ') : 'Saved ✔'); return show(left.length ? 'log' : 'dash'); }
     case 'showAll': V._all = true; return show('log');
     case 'csvBtn': return download(`fight-log-${(S.fighter||'fighter').replace(/\W+/g,'-')}-${today()}.csv`, Insights.toCSV(S.entries), 'text/csv;charset=utf-8');
     case 'delLog': if (confirm('Delete this day?')) { S.entries = S.entries.filter(x=>x.date!==V._e.date); save(); V._date=null; show('log'); } return;

@@ -16,6 +16,10 @@
     if (!e || !num(e.sleep)) m.push('sleep'); if (!e || !num(e.screen)) m.push('screen time'); if (!e || e.family == null) m.push('family/friends');
     if ((!e || e.v >= 2) && S.wellnessScore(e) == null) m.push('wellness (energy, soreness, mood, stress)');
     return m; }
+  // Log-screen sections. All four true <=> isComplete for current (v2) days.
+  function sections(e) { const ms = missing(e);
+    return { morning: !ms.includes('sleep') && !ms.some(m => m.startsWith('wellness')), nutrition: !ms.includes('nutrition'),
+      training: !ms.includes('training') && !ms.includes('session effort + minutes'), evening: !ms.includes('screen time') && !ms.includes('family/friends') }; }
   // Legacy (pre-v2) days with the old 5 items stay complete.
   const isComplete = e => !!e && !missing(e).length;
   const isPartial = e => !!e && !isComplete(e) && (CORE.some(k => num(e[k]) || e[k] === true || e[k] === false) || num(e.weight));
@@ -150,6 +154,6 @@
       return [e.date,e.nutrition,S.trainingPct(e)===100,e.sleep,e.screen,e.family,e.weight,e.notes,e.energy,e.soreness,e.mood,e.stress,ws==null?'':ws,Array.isArray(e.sessions)?ss.length:'',ss.filter(s=>s.done===true).length,Math.round(S.trainingPct(e)),...sc(0),...sc(1),x.label,x.rpe,x.mins,sessionLoad(e),isComplete(e)?'Y':'N'].map(csvCell).join(','); });
     return [CSV_COLS.join(',')].concat(rows).join('\r\n') + '\r\n';
   }
-  const api = { cutPlan, weightVerdict, fightWeek, weekReview, reviewText, WELL, missing, isComplete, isPartial, streak, grid, dayWellness, sessionLoad, wellness, load, cutSafety, toCSV, CSV_COLS };
+  const api = { sections, cutPlan, weightVerdict, fightWeek, weekReview, reviewText, WELL, missing, isComplete, isPartial, streak, grid, dayWellness, sessionLoad, wellness, load, cutSafety, toCSV, CSV_COLS };
   if (typeof module !== 'undefined') module.exports = api; else root.Insights = api;
 })(this);

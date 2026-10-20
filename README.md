@@ -57,6 +57,15 @@ The default weights are Nutrition 25, Training 25, Sleep 15, **Wellness 15**, Sc
 ## Training schedule
 Sign-up (and Setup → Edit profile & training schedule) asks "Do you train once or twice a day?", then Rest / 1 / 2 sessions for each weekday with optional labels. It's pre-filled from the Weekly Outline (sessions 1–2; "Rest/Recovery" focus = rest day). Saving the schedule writes the labels into the current and future Weekly Outlines. The daily log asks "Did you complete session N (label)?" for each of today's sessions. RPE (1–10) and minutes are required for each completed session. Session load is the sum of RPE × minutes over all sessions plus the extra one, so two-a-days add up correctly in the weekly load bars and the acute:chronic ratio.
 
+## Log screen sections
+The Log screen is split into cards, and each card saves on its own straight into that date's entry:
+1. 🌅 **Morning:** sleep (required), weight (optional, with a Mon/Thu prompt) and the 4 wellness ratings (required).
+2. 🍽️ **Nutrition:** Y/N.
+3. 🥊 **Training:** one Save per scheduled session (Y/N; RPE and minutes required if done), plus the extra session (RPE and minutes required if given; clear all fields to remove it). Legacy days keep a single Y/N.
+4. 🌙 **Evening:** screen hours and family/friends (both required), plus notes.
+
+Each card shows ✓ Done from `Insights.sections()`, which matches the completeness rules. The top shows "N of 4 sections done" and the still-to-log list. Unsaved taps in other cards survive a section save.
+
 ## Complete days, streaks, banners
 A day logged in v2 is complete only when it has nutrition, every scheduled session answered (with RPE + minutes if done), sleep, screen, family and all 4 wellness ratings. Days stored before v2 keep the old 5-item rule, so existing streaks stay valid. The Day-1 banner, the "still to log" message after saving, and the morning/evening reminders use the same rules. Morning = sleep + nutrition + wellness. Evening = sessions + screen + family.
 
