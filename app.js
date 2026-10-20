@@ -29,6 +29,12 @@ function fightCard() { const p = S.profile || {}, lw = res().latestWeight, cd = 
   if (!cd && !ws) return '';
   return `<div class="card"><div class="row" style="margin:0">${cd?`<div><div class="muted">Fight date ${esc(p.fightDate)}</div><div style="font-size:1.8rem;font-weight:800">${cd.days===0?'🥊 Today':cd.days+' days'}</div><div class="muted">${cd.days?cd.weeks+'w '+cd.days%7+'d to go':'Fight day!'}</div></div>`:''}
    ${ws?`<div style="text-align:right"><div class="muted">Current → target</div><div style="font-size:1.4rem;font-weight:700">${ws.current} → ${ws.target}</div><div style="color:${ws.diff>0?'#ffb74d':'#81c784'}">${ws.text}</div></div>`:''}</div></div>`; }
+function missingToday(e) { const m = [];
+  if (!e || e.nutrition==null) m.push('nutrition'); if (!e || e.training==null) m.push('training');
+  if (!e || e.sleep===''||e.sleep==null) m.push('sleep'); if (!e || e.screen===''||e.screen==null) m.push('screen time'); if (!e || e.family==null) m.push('family/friends'); return m; }
+function day1Banner(onLog) { if (!S.startDate || S.startDate !== today()) return '';
+  const m = missingToday(S.entries.find(x=>x.date===today())); if (!m.length) return '';
+  return `<div class="card hint" id="day1banner">🥊 <b>Day 1, let's finish today's log.</b> Still missing: ${m.join(', ')}.${onLog?'':' <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a>'}</div>`; }
 const lockMsg = r => `🔒 Trends unlock in ${r.unlockIn} day${r.unlockIn==1?'':'s'}. Keep logging!`;
 const ynI = v => v===true?'✅':v===false?'❌':'—';
 const todayRow = () => { const e = S.entries.find(x=>x.date===today()); return e ? `<p>Today: Nutrition ${ynI(e.nutrition)} • Training ${ynI(e.training)} • Sleep ${e.sleep===''?'—':e.sleep+'h'} • Screen ${e.screen===''?'—':e.screen+'h'} • Family ${ynI(e.family)}${+e.weight?' • '+e.weight+' lbs':''}</p>` : '<p class="muted">Nothing logged today yet.</p>'; };
@@ -56,7 +62,7 @@ const V = {
   const r = res(), lw = r.latestWeight;
   const isWeighDay = [1,4].includes(new Date().getDay()) && !S.entries.some(e=>e.date===today() && +e.weight>0);
   const dueNow = Reminders.due(S.entries.find(e=>e.date===today()), new Date(), S.reminders.morning, S.reminders.evening);
-  return `${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning log not done: sleep hours + nutrition plan'+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: training, screen hours, family/friends, notes'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${fightCard()}
+  return `${day1Banner(false)}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning log not done: sleep hours + nutrition plan'+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: training, screen hours, family/friends, notes'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${fightCard()}
   ${isWeighDay?'<div class="card hint">⚖️ It\'s a weigh-in day (Mon/Thu). Weigh in this morning, fasted, and log it.</div>':''}
   ${r.locked?`<div class="card"><div class="muted" style="text-align:center">Fight Readiness Score</div><div class="big">🔒</div><p style="text-align:center"><b>${lockMsg(r)}</b></p><p class="muted" style="text-align:center">Days logged so far: ${r.daysLogged}</p>${todayRow()}</div>`:`
   <div class="card"><div class="muted" style="text-align:center">Fight Readiness Score</div><div class="big">${r.daysLogged?r.score:'—'}</div>
@@ -74,7 +80,7 @@ const V = {
   const step = (k,l,st) => `<label>${l}</label><div class="step"><button data-step="${k}" data-d="-${st}">−</button><input id="f_${k}" type="number" inputmode="decimal" step="${st}" min="0" max="24" value="${esc(e[k])}"><button data-step="${k}" data-d="${st}">+</button></div>`;
   const wd = [1,4].includes(new Date(d+'T12:00').getDay());
   V._e = Object.assign({}, e);
-  return `<div class="card"><label>Date</label><input id="f_date" type="date" value="${d}" max="${today()}">
+  return `${d===today()?day1Banner(true):''}<div class="card"><label>Date</label><input id="f_date" type="date" value="${d}" max="${today()}">
   ${yn('nutrition','Nutrition plan followed?')}${yn('training','Training session completed?')}
   ${step('sleep','Sleep last night (hours)',0.5)}${step('screen','Recreational screen time (hours)',0.5)}
   ${yn('family','Quality time with family/friends?')}
@@ -119,7 +125,7 @@ const V = {
   const fld = (k, l, attrs='', req=false) => `<label for="p_${k}">${l}${req?' *':''}</label><input id="p_${k}" ${attrs} value="${v(k)}">${er[k]?`<p class="err">${esc(er[k])}</p>`:''}`;
   const sel = (k, l, opts) => `<label for="p_${k}">${l}</label><select id="p_${k}"><option value="">—</option>${opts.map(o=>`<option ${(V._pdraft?V._pdraft[k]:p[k])===o?'selected':''}>${o}</option>`).join('')}</select>${er[k]?`<p class="err">${esc(er[k])}</p>`:''}`;
   const num = 'type="number" inputmode="decimal" step="0.1" min="60" max="400"';
-  return `${first?'<div class="card"><h2 style="margin:0">🥊 Welcome! Sign up</h2><p class="muted">Set up your fighter profile. It stays on this phone only and is included in your backups. You can edit it later in Setup.</p></div>':'<div class="card"><h2 style="margin:0">Fighter profile</h2></div>'}
+  return `${first?'<div class="card"><h2 style="margin:0">🥊 Welcome! Sign up</h2><p class="muted">Set up your fighter profile. It stays on this phone only and is included in your backups. You can edit it later in Setup.</p></div><div class="card hint" id="day1note">📅 <b>Your sign-up day is Day 1 of tracking.</b> After you sign up, finish today&#39;s log tonight: nutrition, training, sleep, screen time, and family/friends. Trends unlock after 7 days.</div>':'<div class="card"><h2 style="margin:0">Fighter profile</h2></div>'}
   ${Object.keys(er).length?'<div class="card hint">Please fix the highlighted fields.</div>':''}
   <div class="card"><h3>Fighter</h3>${fld('name','Fighter name','autocomplete="name" maxlength="60" required',true)}${fld('nickname','Nickname','maxlength="40"')}
    ${fld('dob','Date of birth','type="date" max="'+today()+'"')}${p.dob&&!V._pdraft?`<p class="muted">Age ${Profile.age(p.dob)}</p>`:''}
@@ -156,6 +162,7 @@ const V = {
   return `<div class="card"><h3>How to use</h3>
   <p><b>Install:</b> open the link in Safari (iPhone: Share → Add to Home Screen) or Chrome (Android: menu → Install app). Works offline after first load.</p>
   <p><b>First week:</b> the score, weight trend and bonus unlock 7 days after you finish Setup. Only days since then count.</p>
+  <p><b>Day 1:</b> your sign-up day is Day 1. Finish that day's log that night. Trends unlock after 7 days.</p>
   <p><b>Profile:</b> on first open, sign up with your name (required) and optional team, weight, fight date and safety details. Edit it anytime in Setup → Edit profile. Your starting weight becomes your first weigh-in. The Dashboard shows your fight countdown and lbs to go.</p>
   <p><b>Daily log (under 60 sec):</b> after training or before bed, tap Log. Nutrition = followed your plan (macros, timing, hydration). Training = completed the scheduled session (N if missed or partial). Sleep = hours slept last night. Screen = recreational screen time only (not film study or school). Family/Friends = real quality time without heavy screens.</p>
   <p><b>Reminders:</b> Setup → Reminders → pick times → <i>Add reminders to my calendar</i>. Your phone's calendar then alerts you every morning and evening, plus a Mon/Thu weigh-in alert, even when the app is closed. The app also shows a banner if today's morning or evening items aren't logged after those times. You can log the morning items first and add the evening ones later.</p>
@@ -201,7 +208,8 @@ document.addEventListener('click', async ev => {
     case 'saveLog': { const e = V._e; e.date = $('#f_date').value || today();
       ['sleep','screen','weight'].forEach(k => { const v = $('#f_'+k).value; e[k] = v===''?'':+v; }); e.notes = $('#f_notes').value.trim();
       if (e.nutrition==null && e.training==null && e.family==null && e.sleep==='' && e.screen==='' && e.weight==='' && !e.notes) return alert('Nothing to save yet.');
-      upsert([e]); V._date = null; alert('Saved ✔ (you can come back later to fill the rest)'); return show('dash'); }
+      upsert([e]); V._date = null; const left = e.date===today() && S.startDate===today() ? missingToday(e) : [];
+      alert(left.length ? 'Saved ✔ Still to log today: ' + left.join(', ') : 'Saved ✔'); return show(left.length ? 'log' : 'dash'); }
     case 'delLog': if (confirm('Delete this day?')) { S.entries = S.entries.filter(x=>x.date!==V._e.date); save(); V._date=null; show('log'); } return;
     case 'wkPrev': S.weekIdx = Math.max(0, S.weekIdx-1); save(); return show('plan');
     case 'wkNext': S.weekIdx = Math.min(S.weeks.length-1, S.weekIdx+1); save(); return show('plan');
@@ -222,7 +230,7 @@ document.addEventListener('click', async ev => {
       V._perr = V._pdraft = null; S.profile = d; S.fighter = d.name; S.coach = d.coach; S.targetWeight = d.targetWeight;
       if (first) { if (!S.startDate) S.startDate = today();
         if (+d.startWeight > 0 && !S.entries.some(e=>+e.weight>0)) upsert([{ date:today(), nutrition:null, training:null, family:null, sleep:'', screen:'', weight:+d.startWeight, notes:'' }]); }
-      save(); return show(first ? 'dash' : 'setup'); }
+      save(); V._date = null; return show(first ? 'log' : 'setup'); }
     case 'saveSetup': { if (!S.startDate) S.startDate = today();
       document.querySelectorAll('[data-p]').forEach(i => { if (i.value!=='') S.params[i.dataset.p] = +i.value; });
       const sum = CATS.reduce((s,c)=>s+S.params[c[2]],0); save(); alert(sum===100?'Saved ✔':`Saved. Note: weights add up to ${sum}, not 100.`); return show('dash'); }

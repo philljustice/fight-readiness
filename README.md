@@ -14,12 +14,13 @@ Both use HTTPS, which install and offline mode need. Send the link to the team.
 - **Android:** open it in Chrome → ⋮ → *Install app* / *Add to Home screen*.
 
 ## Updating the app
-Edit the files, bump `CACHE` in `sw.js` (e.g. `fr-v7`), and redeploy. Phones pick up the new version after the app is opened once or twice.
+Edit the files, bump `CACHE` in `sw.js` (e.g. `fr-v8`), and redeploy. Phones pick up the new version after the app is opened once or twice.
 
 ## Fighter profile
 On first open the app shows a sign-up screen. Only the fighter name is required. The optional fields are nickname, date of birth, discipline, gym, head coach and their contact, weight class, starting and target weight, fight date, an emergency contact, and injury/allergy notes. You can edit the profile anytime in Setup. The starting weight is saved as the first weigh-in. The Dashboard shows the fight countdown and current → target weight with lbs to go. The Coach Report header shows fighter, gym, coach, weight class, current/target weight and days to fight. The profile stays on the phone and is included in JSON backups.
 
 ## First week
+The sign-up day is Day 1. After sign-up the app goes straight to today's log, and a "Day 1, let's finish today's log" banner lists what's still missing (nutrition, training, sleep, screen time, family/friends) until today's log is complete.
 The app starts empty. The start date is saved the first time Setup is completed. For the first 7 days the Dashboard and Coach Report show "Trends unlock in X days" in place of the score, weight trend and consistency bonus. Today's entry and the number of days logged still show. After that, normal scoring uses the last 3 weeks, counting only days since the start date. Restoring a backup brings its start date with it.
 
 ## Reminders (no push server needed)
