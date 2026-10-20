@@ -1,5 +1,6 @@
 *.xlsx
 *.csv
 *.ics
+!cal/*.ics
 *backup*.json
 node_modules/

@@ -234,9 +234,14 @@ const V = {
    ${n('wNutrition','Nutrition weight %')}${n('wTraining','Training weight %')}${n('wSleep','Sleep weight %')}${n('wWellness','Wellness weight %')}${n('wScreen','Screen weight %')}${n('wFamily','Family/Friends weight %')}
    ${n('idealSleep','Ideal sleep hours')}${n('sleepPenalty','Sleep penalty per hour off')}${n('screenFree','Max screen hours for full score')}${n('screenPenalty','Screen penalty per extra hour')}
    <p id="wsum" class="muted"></p><button class="btn" id="saveSetup">💾 Save setup</button><button class="btn alt" id="resetParams">Reset parameters to defaults</button></div>
-  <div class="card"><h3>⏰ Reminders</h3><label>Morning reminder</label><input id="r_morning" type="time" value="${S.reminders.morning}">
-   <label>Evening reminder</label><input id="r_evening" type="time" value="${S.reminders.evening}">
-   <button class="btn" id="icsBtn">📅 Add reminders to my calendar</button>
+  <div class="card" id="remCard"><h3>⏰ Reminders</h3>
+   <label for="r_morning">Morning reminder</label><select id="r_morning">${Reminders.MORNING_TIMES.map(t=>`<option ${t===Reminders.nearest(S.reminders.morning,Reminders.MORNING_TIMES)?'selected':''}>${t}</option>`).join('')}</select>
+   <label for="r_evening">Evening reminder</label><select id="r_evening">${Reminders.EVENING_TIMES.map(t=>`<option ${t===Reminders.nearest(S.reminders.evening,Reminders.EVENING_TIMES)?'selected':''}>${t}</option>`).join('')}</select>
+   <a class="btn" id="calLink" href="${calURL()}" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">📅 Add reminders to my calendar</a>
+   <div class="hint" style="margin-top:10px"><b>iPhone:</b> tap the button above. Safari opens a calendar preview with 4 events. Tap <b>Add All</b> (top right), pick your calendar, then come back to the app.<br><b>Android:</b> open the downloaded file and choose your Calendar app to import it.</div>
+   <a class="btn alt" id="calSub" href="${calURL().replace(/^https?:/,'webcal:')}" style="text-align:center;text-decoration:none">🔁 Or subscribe (webcal)</a>
+   <p class="muted">Subscribe also works. On iPhone, open Settings → Calendar → Accounts → Subscribed Calendars → Fight Readiness and turn <b>off</b> "Remove Alerts", or the alarms won't ring.</p>
+   <button class="btn alt" id="icsShare">📤 Share / save the calendar file</button>
    <button class="btn alt" id="notifBtn">🔔 Also notify me while the app is open</button>
    <p class="muted">The calendar file adds 4 repeating events with alarms: a daily morning log, a Mon/Thu weigh-in, a daily evening log, and a Sunday 6 PM reminder to send the weekly report to ${Weekly.CONFIG.ADMIN_NAME}. <b>Already added reminders before? Tap the button again to get the new Sunday reminder</b> (delete the old duplicates in your calendar). If you change the times, tap the button again and delete the old events in your calendar.</p></div>
   <div class="card"><h3>Backup & import</h3>
@@ -253,7 +258,7 @@ const V = {
   <p><b>Profile:</b> on first open, sign up with your name (required) and optional team, weight, fight date and safety details. Edit it anytime in Setup → Edit profile. Your starting weight becomes your first weigh-in. The Dashboard shows your fight countdown and lbs to go.</p>
   <p><b>Daily log (about 30 sec):</b> tap Log. Nutrition = followed your plan (macros, timing, hydration). <b>Training:</b> for each session on your schedule today, answer "Did you complete session N?" and, if yes, its effort (RPE 1–10) and minutes (both required). Rest days need nothing. Add an unscheduled extra session if you did one. Sleep = hours slept last night. Screen = recreational screen time only (not film study or school). Family/Friends = real quality time without heavy screens. <b>How you feel</b> (required daily, 1–5): Energy (5 = fresh), Soreness (5 = no soreness), Mood (5 = great), Stress (5 = no stress).</p>
   <p><b>Training schedule:</b> set at sign-up (once or twice a day, then Rest / 1 / 2 sessions per weekday with optional labels). Edit it in Setup → Edit profile & training schedule. Saving it updates this week's and future Weekly Outlines.</p>
-  <p><b>Reminders:</b> Setup → Reminders → pick times → <i>Add reminders to my calendar</i>. Your phone's calendar then alerts you every morning and evening, plus a Mon/Thu weigh-in alert, even when the app is closed. The app also shows a banner if today's morning or evening items aren't logged after those times. You can log the morning items first and add the evening ones later.</p>
+  <p><b>Reminders:</b> Setup → Reminders → pick a morning (5:00–10:00) and evening (18:00–23:00) time in 30-min steps → tap <i>Add reminders to my calendar</i>. <b>On iPhone</b> Safari opens a calendar preview: tap <b>Add All</b>. This works from the home-screen app too. You get a daily morning and evening alarm, a Mon/Thu weigh-in, and a Sunday 6 PM weekly-report reminder, even when the app is closed. Alternatives: <i>Subscribe (webcal)</i> (then turn off "Remove Alerts" in Settings → Calendar → Accounts → Subscribed Calendars) or <i>Share / save the calendar file</i>. The app also shows a banner if today's morning or evening items aren't logged after those times.</p>
   <p><b>Weight:</b> weigh Monday & Thursday mornings: fasted, after the bathroom, same scale, minimal clothing.</p>
   <p><b>Streak:</b> 🔥 counts days in a row with a full log (nutrition, every scheduled session with effort + minutes, sleep, screen, family, and all 4 wellness ratings). Today not done yet doesn't break it. Miss a whole day and it resets.</p>
   <p><b>How you feel (Hooper-style check-in):</b> four quick 1–5 ratings modelled on the Hooper Index used by pro teams: fatigue/energy, muscle soreness, stress and mood (5 = best). Sleep is logged separately as hours. It's 15% of the score.</p>
@@ -341,6 +346,7 @@ document.addEventListener('click', async ev => {
       S.weeks.splice(S.weekIdx+1, 0, c); S.weekIdx++; save(); return show('plan'); }
     case 'wkDel': if (S.weeks.length>1 && confirm('Delete this week?')) { S.weeks.splice(S.weekIdx,1); S.weekIdx=Math.max(0,S.weekIdx-1); save(); show('plan'); } else if (S.weeks.length===1) alert('Keep at least one week.'); return;
     case 'icsBtn': return addToCalendar();
+    case 'icsShare': return shareICS();
     case 'notifBtn': if (!('Notification' in window)) return alert('Notifications are not supported here. Use the calendar reminders.');
       { const p = await Notification.requestPermission(); S.notify = p==='granted'; save(); alert(p==='granted'?'OK. You\'ll get a notification if the app is open at reminder time.':'Notifications are off. The calendar reminders still work.'); } return;
     case 'printBtn': return window.print();
@@ -373,7 +379,7 @@ document.addEventListener('input', ev => { const t = ev.target, w = S.weeks[S.we
   else if (t.id && t.id.startsWith('w_')) { w[t.id.slice(2)] = t.value; save(); }
 });
 document.addEventListener('change', async ev => { const t = ev.target;
-  if (t.id === 'r_morning' || t.id === 'r_evening') { if (t.value) { S.reminders[t.id.slice(2)] = t.value; save(); } return; }
+  if (t.id === 'r_morning' || t.id === 'r_evening') { if (t.value) { S.reminders[t.id.slice(2)] = t.value; save(); $('#calLink').href = calURL(); $('#calSub').href = calURL().replace(/^https?:/,'webcal:'); } return; }
   if (t.id === 'wkSel') { S.weekIdx = +t.value; save(); return show('plan'); }
   if (t.id === 'w_start') return show('plan');
   if (t.id === 'f_date') { V._date = t.value; return show('log'); }
@@ -384,6 +390,11 @@ document.addEventListener('change', async ev => { const t = ev.target;
       else { const rows = parseCSV(text); upsert(rows); alert(`Imported ${rows.length} days ✔`); }
       show('dash'); } catch (e) { alert('Import failed: ' + e.message); } }
 });
+function calURL() { return new URL(Reminders.calFile(S.reminders.morning, S.reminders.evening), location.href.replace(/[#?].*$/,'')).href; }
+async function shareICS() { const url = calURL(), name = 'fight-readiness-reminders.ics';
+  try { const txt = await (await fetch(url, { cache:'no-store' })).text(); const f = new File([txt], name, { type:'text/calendar' });
+    if (navigator.canShare && navigator.canShare({ files:[f] })) { try { await navigator.share({ files:[f], title:'Fight Readiness reminders' }); } catch (e) {} return; }
+    download(name, txt, 'text/calendar;charset=utf-8'); } catch (e) { location.href = url; } }
 function addToCalendar() {
   const ics = Reminders.buildICS({ morning:S.reminders.morning, evening:S.reminders.evening, fighter:S.fighter, url: location.origin + location.pathname.replace(/[^/]*$/, '') });
   const name = 'fight-readiness-reminders.ics', ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);

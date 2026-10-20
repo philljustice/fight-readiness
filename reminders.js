@@ -44,6 +44,12 @@
     if (t >= mins(evening) && !eveningDone(entry)) out.push('evening');
     return out;
   }
-  const api = { buildICS, fold, morningDone, eveningDone, due };
+  // Pre-built static calendar files (cal/r-HHMM-HHMM.ics) at 30-min steps: morning 05:00-10:00, evening 18:00-23:00.
+  const steps = (h0, h1) => { const o = []; for (let m = h0*60; m <= h1*60; m += 30) o.push(pad(Math.floor(m/60)) + ':' + pad(m%60)); return o; };
+  const MORNING_TIMES = steps(5, 10), EVENING_TIMES = steps(18, 23);
+  const toMin = hm => { const [h, m] = String(hm).split(':').map(Number); return h*60 + (m||0); };
+  const nearest = (hm, list) => list.reduce((b, x) => Math.abs(toMin(x) - toMin(hm)) < Math.abs(toMin(b) - toMin(hm)) ? x : b, list[0]);
+  const calFile = (m, e) => `cal/r-${nearest(m, MORNING_TIMES).replace(':','')}-${nearest(e, EVENING_TIMES).replace(':','')}.ics`;
+  const api = { MORNING_TIMES, EVENING_TIMES, nearest, calFile, buildICS, fold, morningDone, eveningDone, due };
   if (typeof module !== 'undefined') module.exports = api; else root.Reminders = api;
 })(this);

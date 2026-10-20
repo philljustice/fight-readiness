@@ -47,3 +47,12 @@ assert(tue.includes('UID:fighter-weighin@fight-readiness') && /BYDAY=MO,TH[\s\S]
 assert.equal(tue.split('BEGIN:VEVENT')[2].match(/DTSTART:(\d{8})/)[1], '20261022'); // Tue -> next Thu
 require('fs').writeFileSync('/tmp/sample.ics', ics);
 console.log('All reminder/ICS tests passed');
+
+// static calendar files
+assert.equal(R.MORNING_TIMES.length, 11); assert.equal(R.EVENING_TIMES[0], '18:00'); assert.equal(R.EVENING_TIMES[10], '23:00');
+assert.equal(R.calFile('07:00','21:00'), 'cal/r-0700-2100.ics'); assert.equal(R.calFile('06:45','21:10'), 'cal/r-0630-2100.ics'.replace('0630','0630'));
+assert.equal(R.calFile('04:00','23:59'), 'cal/r-0500-2300.ics'); assert.equal(R.nearest('07:20', R.MORNING_TIMES), '07:30');
+const fs = require('fs'); for (const m of R.MORNING_TIMES) for (const e of R.EVENING_TIMES) { const f = R.calFile(m,e); assert(fs.existsSync(f), f); }
+const c = fs.readFileSync('cal/r-0630-2130.ics','utf8').replace(/\r\n /g,'');
+assert.equal((c.match(/BEGIN:VEVENT/g)||[]).length, 4); assert(/DTSTART:\d{8}T063000/.test(c)); assert(/DTSTART:\d{8}T213000/.test(c)); assert(/BYDAY=SU/.test(c)); assert(c.includes('https://philljustice.github.io/fight-readiness/'));
+console.log('Static calendar files OK');

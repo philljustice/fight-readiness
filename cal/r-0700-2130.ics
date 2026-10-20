@@ -1,0 +1,80 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Fight Readiness//Reminders//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:Fight Readiness
+BEGIN:VEVENT
+UID:team-morning@fight-readiness
+DTSTAMP:20261020T160000Z
+DTSTART:20261020T070000
+DURATION:PT10M
+RRULE:FREQ=DAILY
+SUMMARY:🥊 Morning log: sleep + nutrition + how you feel
+DESCRIPTION:Log last night's sleep hours\, whether you're following your nu
+ trition plan today\, and how you feel (energy\, soreness\, mood\, stress 1
+ -5).\nOpen app: https://philljustice.github.io/fight-readiness/
+URL:https://philljustice.github.io/fight-readiness/
+TRANSP:TRANSPARENT
+BEGIN:VALARM
+ACTION:DISPLAY
+DESCRIPTION:🥊 Morning log: sleep + nutrition + how you feel
+TRIGGER:-PT0M
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:team-weighin@fight-readiness
+DTSTAMP:20261020T160000Z
+DTSTART:20261022T070000
+DURATION:PT10M
+RRULE:FREQ=WEEKLY;BYDAY=MO,TH
+SUMMARY:⚖️ Weigh-in day (Mon/Thu)
+DESCRIPTION:Weigh in before eating: after the bathroom\, same scale\, minim
+ al clothing. Log the weight in the app.\nOpen app: https://philljustice.gi
+ thub.io/fight-readiness/
+URL:https://philljustice.github.io/fight-readiness/
+TRANSP:TRANSPARENT
+BEGIN:VALARM
+ACTION:DISPLAY
+DESCRIPTION:⚖️ Weigh-in day (Mon/Thu)
+TRIGGER:-PT0M
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:team-evening@fight-readiness
+DTSTAMP:20261020T160000Z
+DTSTART:20261020T213000
+DURATION:PT10M
+RRULE:FREQ=DAILY
+SUMMARY:🥊 Evening log: training + screen + family
+DESCRIPTION:Log training (each session done Y/N\, effort RPE + minutes)\, r
+ ecreational screen hours\, family/friends time\, and any notes (injuries\,
+  illness\, soreness).\nOpen app: https://philljustice.github.io/fight-read
+ iness/
+URL:https://philljustice.github.io/fight-readiness/
+TRANSP:TRANSPARENT
+BEGIN:VALARM
+ACTION:DISPLAY
+DESCRIPTION:🥊 Evening log: training + screen + family
+TRIGGER:-PT0M
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:team-weekly@fight-readiness
+DTSTAMP:20261020T160000Z
+DTSTART:20261025T180000
+DURATION:PT10M
+RRULE:FREQ=WEEKLY;BYDAY=SU
+SUMMARY:Send weekly Fight Readiness report to Phill
+DESCRIPTION:Open the Fight Readiness app and tap "Send weekly report to Phi
+ ll" (then pick Mail and tap Send).\nOpen app: https://philljustice.github.
+ io/fight-readiness/
+URL:https://philljustice.github.io/fight-readiness/
+TRANSP:TRANSPARENT
+BEGIN:VALARM
+ACTION:DISPLAY
+DESCRIPTION:Send weekly Fight Readiness report to Phill
+TRIGGER:-PT0M
+END:VALARM
+END:VEVENT
+END:VCALENDAR

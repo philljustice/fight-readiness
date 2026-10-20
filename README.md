@@ -38,6 +38,9 @@ If you change the times, add the file again and delete the old events.
 
 Inside the app, a banner shows when today's morning or evening items aren't logged after their times. You can also allow notifications, but they only appear while the app is open, so they don't replace the calendar reminders.
 
+### iPhone fix: static calendar files
+Home-screen (standalone) PWAs on iOS ignore `data:`/`blob:` .ics downloads. The calendars are now pre-built static files in `cal/r-HHMM-HHMM.ics`: 11 morning times (05:00–10:00) × 11 evening times (18:00–23:00) at 30-min steps, 121 files, each with all 4 events. Regenerate them with `node build-ics.js` after changing reminder text. The reminder time pickers use the same 30-min steps, and older saved times are rounded to the nearest step. The **Add reminders** button is a normal `https` link (`target=_blank`), so iOS hands it to Safari, which shows the calendar preview with **Add All**. There's also a `webcal://` subscribe link (iOS defaults to "Remove Alerts" on subscriptions, so users turn that off) and a Share/save fallback using the Web Share API with an .ics file. The service worker doesn't intercept `cal/*.ics`. `.gitignore` excludes `*.ics` except `cal/*.ics`. GitHub Pages serves them as `text/calendar`.
+
 ## Data & backup
 Setup → *Export backup (JSON)* saves a file. *Restore* on any phone loads it back. You can also import a FightLog CSV (Date, Nutrition, Training, Sleep_Hours, Screen_Hours, Family_Friends, Weight, Notes). Deleting browser data, or iOS clearing storage for an app that hasn't been opened in weeks, will erase entries. **Export weekly.**
 
