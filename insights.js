@@ -6,7 +6,8 @@
   const num = v => v !== '' && v != null && !isNaN(v);
   const avg = a => a.length ? a.reduce((s,v)=>s+v,0)/a.length : null;
   const CORE = ['nutrition','training','sleep','screen','family'];
-  const WELL = [['energy','Energy','1 = drained','5 = fresh'],['soreness','Soreness','1 = very sore','5 = no soreness'],['mood','Mood','1 = down','5 = great'],['stress','Stress','1 = very stressed','5 = no stress']];
+  // Hooper-style check-in (sleep quality/duration is logged separately). Keys unchanged for data compatibility; 5 = best.
+  const WELL = [['energy','Fatigue / energy','1 = always tired','5 = very fresh'],['soreness','Muscle soreness','1 = very sore','5 = no soreness'],['stress','Stress','1 = very stressed','5 = very relaxed'],['mood','Mood','1 = irritable / down','5 = very positive']];
   // What's still missing for a complete day. v2 (current) entries need wellness + every scheduled session answered (with RPE + minutes if done).
   function missing(e) { const m = [];
     if (!e || e.nutrition == null) m.push('nutrition');
@@ -71,6 +72,75 @@
         out.pace = { perWeek: Math.round(perWk*10)/10, pct: Math.round(pct*10)/10, level: pct > 1.5 ? 'warn' : pct > 1 ? 'caution' : 'ok' }; } }
     return out;
   }
+  // Impossible-cut check. Safe pace = 1%/week of current weight (caution above 1%, warning above 1.5%).
+  function cutPlan(current, target, fightDate, today = new Date()) {
+    current = +current; target = +target; if (!(current > 0) || !(target > 0) || !fightDate) return null;
+    const days = dayNum(fightDate) - dayNum(ymd(today)); if (days < 0) return null;
+    const toGo = Math.round((current - target)*10)/10, r1 = v => Math.round(v*10)/10;
+    if (toGo <= 0) return { level:'ok', toGo, perWeek:0, pct:0, days, msg:`At or under target (${target} lbs).` };
+    const weeks = Math.max(days, 1) / 7, perWeek = toGo / weeks, pct = perWeek / current * 100;
+    let safe = current; for (let i = 0; i < Math.floor(weeks); i++) safe *= 0.99; safe -= safe * 0.01 * (weeks - Math.floor(weeks));
+    const reach = r1(Math.max(safe, target)), short = r1(Math.max(0, reach - target));
+    const level = pct > 1.5 ? 'warn' : pct > 1 ? 'caution' : 'ok';
+    const msg = level === 'ok' ? `Needs ${r1(perWeek)} lbs/week (${r1(pct)}%/week). That's within the safe range.` :
+      `You'd need ${r1(perWeek)} lbs/week (${r1(pct)}% of bodyweight). A safe pace (~1%/week) reaches about ${reach} lbs by fight day, ${short} lbs short of ${target}. ` +
+      (level === 'warn' ? 'This plan is not safe. Talk to your coach about a higher weight class or a later fight date.' : 'This is at the edge of safe. Consider a higher weight class or a later date, and watch energy and soreness.');
+    return { level, toGo, perWeek:r1(perWeek), pct:r1(pct), days, reach, short, msg };
+  }
+  // One-line daily weight verdict: On track / Too fast / Too slow / No target
+  function weightVerdict(entries, profile = {}, today = new Date()) {
+    const tgt = +profile.targetWeight; if (!(tgt > 0)) return { word:'No target', color:'grey', text:'Set a target weight in your profile.' };
+    const ws = entries.filter(e => num(e.weight) && +e.weight > 0).sort((a,b)=>a.date<b.date?-1:1), cur = ws.length ? +ws[ws.length-1].weight : null;
+    if (cur == null) return { word:'No data', color:'grey', text:'Log a weigh-in.' };
+    const c = cutSafety(entries, today, profile), plan = cutPlan(cur, tgt, profile.fightDate, today), lossPct = c.pctPerWeek == null ? null : -c.pctPerWeek;
+    if (lossPct != null && lossPct > 1.5) return { word:'Too fast', color:'red', text:`Losing ${lossPct}%/week. Slow down: eat enough and do not dehydrate.` };
+    if (cur <= tgt) return { word:'On track', color:'green', text:`At or under target (${tgt} lbs). Hold steady.` };
+    if (lossPct == null) return { word:'On track?', color:'grey', text:`${Math.round((cur-tgt)*10)/10} lbs to go. Need 2 weeks of weigh-ins to judge pace.` };
+    const need = plan ? Math.min(plan.pct, 1) : 0.5; // required pace, capped at the safe 1%/week
+    if (lossPct + 0.15 < need * 0.8) return { word:'Too slow', color:'orange', text:`Losing ${Math.max(lossPct,0)}%/week; you need about ${Math.round(need*10)/10}%/week${plan?' to make '+tgt+' safely':''}.` };
+    return { word:'On track', color:'green', text:`Losing ${lossPct}%/week${plan?`, need ${plan.pct}%/week`:''}.` };
+  }
+  // Fight-week plan: general, conservative guidance (ISSN 2025 position stand). No dehydration protocol.
+  const FW = [
+    [7,'Train normally but start the taper: keep intensity, cut volume ~20–30%.','Drink normally (pale-yellow urine).','Normal salt.','Normal carbs (not below ~3 g/kg/day), protein 1.2–2 g/kg.'],
+    [6,'Technical work + short hard rounds; no new skills.','Drink normally.','Normal salt.','Normal carbs; keep protein high.'],
+    [5,'Volume down ~40%. Last moderate sparring at most, light contact.','Drink normally.','Normal salt; skip very salty fast food.','Normal carbs; start choosing lower-fibre foods if your coach/dietitian plans it.'],
+    [4,'Light technical session, pads, mobility.','Drink normally. Any water-loading only if your coach/dietitian runs it.','Moderate salt; any sodium change only if supervised.','Carbs can come down a little if planned, but do not crash them; keep lower fibre.'],
+    [3,'Light drilling + shadowboxing, 30–45 min.','Keep drinking. No fluid restriction on your own.','Moderate salt.','Smaller, low-fibre meals; keep eating.'],
+    [2,'Very light: shadowboxing, stretching, rest.','Keep drinking unless your coach/dietitian has a supervised plan.','Normal to low salt if planned.','Small low-fibre meals. Weigh yourself morning + night.'],
+    [1,'Rest, walk, visualize. Check weight with your coach.','Sip to thirst. No saunas, sweat suits or spitting on your own.','—','Light, familiar, low-fibre food.'],
+    [0,'Weigh-in day. After weigh-in: rehydrate and refuel.','After weigh-in: oral rehydration ~1–1.5 L/hour with electrolytes.','Electrolyte drink after weigh-in.','After weigh-in: fast carbs up to ~60 g/hour, low fibre, familiar food.']];
+  function fightWeek(fightDate, today = new Date(), weighInDate = null) {
+    if (!fightDate) return null; const wi = weighInDate || fightDate, d = dayNum(wi) - dayNum(ymd(today)); if (d < 0 || d > 7) return null;
+    return { daysToWeighIn: d, days: FW.map(([n, train, water, salt, carbs]) => { const x = new Date(wi+'T12:00'); x.setDate(x.getDate()-n);
+      return { offset:-n, date:ymd(x), today: n === d, train, water, salt, carbs }; }) };
+  }
+  // Rule-based weekly review: what went well / what was missed / focus for next week
+  function weekReview(entries, today = new Date(), params = {}, profile = {}) {
+    const t = dayNum(ymd(today)), wk = inRange(entries, t, 6, 0), r = S.compute(wk, today, Object.assign({}, params, { windowDays:6, startDate:null }));
+    const NAMES = { nutrition:'Nutrition', training:'Training', sleep:'Sleep', wellness:'Wellness', screen:'Screen time', family:'Family/friends' };
+    const out = { well:[], missed:[], focus:[] };
+    if (!wk.length) { out.missed.push('No days logged this week'); out.focus.push('Log every day: it takes about 30 seconds'); return out; }
+    const cats = Object.keys(NAMES).filter(k => r.cats[k] != null).map(k => [k, Math.round(r.cats[k])]).sort((a,b)=>b[1]-a[1]);
+    const best = cats.filter(c => c[1] >= 80).slice(0,2), worst = cats.slice().reverse().filter(c => c[1] < 70).slice(0,2);
+    best.forEach(([k,v]) => out.well.push(`${NAMES[k]} ${v}/100`));
+    const full = wk.filter(isComplete).length; if (full >= 6) out.well.push(`${full}/7 days fully logged`); else out.missed.push(`Only ${full}/7 days fully logged`);
+    let sch = 0, done = 0; const miss = [];
+    wk.forEach(e => { if (Array.isArray(e.sessions)) e.sessions.forEach((x,i) => { sch++; if (x.done === true) done++; else miss.push(e.date.slice(5)+' '+(x.label||'session '+(i+1))); }); else if (e.training != null) { sch++; if (e.training) done++; else miss.push(e.date.slice(5)); } });
+    if (sch && done === sch) out.well.push(`All ${sch} scheduled sessions done`); else if (sch) out.missed.push(`${sch-done} of ${sch} sessions missed${miss.length?' ('+miss.slice(0,4).join(', ')+')':''}`);
+    worst.forEach(([k,v]) => out.missed.push(`${NAMES[k]} only ${v}/100`));
+    const w = wellness(entries, today); if (w.flags.length) out.missed.push(`🚩 Low ratings: ${w.flags.slice(0,3).map(f=>f.item+' '+f.value).join(', ')}`);
+    const v = weightVerdict(entries, profile, today); if (v.word === 'On track') out.well.push('Weight on track'); else if (v.word === 'Too fast' || v.word === 'Too slow') out.missed.push(`Weight ${v.word.toLowerCase()}`);
+    const tips = { nutrition:'Hit your nutrition plan every day: prep meals ahead', training:'Make every scheduled session, or tell your coach early', sleep:`Aim for ${params.idealSleep||8}h of sleep: same bedtime nightly`, wellness:'Recovery: sleep, food and easier sessions; tell your coach how you feel', screen:'Cut recreational screens to 2h or less, especially before bed', family:'Plan real time with family or friends' };
+    worst.forEach(([k]) => out.focus.push(tips[k]));
+    if (v.word === 'Too fast') out.focus.push('Slow the cut to about 1%/week: eat enough carbs and protein');
+    if (v.word === 'Too slow') out.focus.push('Tighten nutrition to get to about 0.5–1%/week loss');
+    if (w.flags.length && !worst.some(c=>c[0]==='wellness')) out.focus.push('Talk to your coach about the low wellness ratings');
+    if (!out.focus.length) out.focus.push('Keep the same habits: consistency wins camps');
+    if (!out.well.length) out.well.push('You showed up and logged: build from here');
+    return out;
+  }
+  const reviewText = rv => `What went well: ${rv.well.join('; ')}\nWhat was missed: ${rv.missed.length?rv.missed.join('; '):'nothing major'}\nFocus next week: ${rv.focus.join('; ')}`;
   const csvCell = v => { const s = v == null ? '' : v === true ? 'Y' : v === false ? 'N' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; };
   const CSV_COLS = ['Date','Nutrition','Training','Sleep_Hours','Screen_Hours','Family_Friends','Weight','Notes','Energy','Soreness','Mood','Stress','Wellness_Score','Sessions_Scheduled','Sessions_Done','Training_Pct','S1_Label','S1_Done','S1_RPE','S1_Min','S2_Label','S2_Done','S2_RPE','S2_Min','Extra_Label','Extra_RPE','Extra_Min','Session_Load','Complete'];
   function toCSV(entries) {
@@ -80,6 +150,6 @@
       return [e.date,e.nutrition,S.trainingPct(e)===100,e.sleep,e.screen,e.family,e.weight,e.notes,e.energy,e.soreness,e.mood,e.stress,ws==null?'':ws,Array.isArray(e.sessions)?ss.length:'',ss.filter(s=>s.done===true).length,Math.round(S.trainingPct(e)),...sc(0),...sc(1),x.label,x.rpe,x.mins,sessionLoad(e),isComplete(e)?'Y':'N'].map(csvCell).join(','); });
     return [CSV_COLS.join(',')].concat(rows).join('\r\n') + '\r\n';
   }
-  const api = { WELL, missing, isComplete, isPartial, streak, grid, dayWellness, sessionLoad, wellness, load, cutSafety, toCSV, CSV_COLS };
+  const api = { cutPlan, weightVerdict, fightWeek, weekReview, reviewText, WELL, missing, isComplete, isPartial, streak, grid, dayWellness, sessionLoad, wellness, load, cutSafety, toCSV, CSV_COLS };
   if (typeof module !== 'undefined') module.exports = api; else root.Insights = api;
 })(this);

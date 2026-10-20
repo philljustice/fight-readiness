@@ -19,7 +19,7 @@ const g = I.grid([full(0),{date:d(1),weight:170}], today, 7); assert.equal(g.len
 // wellness
 assert.equal(I.dayWellness({energy:4,soreness:2,mood:'',stress:null}),3); assert.equal(I.dayWellness({}),null);
 let w = I.wellness([full(0,{energy:1,mood:5}),full(1,{energy:3,soreness:3}),full(10,{energy:5,soreness:5,mood:5,stress:5})], today);
-assert.equal(w.days,2); assert.equal(w.flags.length,1); assert.equal(w.flags[0].item,'Energy'); assert.equal(w.items.energy,2);
+assert.equal(w.days,2); assert.equal(w.flags.length,1); assert.equal(w.flags[0].item,'Fatigue / energy'); assert.equal(w.items.energy,2);
 // load
 assert.equal(I.sessionLoad({rpe:7,mins:90}),630); assert.equal(I.sessionLoad({rpe:7,mins:''}),null);
 let L = I.load([full(0,{rpe:8,mins:60}),full(3,{rpe:5,mins:60})], today); assert.equal(L.week,780); assert.equal(L.sessions,2); assert.equal(L.acwr,null);
@@ -40,4 +40,27 @@ assert.equal(lines[0], I.CSV_COLS.join(',')); assert.ok(lines[1].startsWith(d(1)
 // core score unaffected by optional fields
 const base = Array.from({length:10},(_,i)=>full(i)); const extra = base.map(e=>Object.assign({},e,{energy:1,soreness:1,rpe:10,mins:200}));
 assert.equal(S.compute(base,today).score, S.compute(extra,today).score);
+// impossible-cut check
+const fd = n => S.ymd(new Date(2026,9,19+n));
+let cp = I.cutPlan(170,155,fd(35),today); assert.equal(cp.level,'warn'); assert.equal(cp.perWeek,3); assert.equal(cp.reach,161.7); assert.equal(cp.short,6.7); assert.ok(/not safe/.test(cp.msg) && /weight class/.test(cp.msg));
+cp = I.cutPlan(170,161,fd(35),today); assert.equal(cp.level,'caution'); assert.ok(cp.pct>1 && cp.pct<=1.5);
+cp = I.cutPlan(170,165,fd(70),today); assert.equal(cp.level,'ok'); assert.equal(cp.short,0);
+assert.equal(I.cutPlan(150,155,fd(10),today).level,'ok'); assert.equal(I.cutPlan(170,155,'',today),null); assert.equal(I.cutPlan(170,155,fd(-1),today),null);
+// verdict
+assert.equal(I.weightVerdict([], {}, today).word,'No target');
+assert.equal(I.weightVerdict(wt(196,200), {targetWeight:180}, today).word,'Too fast');   // -2%/wk
+assert.equal(I.weightVerdict(wt(199.8,200), {targetWeight:180, fightDate:fd(70)}, today).word,'Too slow');
+assert.equal(I.weightVerdict(wt(198.2,200), {targetWeight:190, fightDate:fd(70)}, today).word,'On track');
+assert.equal(I.weightVerdict(wt(185,186), {targetWeight:190}, today).word,'On track');
+assert.equal(I.weightVerdict([full(0,{weight:200})], {targetWeight:190}, today).word,'On track?');
+// fight week
+assert.equal(I.fightWeek(fd(8),today),null); assert.equal(I.fightWeek(fd(-1),today),null);
+let fw = I.fightWeek(fd(3),today); assert.equal(fw.days.length,8); assert.equal(fw.days[0].offset,-7); assert.equal(fw.days[7].date,fd(3)); assert.ok(fw.days.find(d=>d.today).offset===-3);
+assert.ok(!fw.days.some(d => /sauna/i.test(d.water) && !/no sauna/i.test(d.water)));
+// weekly review
+const wkd = Array.from({length:7},(_,i)=>full(i,{v:2,family:true,energy:5,soreness:5,mood:5,stress:5,sessions:[{label:'Wrestling',done:i!==2,rpe:i!==2?6:'',mins:i!==2?60:''}],screen:i<3?5:1}));
+let rv = I.weekReview(wkd, today, S.DEFAULT_PARAMS, {});
+assert.ok(rv.missed.some(x=>/1 of 7 sessions missed.*Wrestling/.test(x)), rv.missed); assert.ok(rv.missed.some(x=>/Screen time/.test(x))); assert.ok(rv.focus.some(x=>/screens/.test(x)));
+assert.ok(rv.well.some(x=>/Nutrition 100/.test(x))); assert.ok(I.reviewText(rv).startsWith('What went well: '));
+assert.deepEqual(I.weekReview([], today, {}, {}).missed, ['No days logged this week']);
 console.log('All insights tests passed');

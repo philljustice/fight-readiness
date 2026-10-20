@@ -44,9 +44,21 @@ function streakCard() { const st = Insights.streak(S.entries), g = Insights.grid
    <p class="muted" style="margin:4px 0 0">Last 28 days: 🟥 full log • 🟧 partial • ⬛ none.${st.todayDone?' Today is done ✔':' Finish today to keep the streak.'}</p></div>`; }
 function cutWarn(ws) { const c = Insights.cutSafety(S.entries, new Date(), S.profile||{}); let h = '';
   if (c.level) h += `<div class="hint ${c.level}">⚠️ ${esc(c.msg)}</div>`;
-  if (c.pace && c.pace.level !== 'ok') h += `<div class="hint ${c.pace.level}">⚠️ To make target by fight day you'd need ${c.pace.perWeek} lbs/week (${c.pace.pct}% of bodyweight). That's more than the safe ~1%/week. Talk to your coach about the plan or a different weight class.</div>`;
-  else if (c.pace) h += `<p class="muted">Pace needed to hit target: ${c.pace.perWeek} lbs/week (${c.pace.pct}%/week) ✔ within safe range.</p>`;
+  const p = S.profile||{}, lw = res().latestWeight; h += planBox(lw ? lw.weight : p.startWeight, p.targetWeight, p.fightDate);
   return h; }
+function planBox(cur, tgt, fd) { const c = Insights.cutPlan(cur, tgt, fd); if (!c) return '';
+  if (c.level === 'ok') return `<p class="muted">🎯 Target plan: ${esc(c.msg)}</p>`;
+  return `<div class="hint ${c.level}">${c.level==='warn'?'⛔ <b>Unsafe cut plan.</b>':'⚠️ <b>Tight cut plan.</b>'} ${esc(c.msg)}</div>`; }
+const VCOL = { green:'#43a047', orange:'#fb8c00', red:'#e53935', grey:'#777' };
+function verdictLine() { const v = Insights.weightVerdict(S.entries, S.profile||{});
+  return `<p id="wverdict" style="margin:6px 0"><span style="display:inline-block;background:${VCOL[v.color]};color:#fff;font-weight:700;padding:3px 10px;border-radius:12px">${esc(v.word)}</span> ${esc(v.text)}</p>`; }
+function fightWeekCard() { const p = S.profile||{}, fw = Insights.fightWeek(p.fightDate); if (!fw) return ''; const minor = p.dob && Profile.age(p.dob) < 18;
+  return `<div class="card" id="fightWeek"><h3>🥊 Fight week: ${fw.daysToWeighIn===0?'weigh-in day':fw.daysToWeighIn+' day'+(fw.daysToWeighIn==1?'':'s')+' to weigh-in'}</h3>
+   <div class="hint warn">⚠️ <b>General guidance, not medical advice.</b> Follow your coach and dietitian. <b>No saunas, sweat suits, diuretics, laxatives or fluid restriction for minors (under 18)${minor?' — that includes you':''}</b>, and never without supervision for anyone. If you're more than ~3% over on day −2, tell your coach. Don't try to cut it alone.</div>
+   ${fw.days.map(d=>`<div class="fwday${d.today?' now':''}"><b>${d.offset===0?'Weigh-in':'Day '+d.offset}</b> <span class="muted">${d.date}${d.today?' • today':''}</span><br>🏋️ ${esc(d.train)}<br>💧 ${esc(d.water)}<br>🧂 ${esc(d.salt)}<br>🍚 ${esc(d.carbs)}</div>`).join('')}
+   <p class="muted">Based on the ISSN 2025 combat-sports position stand: gradual descent, carbs ≥3 g/kg and protein 1.2–2 g/kg during the cut, oral rehydration 1–1.5 L/h and ≤60 g/h carbs after weigh-in.</p></div>`; }
+function reviewCard() { const rv = Insights.weekReview(S.entries, new Date(), S.params, S.profile||{}); const li = a => a.map(x=>`<li>${esc(x)}</li>`).join('');
+  return `<div class="card" id="review"><h3>📋 Weekly review (last 7 days)</h3><p><b>✅ What went well</b></p><ul>${li(rv.well)}</ul><p><b>❌ What was missed</b></p><ul>${rv.missed.length?li(rv.missed):'<li>Nothing major</li>'}</ul><p><b>🎯 Focus for next week</b></p><ul>${li(rv.focus)}</ul></div>`; }
 function wellCard(report) { const w = Insights.wellness(S.entries), L = Insights.load(S.entries);
   if (!w.days && !L.sessions && !report) return '';
   const f = v => v==null?'—':v.toFixed(1);
@@ -63,13 +75,15 @@ function tr7() { const es = S.entries.filter(e => Scoring.dayNum(e.date) > Scori
   return `${done}/${sch} scheduled sessions done${extra?` + ${extra} extra`:''} • load ${Insights.load(S.entries).week} AU`; }
 function weeklySummary() { const r = res(), st = Insights.streak(S.entries), w = Insights.wellness(S.entries), c = Insights.cutSafety(S.entries, new Date(), S.profile||{}), p = S.profile||{};
   const flags = [];
-  if (c.level) flags.push(`Weight loss ${-c.pctPerWeek}%/wk (${c.level})`); if (c.pace && c.pace.level !== 'ok') flags.push(`Target pace ${c.pace.perWeek} lbs/wk (${c.pace.pct}%)`);
+  const cp = Insights.cutPlan(r.latestWeight ? r.latestWeight.weight : p.startWeight, p.targetWeight, p.fightDate), vd = Insights.weightVerdict(S.entries, p);
+  if (c.level) flags.push(`Weight loss ${-c.pctPerWeek}%/wk (${c.level})`); if (cp && cp.level !== 'ok') flags.push(`Target needs ${cp.perWeek} lbs/wk (${cp.pct}%), ${cp.short} lbs short at safe pace`);
   if (w.dropping) flags.push('Wellness below normal'); w.flags.forEach(f => flags.push(`Low ${f.item} ${f.value} on ${f.date.slice(5)}`));
   const notes = S.entries.filter(e => e.notes && Scoring.dayNum(e.date) >= Scoring.dayNum(today())-6).map(e => `${e.date.slice(5)}: ${e.notes}`);
   return `Fighter: ${p.name||S.fighter||'—'}${p.gym?' ('+p.gym+')':''}\nDate: ${today()}\nScore: ${r.locked?lockMsg(r):r.score+'/100 – '+r.verdict}\n` +
    `Streak: ${st.current} days (best ${st.best}) • Days logged (3 wks): ${r.daysLogged}\n` +
    `Training (7 days): ${tr7()} • Wellness (7 days, 1–5): ${w.avg7==null?'—':w.avg7.toFixed(1)}\n` +
-   `Weight: ${r.latestWeight?r.latestWeight.weight+' lbs':'—'} • Trend: ${r.locked?'locked':(r.delta==null?'—':r.delta+' lbs/wk '+r.trend.emoji)}\n` +
+   `Weight: ${r.latestWeight?r.latestWeight.weight+' lbs':'—'} • Trend: ${r.locked?'locked':(r.delta==null?'—':r.delta+' lbs/wk '+r.trend.emoji)} • Verdict: ${vd.word}\n` +
+   Insights.reviewText(Insights.weekReview(S.entries, new Date(), S.params, p)) + '\n' +
    `Flags: ${flags.length?flags.join('; '):'none'}${notes.length?'\nNotes: '+notes.join(' | '):''}`; }
 function weeklyCard() { const wk = Weekly.isDue(S.weeklySent||{}, new Date(), S.startDate); if (!wk) return '';
   return `<div class="card hint warn" id="weeklyCard">📧 <b>Weekly report due</b> (week ${Weekly.weekLabel(wk)}). Testing phase: please send it to ${Weekly.CONFIG.ADMIN_NAME}.<button class="btn" id="weeklyBtn">📤 Send weekly report to ${Weekly.CONFIG.ADMIN_NAME}</button></div>`; }
@@ -110,7 +124,7 @@ const V = {
   const r = res(), lw = r.latestWeight;
   const isWeighDay = [1,4].includes(new Date().getDay()) && !S.entries.some(e=>e.date===today() && +e.weight>0);
   const dueNow = Reminders.due(S.entries.find(e=>e.date===today()), new Date(), S.reminders.morning, S.reminders.evening);
-  return `${day1Banner(false)}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning log not done: sleep hours, nutrition plan, how you feel (energy, soreness, mood, stress)'+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: each training session (effort + minutes), screen hours, family/friends, notes'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${weeklyCard()}${fightCard()}${streakCard()}
+  return `${day1Banner(false)}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning log not done: sleep hours, nutrition plan, how you feel (energy, soreness, mood, stress)'+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: each training session (effort + minutes), screen hours, family/friends, notes'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${weeklyCard()}${fightCard()}${fightWeekCard()}${streakCard()}
   ${isWeighDay?'<div class="card hint">⚖️ It\'s a weigh-in day (Mon/Thu). Weigh in this morning, fasted, and log it.</div>':''}
   ${r.locked?`<div class="card"><div class="muted" style="text-align:center">Fight Readiness Score</div><div class="big">🔒</div><p style="text-align:center"><b>${lockMsg(r)}</b></p><p class="muted" style="text-align:center">Days logged so far: ${r.daysLogged}</p>${todayRow()}</div>`:`
   <div class="card"><div class="muted" style="text-align:center">Fight Readiness Score</div><div class="big">${r.daysLogged?r.score:'—'}</div>
@@ -119,7 +133,7 @@ const V = {
   <div class="card"><h3>Categories (last 3 weeks)</h3>${catTable(r)}
   <p>Core consistency (Nutrition + Training both Y): <b>${r.consistency.toFixed(0)}%</b> → ${r.bonus?'+'+r.bonus+' pts for daily discipline!':'Build streaks on both key plans'}</p>
   <p class="muted">Bonus: +5 at ≥90%, +3 at ≥75%, +1 at ≥60%.</p></div>`}
-  <div class="card"><h3>🥊 Weight</h3><p>Latest: <b>${lw?lw.weight+' lbs':'—'}</b> ${lw?'<span class="muted">('+lw.date+')</span>':''}${+S.targetWeight?` • Target ${esc(S.targetWeight)} lbs`:''}</p>
+  <div class="card"><h3>🥊 Weight</h3>${verdictLine()}<p>Latest: <b>${lw?lw.weight+' lbs':'—'}</b> ${lw?'<span class="muted">('+lw.date+')</span>':''}${+S.targetWeight?` • Target ${esc(S.targetWeight)} lbs`:''}</p>
   ${r.locked?`<p>7-day trend: ${lockMsg(r)}</p>`:`<p>7-day trend: <b>${r.delta==null?'—':(r.delta>0?'+':'')+r.delta+' lbs/wk'}</b></p><p>${r.trend.emoji} ${esc(r.trend.label)}</p>`}${cutWarn()}${weightChart()}</div>${wellCard(false)}`;
  },
  log() {
@@ -176,8 +190,9 @@ const V = {
   return `<div class="card"><h2 style="margin:0">🥊 Coach Report: Fight Readiness Summary</h2>
   ${reportHeader(r)}<p class="muted">Report date: ${today()} • Data period: last 3 weeks (${r.daysLogged} days logged)</p></div>
   ${r.locked?`<div class="card"><p style="text-align:center"><b>${lockMsg(r)}</b><br>Days logged so far: ${r.daysLogged}</p>${todayRow()}</div>`:`<div class="card"><div class="big">${r.score}</div><p style="text-align:center">${esc(r.verdict)}</p></div>`}
-  <div class="card"><h3>Weight & trend</h3><p>Latest: ${r.latestWeight?r.latestWeight.weight+' lbs ('+r.latestWeight.date+')':'—'}${+S.targetWeight?' • Target: '+esc(S.targetWeight)+' lbs':''}<br>
+  <div class="card"><h3>Weight & trend</h3>${verdictLine()}<p>Latest: ${r.latestWeight?r.latestWeight.weight+' lbs ('+r.latestWeight.date+')':'—'}${+S.targetWeight?' • Target: '+esc(S.targetWeight)+' lbs':''}<br>
    7-day trend: ${r.locked?lockMsg(r):(r.delta==null?'—':r.delta+' lbs/wk')+' '+r.trend.emoji+' '+esc(r.trend.label)}</p>${cutWarn()}${weightChart()}</div>
+  ${reviewCard()}${fightWeekCard()}
   <div class="card"><h3>Training</h3><p>Last 7 days: <b>${tr7()}</b></p></div>
   <div class="card"><h3>Logging</h3><p>Current streak: <b>${Insights.streak(S.entries).current} days</b> (best ${Insights.streak(S.entries).best}) • Full logs in last 28 days: <b>${Insights.grid(S.entries).filter(x=>x.status==='done').length}/28</b></p></div>
   ${wellCard(true)}
@@ -200,7 +215,7 @@ const V = {
   <div class="card"><h3>Team</h3>${fld('gym','Gym name','maxlength="60"')}${fld('coach','Head coach','maxlength="60"')}${Weekly.CONFIG.SHOW_COACH_CONTACT?fld('coachContact','Coach email or phone','type="text" inputmode="email" maxlength="80"'):''}</div>
   <div class="card"><h3>Weight & fight</h3>${sel('weightClass','Weight class',Profile.WEIGHT_CLASSES)}
    ${fld('startWeight','Starting weight (lbs)',num+(first?'':' disabled'))}${first?'<p class="muted">Saved as your first weigh-in.</p>':''}
-   ${fld('targetWeight','Target weight (lbs)',num)}${fld('fightDate','Fight date (optional)','type="date" min="'+today()+'"')}</div>
+   ${fld('targetWeight','Target weight (lbs)',num)}${fld('fightDate','Fight date (optional)','type="date" min="'+today()+'"')}<div id="cutBox"></div></div>
   <div class="card" id="schedCard"><h3>🗓️ Training schedule</h3><p class="muted">Your usual week. The daily log asks about each session. Training score = % of scheduled sessions done (rest days count 100%).</p>
    <label>Do you train once or twice a day?</label><div class="sc" id="perDay"><button data-perday="1">Once</button><button data-perday="2">Twice</button></div>
    ${Profile.DAYS.map((dn,i)=>`<div class="sday"><label>${dn}</label><div class="sc">${['Rest','1 session','2 sessions'].map((l,n)=>`<button data-sd="${i}" data-n="${n}">${l}</button>`).join('')}</div>
@@ -241,6 +256,11 @@ const V = {
   <p><b>Reminders:</b> Setup → Reminders → pick times → <i>Add reminders to my calendar</i>. Your phone's calendar then alerts you every morning and evening, plus a Mon/Thu weigh-in alert, even when the app is closed. The app also shows a banner if today's morning or evening items aren't logged after those times. You can log the morning items first and add the evening ones later.</p>
   <p><b>Weight:</b> weigh Monday & Thursday mornings: fasted, after the bathroom, same scale, minimal clothing.</p>
   <p><b>Streak:</b> 🔥 counts days in a row with a full log (nutrition, every scheduled session with effort + minutes, sleep, screen, family, and all 4 wellness ratings). Today not done yet doesn't break it. Miss a whole day and it resets.</p>
+  <p><b>How you feel (Hooper-style check-in):</b> four quick 1–5 ratings modelled on the Hooper Index used by pro teams: fatigue/energy, muscle soreness, stress and mood (5 = best). Sleep is logged separately as hours. It's 15% of the score.</p>
+  <p><b>Weight verdict:</b> the Dashboard shows one line every day. 🟢 <b>On track</b> = losing at roughly the pace you need, within the safe ~1%/week. 🔴 <b>Too fast</b> = losing more than 1.5%/week. 🟠 <b>Too slow</b> = well under the pace you need. ⚪ <b>No target</b> = set a target weight in your profile.</p>
+  <p><b>Impossible-cut check:</b> with a target weight and fight date set, the app works out the weekly loss needed. Over 1%/week of bodyweight shows a caution and over 1.5% says the plan is unsafe. It shows the weight a safe pace reaches by fight day and how far short that is, so you can talk to your coach about a higher weight class or a later date.</p>
+  <p><b>Fight week:</b> in the last 7 days before your fight date (used as weigh-in day) the Dashboard and Report show a day-by-day card covering taper, water, salt and carbs. It's general, conservative guidance based on the ISSN 2025 combat-sports position stand, not medical advice. Follow your coach and dietitian. No saunas, diuretics or fluid restriction for minors.</p>
+  <p><b>Weekly review:</b> the Coach Report, weekly email and share text include an automatic "What went well / What was missed / Focus for next week" from your last 7 days (best and worst categories, missed sessions, 🚩 flags, weight verdict).</p>
   <p><b>Wellness & load:</b> wellness ratings of 1–2 get a 🚩 flag for your coach, and a drop below your normal is highlighted. Session load = RPE × minutes summed over all sessions (two-a-days add up). It's shown on the Dashboard and Coach Report and doesn't change the score.</p>
   <p><b>Safe weight cut:</b> the app warns if you lose more than 1%/week of bodyweight (caution) or 1.5%/week (warning), or if your target and fight date would need a faster pace. Sports-nutrition guidance for combat sports is a gradual ~0.5–1 kg (1–2 lbs) per week. Never cut by skipping meals or dehydrating without coach supervision.</p>
   <p><b>Weekly report (testing phase):</b> every Sunday (and on the first open after, until it's sent) the Score screen shows a <i>Send weekly report to ${Weekly.CONFIG.ADMIN_NAME}</i> card. Tap it, pick <b>Mail</b>, check the To address is ${Weekly.CONFIG.ADMIN_EMAIL}, and tap Send. It attaches your log as a CSV plus a short summary (name, score, streak, weight trend, flags). If your phone can't share files, it opens a pre-filled email instead. You can send anytime from Setup or Report → <i>Send report to ${Weekly.CONFIG.ADMIN_NAME}</i>. A calendar reminder fires Sundays at 6 PM.</p>
@@ -253,6 +273,8 @@ const V = {
  }
 };
 let cur = 'dash';
+function refreshCut() { const b = $('#cutBox'); if (!b) return; const lw = res().latestWeight, sw = $('#p_startWeight');
+  b.innerHTML = planBox(lw ? lw.weight : sw && sw.value, $('#p_targetWeight').value, $('#p_fightDate').value); }
 function refreshSched() { const sc = V._sched; if (!sc || !$('#schedCard')) return;
   document.querySelectorAll('#perDay button').forEach(b => b.classList.toggle('on', +b.dataset.perday === sc.perDay));
   sc.days.forEach((d,i) => { document.querySelectorAll(`[data-sd="${i}"]`).forEach(b => b.classList.toggle('on', +b.dataset.n === d.n));
@@ -260,7 +282,7 @@ function refreshSched() { const sc = V._sched; if (!sc || !$('#schedCard')) retu
 function show(v) { if (!S.profile && v !== 'help') v = 'profile';
   if (v === 'profile' && !V._sched) V._sched = JSON.parse(JSON.stringify((S.profile && S.profile.schedule) || Profile.scheduleFromWeek(S.weeks[S.weekIdx])));
   if (v !== 'profile') V._sched = null; cur = v; $('#view').innerHTML = V[v](); document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.v===(v==='profile'?'setup':v)));
-  $('#title').textContent = 'Fight Readiness' + (S.fighter ? ' — ' + S.fighter : ''); if (v === 'profile') refreshSched(); window.scrollTo(0,0); }
+  $('#title').textContent = 'Fight Readiness' + (S.fighter ? ' — ' + S.fighter : ''); if (v === 'profile') { refreshSched(); refreshCut(); } window.scrollTo(0,0); }
 function upsert(list) { list.forEach(e => { const i = S.entries.findIndex(x=>x.date===e.date); if (i>=0) S.entries[i]=e; else S.entries.push(e); }); S.entries.sort((a,b)=>a.date<b.date?-1:1); save(); }
 function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text],{type})); a.download = name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 1000); }
 function parseCSV(text) {
@@ -281,7 +303,7 @@ function shareText() { const r = res();
   if (r.locked) return `🥊 Fight Readiness: ${S.fighter||'Fighter'} (${today()})\n${lockMsg(r)}\nDays logged so far: ${r.daysLogged}`;
   return `🥊 Fight Readiness: ${S.fighter||'Fighter'} (${today()})${S.profile&&S.profile.gym?' • '+S.profile.gym:''}${S.profile&&Profile.countdown(S.profile.fightDate)?'\n'+Profile.countdown(S.profile.fightDate).text:''}\nScore: ${r.score}/100, ${r.verdict}\n` +
    CATS.map(([k,l])=>`${l}: ${r.cats[k].toFixed(0)}`).join(' | ') + `\nConsistency: ${r.consistency.toFixed(0)}% (+${r.bonus})\n` +
-   `Weight: ${r.latestWeight?r.latestWeight.weight+' lbs':'—'}, trend ${r.delta==null?'—':r.delta+' lbs/wk'} ${r.trend.emoji}\nTraining (7 days): ${tr7()}\nDays logged: ${r.daysLogged} (last 3 weeks) • Streak: ${Insights.streak(S.entries).current} days`; }
+   `Weight: ${r.latestWeight?r.latestWeight.weight+' lbs':'—'}, trend ${r.delta==null?'—':r.delta+' lbs/wk'} ${r.trend.emoji}\nWeight verdict: ${Insights.weightVerdict(S.entries, S.profile||{}).word}\nTraining (7 days): ${tr7()}\n${Insights.reviewText(Insights.weekReview(S.entries, new Date(), S.params, S.profile||{}))}\nDays logged: ${r.daysLogged} (last 3 weeks) • Streak: ${Insights.streak(S.entries).current} days`; }
 
 document.addEventListener('click', async ev => {
   const t = ev.target.closest('button,a'); if (!t) return;
@@ -345,6 +367,7 @@ document.addEventListener('click', async ev => {
   }
 });
 document.addEventListener('input', ev => { const t = ev.target, w = S.weeks[S.weekIdx];
+  if (['p_startWeight','p_targetWeight','p_fightDate'].includes(t.id)) refreshCut();
   if (t.dataset.sl && V._sched) { const [i,j] = t.dataset.sl.split('-').map(Number); V._sched.days[i].labels[j] = t.value; return; }
   if (t.dataset.d !== undefined && t.dataset.k) { w.days[+t.dataset.d][t.dataset.k] = t.value; save(); }
   else if (t.id && t.id.startsWith('w_')) { w[t.id.slice(2)] = t.value; save(); }
