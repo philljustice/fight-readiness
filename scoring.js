@@ -1,4 +1,4 @@
-// Scoring logic — matched to source.xlsx (Dashboard/Parameters formulas). Shared by app + node tests.
+// Scoring logic. Shared by app + node tests.
 (function (root) {
   const DEFAULT_PARAMS = { wNutrition:30, wTraining:30, wSleep:20, wScreen:10, wFamily:10,
     idealSleep:8, sleepPenalty:25, screenFree:2, screenPenalty:40, windowDays:21, unlockDays:7, startDate:null,

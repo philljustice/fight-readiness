@@ -1,6 +1,6 @@
 # Fight Readiness Tracker (PWA)
 
-A phone app for MMA fighters, built from the Fight Readiness Tracker spreadsheet (`source.xlsx`). It's plain HTML/CSS/JS with no build step. It installs to the home screen and works offline. Each fighter's data stays in **their own phone's browser storage**. Nothing is uploaded.
+A phone app for MMA fighters. It's plain HTML/CSS/JS with no build step. It installs to the home screen and works offline. Each fighter's data stays in **their own phone's browser storage**. Nothing is uploaded.
 
 ## Get a link for the team (free)
 **Netlify (easiest):** go to https://app.netlify.com/drop and drag this whole folder onto the page. You get an `https://<name>.netlify.app` link right away. Make a free account to keep it and rename the site.
@@ -14,7 +14,7 @@ Both use HTTPS, which install and offline mode need. Send the link to the team.
 - **Android:** open it in Chrome → ⋮ → *Install app* / *Add to Home screen*.
 
 ## Updating the app
-Edit the files, bump `CACHE` in `sw.js` (e.g. `fr-v5`), and redeploy. Phones pick up the new version after the app is opened once or twice.
+Edit the files, bump `CACHE` in `sw.js` (e.g. `fr-v6`), and redeploy. Phones pick up the new version after the app is opened once or twice.
 
 ## First week
 The app starts empty. The start date is saved the first time Setup is completed. For the first 7 days the Dashboard and Coach Report show "Trends unlock in X days" in place of the score, weight trend and consistency bonus. Today's entry and the number of days logged still show. After that, normal scoring uses the last 3 weeks, counting only days since the start date. Restoring a backup brings its start date with it.
@@ -37,6 +37,5 @@ Inside the app, a banner shows when today's morning or evening items aren't logg
 Setup → *Export backup (JSON)* saves a file. *Restore* on any phone loads it back. You can also import a FightLog CSV (Date, Nutrition, Training, Sleep_Hours, Screen_Hours, Family_Friends, Weight, Notes). Deleting browser data, or iOS clearing storage for an app that hasn't been opened in weeks, will erase entries. **Export weekly.**
 
 ## Files
-`index.html`, `styles.css`, `app.js` (UI), `scoring.js` (scoring, matched to the spreadsheet), `reminders.js` (calendar file + reminder checks), `manifest.webmanifest`, `sw.js`, `icons/`, `test.js` and `test-reminders.js` (`node test.js && node test-reminders.js`).
+`index.html`, `styles.css`, `app.js` (UI), `scoring.js` (scoring), `reminders.js` (calendar file + reminder checks), `manifest.webmanifest`, `sw.js`, `icons/`, `test.js` and `test-reminders.js` (`node test.js && node test-reminders.js`).
 
-The original spreadsheet is kept outside this folder in `../fight-readiness-private/`, so it never gets deployed.

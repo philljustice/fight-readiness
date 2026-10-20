@@ -1,14 +1,14 @@
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-const SAMPLE_WEEK = [ // from source.xlsx "Weekly Training Outline"
- ['Skill and technique','Wrestling (City Centre)','Muay thai pads + drills','MMA drills',3.5,'7'],
- ['Strength and technique','Strength and conditioning','NO Gi','MMA drills and pads with Panda',5,'8-9'],
- ['Sparring + technique','Striking / Mma sparring','Pads (City Centre)','Wrestling (Orleans)',3.5,'7'],
+const SAMPLE_WEEK = [ // sample MMA week
+ ['Skill and technique','Wrestling – Gym A','Muay thai pads + drills','MMA drills',3.5,'7'],
+ ['Strength and technique','Strength and conditioning','NO Gi','MMA drills and pads with coach',5,'8-9'],
+ ['Sparring + technique','Striking / Mma sparring','Muay Thai pads with coach','Wrestling – Gym B',3.5,'7'],
  ['Strength and technique','Strength and conditioning','No Gi','Muay thai drills',3.5,'7'],
  ['Rest + Active Recovery','Light walk, stretching, yoga','','',2,'1'],
- ['Sparring + technique','MMA @ Monette','','',1.5,'7'],
- ['Skill and technique','Montreal Wrestling Club','','',3,'7']];
+ ['Sparring + technique','MMA class','','',1.5,'7'],
+ ['Skill and technique','Wrestling club','','',3,'7']];
 const mondayOf = d => { const x = new Date(d); x.setDate(x.getDate() - ((x.getDay()+6)%7)); return Scoring.ymd(x); };
 const newWeek = start => ({ start, coach:'', phase:'', goals:'', coachNotes:'',
   days: DAYS.map((d,i)=>({ day:d, focus:SAMPLE_WEEK[i][0], s1:SAMPLE_WEEK[i][1], s2:SAMPLE_WEEK[i][2], s3:SAMPLE_WEEK[i][3], hrs:SAMPLE_WEEK[i][4], intensity:SAMPLE_WEEK[i][5], notes:'' })) });

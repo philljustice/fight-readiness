@@ -13,7 +13,6 @@ assert.equal(S.compute([mk(0),mk(22)], today).daysLogged,1);
 // weight delta: last7 avg 170, prev7 avg 172 -> -2
 r = S.compute([mk(0,{weight:169}),mk(3,{weight:171}),mk(8,{weight:172}),mk(13,{weight:172})], today); assert.equal(r.delta,-2); assert.equal(r.trend.emoji,'🔵');
 assert.equal(S.compute([], today).score, 0);
-// Spreadsheet sample, evaluated as of 2026-07-26 (last logged day)
 // start date / unlock
 const full = Array.from({length:22},(_, i)=>mk(i,{weight:170+i*0.2}));
 let L = S.compute(full, today, {startDate:S.ymd(new Date(2026,9,15))}); assert.equal(L.locked,true); assert.equal(L.unlockIn,3); assert.equal(L.daysLogged,5);
