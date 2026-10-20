@@ -30,6 +30,20 @@
   }
   function countdown(fightDate, today = new Date()) { const d = daysTo(fightDate, today); if (d == null || d < 0) return null;
     return { days:d, weeks:Math.floor(d/7), text: d === 0 ? 'Fight day! 🥊' : `${d} day${d===1?'':'s'} to fight (${Math.floor(d/7)}w ${d%7}d)` }; }
-  const api = { DISCIPLINES, WEIGHT_CLASSES, validate, age, daysTo, weightStatus, countdown };
+  // Training schedule: days[0..6] = Mon..Sun, each { n:0|1|2, labels:[s1,s2] }. perDay = default sessions on training days.
+  const REST = /rest|recovery|off/i;
+  function scheduleFromWeek(week) { const days = (week && week.days || []).slice(0,7).map(d => { const labels = [d.s1, d.s2].map(x => String(x||'').trim());
+      const n = REST.test(d.focus||'') || !labels.some(Boolean) ? 0 : labels.filter(Boolean).length; return { n, labels: n ? labels : ['',''] }; });
+    while (days.length < 7) days.push({ n:0, labels:['',''] });
+    const tr = days.filter(d => d.n); return { perDay: tr.length && tr.filter(d=>d.n===2).length * 2 >= tr.length ? 2 : 1, days }; }
+  const dow = date => (new Date(date + 'T12:00').getDay() + 6) % 7; // Mon = 0
+  function sessionsFor(schedule, date) { if (!schedule) return null; const d = schedule.days[dow(date)];
+    return Array.from({ length: d ? d.n : 0 }, (_, i) => ({ label: (d.labels[i] || '').trim(), done:null, rpe:'', mins:'' })); }
+  // Push schedule labels into a weekly outline (sessions 1-2, rest days marked)
+  function applyToWeek(schedule, week) { if (!schedule || !week) return week; week.days.forEach((d, i) => { const s = schedule.days[i];
+      if (!s.n) { if (!REST.test(d.focus||'')) d.focus = 'Rest'; d.s1 = ''; d.s2 = ''; }
+      else { d.s1 = s.labels[0] || 'Session 1'; d.s2 = s.n > 1 ? (s.labels[1] || 'Session 2') : ''; if (REST.test(d.focus||'')) d.focus = 'Training'; } }); return week; }
+  const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  const api = { DAYS, scheduleFromWeek, sessionsFor, applyToWeek, dow, DISCIPLINES, WEIGHT_CLASSES, validate, age, daysTo, weightStatus, countdown };
   if (typeof module !== 'undefined') module.exports = api; else root.Profile = api;
 })(this);

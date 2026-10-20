@@ -25,9 +25,9 @@ The app starts empty. The start date is saved the first time Setup is completed.
 
 ## Reminders (no push server needed)
 Setup → Reminders: pick a morning time (default 7:00) and an evening time (default 21:00), then tap **Add reminders to my calendar**. This makes a `.ics` file with 4 repeating events that each sound an alarm at the start time:
-- a daily morning log (sleep hours + nutrition plan)
+- a daily morning log (sleep hours + nutrition plan + energy/soreness/mood/stress)
 - a Mon/Thu weigh-in before eating
-- a daily evening log (training, screen hours, family/friends, notes)
+- a daily evening log (each session + effort/minutes, screen hours, family/friends, notes)
 - a Sunday 6 PM reminder: "Send weekly Fight Readiness report to Phill" (users who added reminders before this must tap the button again)
 
 Each event links back to the app.
@@ -45,19 +45,27 @@ Setup → *Export backup (JSON)* saves a file. *Restore* on any phone loads it b
 `index.html`, `styles.css`, `app.js` (UI), `scoring.js` (scoring), `reminders.js` (calendar file + reminder checks), `profile.js` (profile validation, countdown), `manifest.webmanifest`, `sw.js`, `icons/`, `test.js`, `test-reminders.js`, `test-profile.js` (`node test.js && node test-reminders.js && node test-profile.js`).
 
 
-## Streaks, wellness, load and weight-cut safety (optional, not in the score)
-These live in `insights.js` (tested in `test-insights.js`). **None of them change the Fight Readiness Score.**
-- **Streak 🔥:** days in a row with a full log (nutrition, training, sleep, screen, family all filled in). If today isn't logged yet, the streak still counts up to yesterday. The Dashboard also shows a 28-day grid (full / partial / none).
-- **Quick log:** one-tap sleep chips (6–9h) and screen chips (0–4h) next to the +/− steppers.
-- **Wellness check-in:** optional 1–5 ratings (5 = best) for Energy, Soreness, Mood and Stress, based on the McLean (2010) questionnaire that TrainHeroic and other team platforms use. Shows a 7-day average against the 4-week average, a "wellness dropping" hint when it's ≥0.5 below normal, and 🚩 flags for any 1–2 rating in the last 3 days.
-- **Session load:** optional RPE (1–10) × minutes, which is Foster's session-RPE method. Shows this week's total and a 4-week bar chart. The acute:chronic ratio (7-day average ÷ 28-day average) appears only after 28 days of RPE data. >1.5 is flagged as a spike, <0.8 as light.
-- **Weight-cut safety:** loss of >1%/week of bodyweight (7-day avg vs prior 7) is a caution and >1.5%/week is a warning. If a target weight and fight date are set, the app also shows the weekly pace needed and warns when it's above 1%/week. This follows the ISSN combat-sports position stand (gradual ~0.5–1 kg/week).
-- **History:** the Log screen lists recent days with a ✓ column for complete days and a "Show all" button. Tap a date to edit that day.
-- **CSV export:** Setup or Report → *Export log as CSV* produces all fields plus Session_Load and Complete, ready for Excel or Google Sheets. CSV import accepts the new columns too.
+## Scoring (v2)
+The default weights are Nutrition 25, Training 25, Sleep 15, **Wellness 15**, Screen 10 and Family 10. They're editable in Setup and Save is refused unless they add up to 100. Installs with saved params that have no `wWellness` are migrated to these defaults on load.
+- **Training** is the average daily % of scheduled sessions completed. A rest day counts as 100. Legacy days count Y = 100 and N or blank = 0. An unscheduled extra session is logged and added to load but doesn't change the training %.
+- **Wellness** uses Energy, Soreness, Mood and Stress, each 1–5 with 5 = best (fresh / no soreness / great / no stress). They're mapped 1→0 … 5→100 and averaged, over days that have all four. All four are required daily. Any 1–2 rating in the last 3 days raises a 🚩 flag.
+- **Consistency bonus** (+5/+3/+1 at ≥90/75/60%) counts days with Nutrition = Y **and** 100% of scheduled sessions done.
+
+## Training schedule
+Sign-up (and Setup → Edit profile & training schedule) asks "Do you train once or twice a day?", then Rest / 1 / 2 sessions for each weekday with optional labels. It's pre-filled from the Weekly Outline (sessions 1–2; "Rest/Recovery" focus = rest day). Saving the schedule writes the labels into the current and future Weekly Outlines. The daily log asks "Did you complete session N (label)?" for each of today's sessions. RPE (1–10) and minutes are required for each completed session. Session load is the sum of RPE × minutes over all sessions plus the extra one, so two-a-days add up correctly in the weekly load bars and the acute:chronic ratio.
+
+## Complete days, streaks, banners
+A day logged in v2 is complete only when it has nutrition, every scheduled session answered (with RPE + minutes if done), sleep, screen, family and all 4 wellness ratings. Days stored before v2 keep the old 5-item rule, so existing streaks stay valid. The Day-1 banner, the "still to log" message after saving, and the morning/evening reminders use the same rules. Morning = sleep + nutrition + wellness. Evening = sessions + screen + family.
+
+## Other insights
+- **Streak 🔥** with a 28-day grid. Quick sleep and screen chips.
+- **Weight-cut safety:** >1%/week bodyweight loss = caution, >1.5% = warning. There's also a pace check against the target weight and fight date (ISSN combat-sports guidance of ~0.5–1 kg/week).
+- **Acute:chronic load ratio** after 28 days of data (>1.5 spike, <0.8 light).
+- **CSV export/import** columns: Date, Nutrition, Training, Sleep_Hours, Screen_Hours, Family_Friends, Weight, Notes, Energy, Soreness, Mood, Stress, Wellness_Score, Sessions_Scheduled, Sessions_Done, Training_Pct, S1_Label, S1_Done, S1_RPE, S1_Min, S2_Label, S2_Done, S2_RPE, S2_Min, Extra_Label, Extra_RPE, Extra_Min, Session_Load, Complete.
 
 ## Testing phase: weekly report to Phill
 Config lives in `weekly.js` → `CONFIG`:
 - `ADMIN_EMAIL: 'philljustice@gmail.com'` is the weekly report recipient.
 - `SHOW_COACH_CONTACT: false` hides the coach email/phone field on sign-up and profile. Existing saved values are kept untouched. The value is never shown on the Coach Report or in the share text. Set it to `true` to bring the field back.
 
-The report week runs Monday–Sunday. On Sunday, and on every open after that until it's sent, the Score screen shows **Send weekly report to Phill**. Tapping it uses the Web Share API with the CSV of all logs attached, plus a text summary: name, score, streak, weight trend, flags (weight-cut warnings, low wellness, notes). The fighter picks Mail. If file sharing isn't supported, it opens a `mailto:` to the admin with subject `Fight Readiness weekly – <fighter> – <Mon> to <Sun>` and the summary plus CSV rows in the body. The body is kept under about 1800 characters by cutting down to the last 14 days (or fewer). The week is marked sent in `weeklySent` (local only). There are manual **Send report to Phill** buttons in Setup and Report. Tested in `test-weekly.js`.
+The report week runs Monday–Sunday. On Sunday, and on every open after that until it's sent, the Score screen shows **Send weekly report to Phill**. Tapping it uses the Web Share API with the CSV of all logs attached, plus a text summary: name, score, streak, training sessions done/scheduled + load, wellness average, weight trend, flags (weight-cut warnings, low wellness, notes). The fighter picks Mail. If file sharing isn't supported, it opens a `mailto:` to the admin with subject `Fight Readiness weekly – <fighter> – <Mon> to <Sun>` and the summary plus CSV rows in the body. The body is kept under about 1800 characters by cutting down to the last 14 days (or fewer). The week is marked sent in `weeklySent` (local only). There are manual **Send report to Phill** buttons in Setup and Report. Tested in `test-weekly.js`.

@@ -7,7 +7,14 @@ let st = I.streak([full(1),full(2),full(3),full(5),full(6),full(7),full(8)], tod
 st = I.streak([full(0),full(1)], today); assert.equal(st.current,2); assert.equal(st.todayDone,true);
 assert.equal(I.streak([full(0,{sleep:''}),full(1)], today).current,1); // today incomplete -> doesn't break
 assert.equal(I.streak([full(2)], today).current,0); // missed yesterday
-assert.equal(I.isComplete(full(0,{family:null})), false); assert.equal(I.isPartial({date:d(0),weight:170,nutrition:null}), true);
+assert.equal(I.isComplete(full(0,{family:null})), false);
+// v2 completion needs wellness + all sessions answered with effort/minutes
+const W4 = {energy:4,soreness:4,mood:4,stress:4}, v2 = o => full(0, Object.assign({v:2, training:undefined, sessions:[{label:'A',done:true,rpe:6,mins:60}]}, W4, o));
+assert.equal(I.isComplete(v2({})), true); assert.deepEqual(I.missing(v2({energy:''})), ['wellness (energy, soreness, mood, stress)']);
+assert.deepEqual(I.missing(v2({sessions:[{done:true,rpe:'',mins:60}]})), ['session effort + minutes']);
+assert.deepEqual(I.missing(v2({sessions:[{done:null}]})), ['training']); assert.equal(I.isComplete(v2({sessions:[]})), true);
+assert.equal(I.isComplete(v2({sessions:[{done:false,rpe:'',mins:''}]})), true);
+assert.equal(I.missing(undefined).length, 6); assert.equal(I.isPartial({date:d(0),weight:170,nutrition:null}), true);
 const g = I.grid([full(0),{date:d(1),weight:170}], today, 7); assert.equal(g.length,7); assert.equal(g[6].status,'done'); assert.equal(g[5].status,'partial'); assert.equal(g[0].status,'none');
 // wellness
 assert.equal(I.dayWellness({energy:4,soreness:2,mood:'',stress:null}),3); assert.equal(I.dayWellness({}),null);
@@ -26,8 +33,10 @@ assert.ok(Math.abs(S.weightDelta(wt(196,200), S.dayNum(d(0))) - -4) < 1e-9); // 
 let p = I.cutSafety([full(0,{weight:170})], today, {targetWeight:155, fightDate:S.ymd(new Date(2026,9,19+35))}).pace; assert.equal(p.perWeek,3); assert.equal(p.level,'warn');
 p = I.cutSafety([full(0,{weight:160})], today, {targetWeight:155, fightDate:S.ymd(new Date(2026,9,19+70))}).pace; assert.equal(p.level,'ok');
 // CSV
-const csv = I.toCSV([full(0,{notes:'sore, "left" knee',rpe:6,mins:90}), full(1)]); const lines = csv.trim().split('\r\n');
-assert.equal(lines[0], I.CSV_COLS.join(',')); assert.ok(lines[1].startsWith(d(1)+',Y,Y,8,1,N')); assert.ok(lines[2].includes('"sore, ""left"" knee"')); assert.ok(lines[2].includes(',6,90,540,Y'));
+const csv = I.toCSV([full(0,{notes:'sore, "left" knee',rpe:6,mins:90}), full(1)]);
+const csv2 = I.toCSV([full(0,{v:2,energy:4,soreness:4,mood:4,stress:4,sessions:[{label:'Wrestling',done:true,rpe:7,mins:90},{label:'Strength',done:false,rpe:'',mins:''}],extra:{label:'Run',rpe:3,mins:20}})]).trim().split('\r\n')[1];
+assert.ok(csv2.includes(',75,2,1,50,Wrestling,Y,7,90,Strength,N,,,Run,3,20,690,Y'), csv2); const lines = csv.trim().split('\r\n');
+assert.equal(lines[0], I.CSV_COLS.join(',')); assert.ok(lines[1].startsWith(d(1)+',Y,Y,8,1,N')); assert.ok(lines[2].includes('"sore, ""left"" knee"')); assert.ok(lines[2].includes(',1,100,,Y,6,90,,,,,,,,540,Y'), lines[2]);
 // core score unaffected by optional fields
 const base = Array.from({length:10},(_,i)=>full(i)); const extra = base.map(e=>Object.assign({},e,{energy:1,soreness:1,rpe:10,mins:200}));
 assert.equal(S.compute(base,today).score, S.compute(extra,today).score);

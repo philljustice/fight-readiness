@@ -1,9 +1,24 @@
 // Scoring logic. Shared by app + node tests.
 (function (root) {
-  const DEFAULT_PARAMS = { wNutrition:30, wTraining:30, wSleep:20, wScreen:10, wFamily:10,
+  const DEFAULT_PARAMS = { wNutrition:25, wTraining:25, wSleep:15, wWellness:15, wScreen:10, wFamily:10,
     idealSleep:8, sleepPenalty:25, screenFree:2, screenPenalty:40, windowDays:21, unlockDays:7, startDate:null,
     // tiered bonus as in Dashboard!C24: >=90% -> 5, >=75% -> 3, >=60% -> 1
     bonusTiers:[[90,5],[75,3],[60,1]] };
+  const WELL_KEYS = ['energy','soreness','mood','stress']; // all stored 1-5 with 5 = best (fresh / no soreness / great / no stress)
+  const isNum = v => v !== '' && v != null && !isNaN(v);
+  // Wellness 0-100 = average of the four ratings mapped 1->0 ... 5->100. null if not all four rated.
+  function wellnessScore(e) { if (!e) return null; const v = WELL_KEYS.map(k => e[k]);
+    if (!v.every(x => isNum(x) && +x >= 1 && +x <= 5)) return null; return v.reduce((s,x)=>s+(+x-1)*25,0)/4; }
+  // Training 0-100 for one day. v2 entries: % of scheduled sessions completed (rest day = 100). Legacy: Y=100, N/blank=0.
+  function trainingPct(e) { if (!e) return 0;
+    if (Array.isArray(e.sessions)) { if (!e.sessions.length) return 100; return e.sessions.filter(x => x.done === true).length / e.sessions.length * 100; }
+    return e.training === true ? 100 : 0; }
+  // Completed sessions with load (scheduled + optional extra; legacy single rpe/mins)
+  function sessionsDone(e) { if (!e) return [];
+    const out = Array.isArray(e.sessions) ? e.sessions.filter(x => x.done === true).map(x => ({ label:x.label||'', rpe:x.rpe, mins:x.mins })) : (isNum(e.rpe) || isNum(e.mins) ? [{ label:'', rpe:e.rpe, mins:e.mins }] : []);
+    if (e.extra && (isNum(e.extra.rpe) || isNum(e.extra.mins) || e.extra.label)) out.push({ label:(e.extra.label||'Extra')+' (extra)', rpe:e.extra.rpe, mins:e.extra.mins, extra:true });
+    return out; }
+  const sessionLoad = e => { const L = sessionsDone(e).filter(x => isNum(x.rpe) && isNum(x.mins) && +x.rpe > 0 && +x.mins > 0).map(x => Math.round(+x.rpe * +x.mins)); return L.length ? L.reduce((a,b)=>a+b,0) : null; };
   const sleepScore = (h, p = DEFAULT_PARAMS) => Math.max(0, 100 - p.sleepPenalty * Math.abs(h - p.idealSleep));
   const screenScore = (h, p = DEFAULT_PARAMS) => h <= p.screenFree ? 100 : Math.max(0, 100 - p.screenPenalty * (h - p.screenFree));
   const ymd = d => { const x = new Date(d); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); };
@@ -42,13 +57,14 @@
     const N = w.length;
     const pctY = k => N ? w.filter(e => e[k] === true).length / N * 100 : 0; // blank counts as N, like COUNTIFS/N4
     const cats = {
-      nutrition: pctY('nutrition'), training: pctY('training'), family: pctY('family'),
+      nutrition: pctY('nutrition'), training: N ? avg(w.map(trainingPct)) : 0, family: pctY('family'),
+      wellness: N ? (avg(w.map(wellnessScore).filter(v => v != null)) || 0) : 0,
       sleep: N ? (avg(w.filter(e => num(e.sleep)).map(e => sleepScore(+e.sleep, p))) || 0) : 0,
       screen: N ? (avg(w.filter(e => num(e.screen)).map(e => screenScore(+e.screen, p))) || 0) : 0,
     };
-    const wt = { nutrition:p.wNutrition, training:p.wTraining, sleep:p.wSleep, screen:p.wScreen, family:p.wFamily };
+    const wt = { nutrition:p.wNutrition, training:p.wTraining, sleep:p.wSleep, wellness:p.wWellness||0, screen:p.wScreen, family:p.wFamily };
     let base = 0; for (const k in cats) base += cats[k] * wt[k] / 100;
-    const consistency = N ? w.filter(e => e.nutrition === true && e.training === true).length / N * 100 : 0;
+    const consistency = N ? w.filter(e => e.nutrition === true && trainingPct(e) === 100).length / N * 100 : 0;
     const bonus = bonusFor(consistency, p);
     const final = Math.min(100, base + bonus);
     const delta = weightDelta(entries, t);
@@ -57,6 +73,6 @@
       delta, trend: trendLabel(delta), verdict: verdict(final), dataQuality: dataQuality(N),
       latestWeight: weighed.length ? weighed[weighed.length-1] : null, windowEntries: w };
   }
-  const api = { DEFAULT_PARAMS, sleepScore, screenScore, weightDelta, trendLabel, compute, ymd, dayNum, verdict, dataQuality };
+  const api = { WELL_KEYS, wellnessScore, trainingPct, sessionsDone, sessionLoad, DEFAULT_PARAMS, sleepScore, screenScore, weightDelta, trendLabel, compute, ymd, dayNum, verdict, dataQuality };
   if (typeof module !== 'undefined') module.exports = api; else root.Scoring = api;
 })(this);

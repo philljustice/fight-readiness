@@ -23,16 +23,19 @@
       `SUMMARY:${esc(summary)}`, `DESCRIPTION:${esc(desc + (url ? '\nOpen app: ' + url : ''))}`, ...(url ? [`URL:${url}`] : []),
       'TRANSP:TRANSPARENT', 'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${esc(summary)}`, 'TRIGGER:-PT0M', 'END:VALARM', 'END:VEVENT'];
     const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Fight Readiness//Reminders//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:Fight Readiness',
-      ...ev('morning', morning, 'FREQ=DAILY', '🥊 Morning log: sleep + nutrition', 'Log last night\'s sleep hours and whether you\'re following your nutrition plan today.'),
+      ...ev('morning', morning, 'FREQ=DAILY', '🥊 Morning log: sleep + nutrition + how you feel', 'Log last night\'s sleep hours, whether you\'re following your nutrition plan today, and how you feel (energy, soreness, mood, stress 1-5).'),
       ...ev('weighin', morning, 'FREQ=WEEKLY;BYDAY=MO,TH', '⚖️ Weigh-in day (Mon/Thu)', 'Weigh in before eating: after the bathroom, same scale, minimal clothing. Log the weight in the app.', wStart),
-      ...ev('evening', evening, 'FREQ=DAILY', '🥊 Evening log: training + screen + family', 'Log training (done Y/N), recreational screen hours, family/friends time, and any notes (injuries, illness, soreness).'),
+      ...ev('evening', evening, 'FREQ=DAILY', '🥊 Evening log: training + screen + family', 'Log training (each session done Y/N, effort RPE + minutes), recreational screen hours, family/friends time, and any notes (injuries, illness, soreness).'),
       ...ev('weekly', '18:00', 'FREQ=WEEKLY;BYDAY=SU', 'Send weekly Fight Readiness report to Phill', 'Open the Fight Readiness app and tap "Send weekly report to Phill" (then pick Mail and tap Send).', sun),
       'END:VCALENDAR'];
     return lines.map(fold).join('\r\n') + '\r\n';
   }
   const num = v => v !== '' && v != null && !isNaN(v);
-  const morningDone = e => !!e && num(e.sleep) && (e.nutrition === true || e.nutrition === false);
-  const eveningDone = e => !!e && (e.training === true || e.training === false) && num(e.screen) && (e.family === true || e.family === false);
+  const wellOK = e => !(e.v >= 2) || ['energy','soreness','mood','stress'].every(k => num(e[k]) && +e[k] >= 1);
+  const trainOK = e => e.v >= 2 ? Array.isArray(e.sessions) && e.sessions.every(x => x.done === false || (x.done === true && num(x.rpe) && num(x.mins))) : (e.training === true || e.training === false);
+  // morning = sleep + nutrition + wellness (energy/soreness/mood/stress); evening = sessions (+ effort/minutes) + screen + family
+  const morningDone = e => !!e && num(e.sleep) && (e.nutrition === true || e.nutrition === false) && wellOK(e);
+  const eveningDone = e => !!e && trainOK(e) && num(e.screen) && (e.family === true || e.family === false);
   const mins = hm => { const [h, m] = hm.split(':').map(Number); return h * 60 + m; };
   // which reminders are due & unfinished right now
   function due(entry, now, morning = '07:00', evening = '21:00') {

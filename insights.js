@@ -6,8 +6,17 @@
   const num = v => v !== '' && v != null && !isNaN(v);
   const avg = a => a.length ? a.reduce((s,v)=>s+v,0)/a.length : null;
   const CORE = ['nutrition','training','sleep','screen','family'];
-  const WELL = [['energy','Energy','😴 Drained','⚡ Fresh'],['soreness','Soreness','🥵 Very sore','💪 No soreness'],['mood','Mood','😠 Down','😄 Great'],['stress','Stress','😫 Very stressed','😌 Relaxed']];
-  const isComplete = e => !!e && e.nutrition != null && e.training != null && e.family != null && num(e.sleep) && num(e.screen);
+  const WELL = [['energy','Energy','1 = drained','5 = fresh'],['soreness','Soreness','1 = very sore','5 = no soreness'],['mood','Mood','1 = down','5 = great'],['stress','Stress','1 = very stressed','5 = no stress']];
+  // What's still missing for a complete day. v2 (current) entries need wellness + every scheduled session answered (with RPE + minutes if done).
+  function missing(e) { const m = [];
+    if (!e || e.nutrition == null) m.push('nutrition');
+    if (!e || (e.v >= 2 ? !Array.isArray(e.sessions) || e.sessions.some(x => x.done == null) : e.training == null)) m.push('training');
+    if (e && e.v >= 2 && Array.isArray(e.sessions) && e.sessions.some(x => x.done === true && !(num(x.rpe) && num(x.mins) && +x.mins > 0))) m.push('session effort + minutes');
+    if (!e || !num(e.sleep)) m.push('sleep'); if (!e || !num(e.screen)) m.push('screen time'); if (!e || e.family == null) m.push('family/friends');
+    if ((!e || e.v >= 2) && S.wellnessScore(e) == null) m.push('wellness (energy, soreness, mood, stress)');
+    return m; }
+  // Legacy (pre-v2) days with the old 5 items stay complete.
+  const isComplete = e => !!e && !missing(e).length;
   const isPartial = e => !!e && !isComplete(e) && (CORE.some(k => num(e[k]) || e[k] === true || e[k] === false) || num(e.weight));
   // Streak = consecutive fully-logged days. Today not done yet doesn't break it (counts up to yesterday).
   function streak(entries, today = new Date()) {
@@ -26,7 +35,7 @@
     return out;
   }
   const dayWellness = e => { const v = WELL.map(w => e && e[w[0]]).filter(x => num(x) && x >= 1 && x <= 5).map(Number); return v.length ? avg(v) : null; };
-  const sessionLoad = e => e && num(e.rpe) && num(e.mins) && +e.rpe > 0 && +e.mins > 0 ? Math.round(+e.rpe * +e.mins) : null;
+  const sessionLoad = S.sessionLoad;
   const inRange = (entries, t, from, to) => entries.filter(e => { const n = dayNum(e.date); return n >= t - from && n <= t - to; });
   function wellness(entries, today = new Date()) {
     const t = dayNum(ymd(today)), last7 = inRange(entries, t, 6, 0), base = inRange(entries, t, 27, 0);
@@ -39,13 +48,13 @@
   // Weekly load (sum of sRPE x minutes) and acute:chronic ratio (7-day avg / 28-day avg). Ratio only after 28 days of data.
   function load(entries, today = new Date()) {
     const t = dayNum(ymd(today)), L = es => es.map(sessionLoad).filter(v => v != null);
-    const w = L(inRange(entries, t, 6, 0)), m = L(inRange(entries, t, 27, 0));
+    const w = L(inRange(entries, t, 6, 0)), m = L(inRange(entries, t, 27, 0)), nSess = inRange(entries, t, 6, 0).reduce((s,e)=>s+S.sessionsDone(e).length,0);
     const week = w.reduce((s,v)=>s+v,0), month = m.reduce((s,v)=>s+v,0);
     const firstLoad = entries.filter(e => sessionLoad(e) != null).map(e => dayNum(e.date)).sort((a,b)=>a-b)[0];
     const enough = firstLoad != null && t - firstLoad >= 27 && month > 0;
     const acwr = enough ? Math.round((week/7)/(month/28)*100)/100 : null;
     const weeks = []; for (let i = 3; i >= 0; i--) weeks.push(L(inRange(entries, t, i*7+6, i*7)).reduce((s,v)=>s+v,0));
-    return { week, sessions: w.length, acwr, weeks, flag: acwr == null ? null : acwr > 1.5 ? 'spike' : acwr < 0.8 ? 'low' : 'ok' };
+    return { week, sessions: nSess, days: w.length, acwr, weeks, flag: acwr == null ? null : acwr > 1.5 ? 'spike' : acwr < 0.8 ? 'low' : 'ok' };
   }
   // Weight-cut safety. ISSN (2025) combat-sports position stand: aim ~0.5-1 kg/week of gradual loss.
   // We flag loss faster than 1%/week as caution and >1.5%/week as warning.
@@ -63,11 +72,14 @@
     return out;
   }
   const csvCell = v => { const s = v == null ? '' : v === true ? 'Y' : v === false ? 'N' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; };
-  const CSV_COLS = ['Date','Nutrition','Training','Sleep_Hours','Screen_Hours','Family_Friends','Weight','Notes','Energy','Soreness','Mood','Stress','RPE','Session_Min','Session_Load','Complete'];
+  const CSV_COLS = ['Date','Nutrition','Training','Sleep_Hours','Screen_Hours','Family_Friends','Weight','Notes','Energy','Soreness','Mood','Stress','Wellness_Score','Sessions_Scheduled','Sessions_Done','Training_Pct','S1_Label','S1_Done','S1_RPE','S1_Min','S2_Label','S2_Done','S2_RPE','S2_Min','Extra_Label','Extra_RPE','Extra_Min','Session_Load','Complete'];
   function toCSV(entries) {
-    const rows = entries.slice().sort((a,b)=>a.date<b.date?-1:1).map(e => [e.date,e.nutrition,e.training,e.sleep,e.screen,e.family,e.weight,e.notes,e.energy,e.soreness,e.mood,e.stress,e.rpe,e.mins,sessionLoad(e),isComplete(e)?'Y':'N'].map(csvCell).join(','));
+    const sess = e => Array.isArray(e.sessions) ? e.sessions : (e.training != null || num(e.rpe) ? [{ label:'', done:e.training, rpe:e.rpe, mins:e.mins }] : []);
+    const rows = entries.slice().sort((a,b)=>a.date<b.date?-1:1).map(e => { const ss = sess(e), x = e.extra || {}, sc = i => ss[i] ? [ss[i].label, ss[i].done, ss[i].rpe, ss[i].mins] : ['','','',''];
+      const ws = S.wellnessScore(e);
+      return [e.date,e.nutrition,S.trainingPct(e)===100,e.sleep,e.screen,e.family,e.weight,e.notes,e.energy,e.soreness,e.mood,e.stress,ws==null?'':ws,Array.isArray(e.sessions)?ss.length:'',ss.filter(s=>s.done===true).length,Math.round(S.trainingPct(e)),...sc(0),...sc(1),x.label,x.rpe,x.mins,sessionLoad(e),isComplete(e)?'Y':'N'].map(csvCell).join(','); });
     return [CSV_COLS.join(',')].concat(rows).join('\r\n') + '\r\n';
   }
-  const api = { WELL, isComplete, isPartial, streak, grid, dayWellness, sessionLoad, wellness, load, cutSafety, toCSV, CSV_COLS };
+  const api = { WELL, missing, isComplete, isPartial, streak, grid, dayWellness, sessionLoad, wellness, load, cutSafety, toCSV, CSV_COLS };
   if (typeof module !== 'undefined') module.exports = api; else root.Insights = api;
 })(this);

@@ -25,7 +25,7 @@ evs.forEach(x => { assert(get(x,'UID')); assert(/^\d{8}T\d{6}Z$/.test(get(x,'DTS
   assert(get(x,'DESCRIPTION').includes('https://team.example/app/')); assert(x.includes('TRIGGER:-PT0M')); assert(x.includes('ACTION:DISPLAY')); });
 assert.equal(new Set(evs.map(x=>get(x,'UID'))).size, 4);
 // escaping
-assert(R.buildICS({fighter:'a'}).includes('Log training (done Y/N)\\, recreational'));
+assert(R.buildICS({fighter:'a'}).replace(/\r\n /g,'').includes('Log training (each session done Y/N\\, effort RPE + minutes)\\, recreational'));
 // due logic
 const full = {nutrition:true, sleep:8, training:true, screen:1, family:false};
 assert.deepEqual(R.due(undefined, new Date(2026,9,19,6,59)), []);
@@ -35,6 +35,13 @@ assert.deepEqual(R.due({nutrition:true, sleep:''}, new Date(2026,9,19,12,0)), ['
 assert.deepEqual(R.due({nutrition:true, sleep:7}, new Date(2026,9,19,21,30)), ['evening']);
 assert.deepEqual(R.due(undefined, new Date(2026,9,19,21,30)), ['morning','evening']);
 assert.deepEqual(R.due(full, new Date(2026,9,19,23,0)), []);
+// v2 entries: wellness needed in the morning, sessions with effort/minutes in the evening
+const v2 = Object.assign({}, full, {v:2, energy:4, soreness:4, mood:4, stress:4, sessions:[{done:true,rpe:6,mins:60}]});
+assert.deepEqual(R.due(v2, new Date(2026,9,19,23,0)), []);
+assert.deepEqual(R.due(Object.assign({}, v2, {mood:''}), new Date(2026,9,19,23,0)), ['morning']);
+assert.deepEqual(R.due(Object.assign({}, v2, {sessions:[{done:true,rpe:'',mins:60}]}), new Date(2026,9,19,23,0)), ['evening']);
+assert.deepEqual(R.due(Object.assign({}, v2, {sessions:[{done:null}]}), new Date(2026,9,19,23,0)), ['evening']);
+assert.deepEqual(R.due(Object.assign({}, v2, {sessions:[]}), new Date(2026,9,19,23,0)), []);
 const tue = R.buildICS({now:new Date(2026,9,20,9,0)}).replace(/\r\n /g,'');
 assert(tue.includes('UID:fighter-weighin@fight-readiness') && /BYDAY=MO,TH[\s\S]*?/.test(tue));
 assert.equal(tue.split('BEGIN:VEVENT')[2].match(/DTSTART:(\d{8})/)[1], '20261022'); // Tue -> next Thu
