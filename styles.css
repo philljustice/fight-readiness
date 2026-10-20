@@ -1,0 +1,16 @@
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,sans-serif;background:#111;color:#eee;padding-bottom:80px}
+header{background:#c62828;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top))}h1{margin:0;font-size:1.2rem}
+main{padding:16px;max-width:640px;margin:auto}.card{background:#1e1e1e;border-radius:12px;padding:14px;margin-bottom:14px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#1a1a1a;border-top:1px solid #333;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;background:none;border:0;color:#aaa;font-size:1.3rem;padding:8px 0}nav button span{display:block;font-size:.7rem}nav button.on{color:#ff5252}
+.big{font-size:4.5rem;font-weight:800;text-align:center;line-height:1}.muted{color:#999;font-size:.9rem}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:10px 0}
+.bar{height:10px;background:#333;border-radius:5px;overflow:hidden;flex:1}.bar i{display:block;height:100%;background:#ff5252}
+.yn{display:flex;gap:8px}.yn button{flex:1;padding:16px;font-size:1.1rem;border-radius:10px;border:2px solid #444;background:#222;color:#eee}
+.yn button.y.on{background:#2e7d32;border-color:#2e7d32}.yn button.n.on{background:#b71c1c;border-color:#b71c1c}
+label{display:block;margin:14px 0 6px;font-weight:600}input,textarea,select{width:100%;padding:12px;font-size:1.05rem;border-radius:10px;border:1px solid #444;background:#222;color:#eee}
+.step{display:flex;gap:8px}.step button{width:56px;font-size:1.4rem;border-radius:10px;border:0;background:#333;color:#fff}.step input{text-align:center}
+.btn{display:block;width:100%;padding:15px;font-size:1.05rem;border:0;border-radius:10px;background:#c62828;color:#fff;margin-top:12px}.btn.alt{background:#333}
+.hint{background:#3e2723;border-left:4px solid #ff9800;padding:10px;border-radius:6px}table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #333;padding:6px;text-align:left;vertical-align:top}
+.day input,.day select{margin-bottom:6px;padding:9px;font-size:.95rem}svg{width:100%;height:auto}
+@media print{body{background:#fff;color:#000;padding:0}header,nav,.noprint{display:none!important}.card{background:#fff;border:1px solid #ccc;break-inside:avoid;padding:8px;margin-bottom:8px}main{max-width:none;padding:0}.muted{color:#444}.bar{background:#ddd}.bar i{background:#c62828}@page{margin:10mm}body{font-size:11px}.big{font-size:2.6rem}h2{font-size:1.1rem}h3{margin:2px 0;font-size:.95rem}p{margin:3px 0}svg{max-height:110px}td,th{padding:2px 4px}}

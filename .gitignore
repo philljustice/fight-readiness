@@ -1,0 +1,5 @@
+*.xlsx
+*.csv
+*.ics
+*backup*.json
+node_modules/
