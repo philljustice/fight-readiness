@@ -237,12 +237,13 @@ const V = {
   <div class="card" id="remCard"><h3>⏰ Reminders</h3>
    <label for="r_morning">Morning reminder</label><select id="r_morning">${Reminders.MORNING_TIMES.map(t=>`<option ${t===Reminders.nearest(S.reminders.morning,Reminders.MORNING_TIMES)?'selected':''}>${t}</option>`).join('')}</select>
    <label for="r_evening">Evening reminder</label><select id="r_evening">${Reminders.EVENING_TIMES.map(t=>`<option ${t===Reminders.nearest(S.reminders.evening,Reminders.EVENING_TIMES)?'selected':''}>${t}</option>`).join('')}</select>
-   <a class="btn" id="calLink" href="${calURL()}" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">📅 Add reminders to my calendar</a>
+   <div id="pushBox">${pushBox()}</div>
+   <p class="muted" style="margin-top:12px"><b>Or use calendar reminders</b> (backup option):</p>
+   <a class="btn alt" id="calLink" href="${calURL()}" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">📅 Add reminders to my calendar</a>
    <div class="hint" style="margin-top:10px"><b>iPhone:</b> tap the button above. Safari opens a calendar preview with 4 events. Tap <b>Add All</b> (top right), pick your calendar, then come back to the app.<br><b>Android:</b> open the downloaded file and choose your Calendar app to import it.</div>
    <a class="btn alt" id="calSub" href="${calURL().replace(/^https?:/,'webcal:')}" style="text-align:center;text-decoration:none">🔁 Or subscribe (webcal)</a>
    <p class="muted">Subscribe also works. On iPhone, open Settings → Calendar → Accounts → Subscribed Calendars → Fight Readiness and turn <b>off</b> "Remove Alerts", or the alarms won't ring.</p>
    <button class="btn alt" id="icsShare">📤 Share / save the calendar file</button>
-   <button class="btn alt" id="notifBtn">🔔 Also notify me while the app is open</button>
    <p class="muted">The calendar file adds 4 repeating events with alarms: a daily morning log, a Mon/Thu weigh-in, a daily evening log, and a Sunday 6 PM reminder to send the weekly report to ${Weekly.CONFIG.ADMIN_NAME}. <b>Already added reminders before? Tap the button again to get the new Sunday reminder</b> (delete the old duplicates in your calendar). If you change the times, tap the button again and delete the old events in your calendar.</p></div>
   <div class="card"><h3>Backup & import</h3>
    <button class="btn" id="exportBtn">⬇️ Export backup (JSON)</button><button class="btn alt" id="csvBtn">📊 Export log as CSV (Excel / Google Sheets)</button><button class="btn alt" data-send="1">📧 Send report to ${Weekly.CONFIG.ADMIN_NAME}</button>
@@ -347,6 +348,12 @@ document.addEventListener('click', async ev => {
     case 'wkDel': if (S.weeks.length>1 && confirm('Delete this week?')) { S.weeks.splice(S.weekIdx,1); S.weekIdx=Math.max(0,S.weekIdx-1); save(); show('plan'); } else if (S.weeks.length===1) alert('Keep at least one week.'); return;
     case 'icsBtn': return addToCalendar();
     case 'icsShare': return shareICS();
+    case 'pushOn': { const b = t; b.disabled = true; b.textContent = 'Turning on…';
+      try { await Push.enable(S.reminders, (S.profile&&S.profile.name)||S.fighter); S.push = true; S.notify = true; save(); alert('🔔 Notifications are on. You\'ll get your morning and evening check-ins, the Mon/Thu weigh-in, and the Sunday 6 PM report reminder, even when the app is closed.'); }
+      catch (e) { alert(e.message==='denied' ? 'Notifications were blocked. To allow them: iPhone Settings → Notifications → Fight Readiness. Calendar reminders below still work.' : 'Could not turn on notifications (' + e.message + '). Check your connection and try again, or use the calendar reminders.'); }
+      return show('setup'); }
+    case 'pushOff': await Push.disable(); S.push = false; save(); alert('Notifications are off.'); return show('setup');
+    case 'pushTest': if (!navigator.serviceWorker) return; (await navigator.serviceWorker.ready).showNotification('🥊 Fight Readiness', { body:'Test: notifications work on this phone.', icon:'icons/icon-192.png', tag:'fr-test' }); return;
     case 'notifBtn': if (!('Notification' in window)) return alert('Notifications are not supported here. Use the calendar reminders.');
       { const p = await Notification.requestPermission(); S.notify = p==='granted'; save(); alert(p==='granted'?'OK. You\'ll get a notification if the app is open at reminder time.':'Notifications are off. The calendar reminders still work.'); } return;
     case 'printBtn': return window.print();
@@ -379,7 +386,7 @@ document.addEventListener('input', ev => { const t = ev.target, w = S.weeks[S.we
   else if (t.id && t.id.startsWith('w_')) { w[t.id.slice(2)] = t.value; save(); }
 });
 document.addEventListener('change', async ev => { const t = ev.target;
-  if (t.id === 'r_morning' || t.id === 'r_evening') { if (t.value) { S.reminders[t.id.slice(2)] = t.value; save(); $('#calLink').href = calURL(); $('#calSub').href = calURL().replace(/^https?:/,'webcal:'); } return; }
+  if (t.id === 'r_morning' || t.id === 'r_evening') { if (t.value) { S.reminders[t.id.slice(2)] = t.value; save(); if (S.push) Push.update(S.reminders, (S.profile&&S.profile.name)||S.fighter).catch(()=>{}); $('#calLink').href = calURL(); $('#calSub').href = calURL().replace(/^https?:/,'webcal:'); } return; }
   if (t.id === 'wkSel') { S.weekIdx = +t.value; save(); return show('plan'); }
   if (t.id === 'w_start') return show('plan');
   if (t.id === 'f_date') { V._date = t.value; return show('log'); }
@@ -390,6 +397,12 @@ document.addEventListener('change', async ev => { const t = ev.target;
       else { const rows = parseCSV(text); upsert(rows); alert(`Imported ${rows.length} days ✔`); }
       show('dash'); } catch (e) { alert('Import failed: ' + e.message); } }
 });
+function pushBox() { const st = Push.status();
+  if (st === 'not-configured') return '<p class="muted">🔔 Push notifications are coming soon. Use the calendar reminders for now.</p>';
+  if (st === 'ios-install') return '<div class="hint">🔔 <b>Want notifications?</b> On iPhone they only work from the Home Screen app. In Safari tap Share → <b>Add to Home Screen</b>, open Fight Readiness from the new icon, then come back to Setup and tap <i>Turn on notifications</i>. (Needs iOS 16.4 or newer.)</div>';
+  if (st === 'unsupported') return '<p class="muted">🔔 This browser can\'t receive notifications. Use the calendar reminders below.</p>';
+  if (S.push && typeof Notification !== 'undefined' && Notification.permission === 'granted') return '<p>🔔 <b>Notifications are on.</b> Changing the times above updates them automatically.</p><button class="btn alt" id="pushTest">Send a test notification</button><button class="btn alt" id="pushOff">Turn off notifications</button>';
+  return '<button class="btn" id="pushOn">🔔 Turn on notifications</button><p class="muted">Recommended. Sends your morning and evening check-ins, the Mon/Thu weigh-in, and the Sunday 6 PM weekly-report reminder, even when the app is closed. Only your reminder times, time zone and first name are sent to the reminder server; your logs stay on this phone.</p>'; }
 function calURL() { return new URL(Reminders.calFile(S.reminders.morning, S.reminders.evening), location.href.replace(/[#?].*$/,'')).href; }
 async function shareICS() { const url = calURL(), name = 'fight-readiness-reminders.ics';
   try { const txt = await (await fetch(url, { cache:'no-store' })).text(); const f = new File([txt], name, { type:'text/calendar' });
@@ -411,4 +424,6 @@ function reminderTick() {
 setInterval(reminderTick, 60000); document.addEventListener('visibilitychange', () => { if (!document.hidden) reminderTick(); });
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js');
 if (!S.profile && S.fighter) S.profile = { name:S.fighter, coach:S.coach||'', targetWeight:S.targetWeight||'', startWeight:'' }; // migrate older installs
-show('dash');
+{ const q = new URLSearchParams(location.search).get('tab'); show(['dash','log','plan','report','setup','help'].includes(q) ? q : 'dash'); }
+if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.tab) { V._date = null; show(e.data.tab); } });
+if (S.push) Push.update(S.reminders, (S.profile&&S.profile.name)||S.fighter).catch(()=>{});
