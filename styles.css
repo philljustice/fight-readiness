@@ -14,3 +14,4 @@ label{display:block;margin:14px 0 6px;font-weight:600}input,textarea,select{widt
 .hint{background:#3e2723;border-left:4px solid #ff9800;padding:10px;border-radius:6px}table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #333;padding:6px;text-align:left;vertical-align:top}
 .day input,.day select{margin-bottom:6px;padding:9px;font-size:.95rem}svg{width:100%;height:auto}
 @media print{body{background:#fff;color:#000;padding:0}header,nav,.noprint{display:none!important}.card{background:#fff;border:1px solid #ccc;break-inside:avoid;padding:8px;margin-bottom:8px}main{max-width:none;padding:0}.muted{color:#444}.bar{background:#ddd}.bar i{background:#c62828}@page{margin:10mm}body{font-size:11px}.big{font-size:2.6rem}h2{font-size:1.1rem}h3{margin:2px 0;font-size:.95rem}p{margin:3px 0}svg{max-height:110px}td,th{padding:2px 4px}}
+.err{color:#ff8a80;margin:4px 0 0;font-size:.9rem}input:disabled{opacity:.6}.hdr td{border:0;padding:4px 6px;width:33%}
