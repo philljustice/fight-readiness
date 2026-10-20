@@ -1,7 +1,7 @@
 // Web Push reminders via the Cloudflare Worker (fight-readiness-push).
 const Push = (() => {
   const CONFIG = {
-    WORKER_URL: 'https://fight-readiness-push.REPLACE-ME.workers.dev', // set after `wrangler deploy`
+    WORKER_URL: 'https://fight-readiness-push.philljustice.workers.dev', // set after `wrangler deploy`
     VAPID_PUBLIC_KEY: 'BEmDoaMF8fOZOVErc87lv4SdzLAsVmQgrQFWugnlFMe2-q2pFFOfGTvhtAZ6mokkTJYtMhTND6bQzY-BUvqZFuA',
   };
   const configured = () => !/REPLACE-ME/.test(CONFIG.WORKER_URL);
