@@ -12,9 +12,10 @@ assert(un.includes('VERSION:2.0')); assert(un.some(l => l.startsWith('PRODID:'))
 // balanced blocks
 for (const b of ['VCALENDAR','VEVENT','VALARM']) assert.equal(un.filter(l=>l==='BEGIN:'+b).length, un.filter(l=>l==='END:'+b).length);
 const evs = ics.replace(/\r\n /g,'').split('BEGIN:VEVENT').slice(1).map(s => s.split('END:VEVENT')[0].split('\r\n').filter(Boolean));
-assert.equal(evs.length, 3);
+assert.equal(evs.length, 4);
 const get = (e,k) => (e.find(l => l.startsWith(k+':'))||'').slice(k.length+1);
-const [m, w, e] = evs;
+const [m, w, e, s] = evs;
+assert.equal(get(s,'DTSTART'), '20261025T180000'); assert.equal(get(s,'RRULE'), 'FREQ=WEEKLY;BYDAY=SU'); assert.equal(get(s,'SUMMARY'), 'Send weekly Fight Readiness report to Phill'); assert(get(s,'DESCRIPTION').includes('Send weekly report to Phill'));
 assert.equal(get(m,'DTSTART'), '20261019T063000'); assert.equal(get(m,'RRULE'), 'FREQ=DAILY');
 assert.equal(get(w,'DTSTART'), '20261019T063000'); assert.equal(get(w,'RRULE'), 'FREQ=WEEKLY;BYDAY=MO,TH'); assert(/before eating/.test(get(w,'DESCRIPTION')));
 assert.equal(get(e,'DTSTART'), '20261019T211500'); assert.equal(get(e,'RRULE'), 'FREQ=DAILY');
@@ -22,7 +23,7 @@ assert(/sleep/i.test(get(m,'DESCRIPTION')) && /nutrition/i.test(get(m,'DESCRIPTI
 for (const k of ['training','screen','family','notes']) assert(new RegExp(k,'i').test(get(e,'DESCRIPTION')), k);
 evs.forEach(x => { assert(get(x,'UID')); assert(/^\d{8}T\d{6}Z$/.test(get(x,'DTSTAMP'))); assert.equal(get(x,'URL'), 'https://team.example/app/');
   assert(get(x,'DESCRIPTION').includes('https://team.example/app/')); assert(x.includes('TRIGGER:-PT0M')); assert(x.includes('ACTION:DISPLAY')); });
-assert.equal(new Set(evs.map(x=>get(x,'UID'))).size, 3);
+assert.equal(new Set(evs.map(x=>get(x,'UID'))).size, 4);
 // escaping
 assert(R.buildICS({fighter:'a'}).includes('Log training (done Y/N)\\, recreational'));
 // due logic

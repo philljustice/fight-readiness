@@ -15,6 +15,7 @@
   function buildICS({ morning = '07:00', evening = '21:00', url = '', fighter = '', now = new Date() } = {}) {
     const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const uidBase = (fighter || 'fighter').replace(/\W+/g, '-').toLowerCase();
+    const sun = new Date(start); while (sun.getDay() !== 0) sun.setDate(sun.getDate()+1);
     const wStart = new Date(start); while (![1,4].includes(wStart.getDay())) wStart.setDate(wStart.getDate()+1); // DTSTART must match BYDAY
     const ev = (id, hm, rrule, summary, desc, s = start) => [
       'BEGIN:VEVENT', `UID:${uidBase}-${id}@fight-readiness`, `DTSTAMP:${stamp(now)}`,
@@ -25,6 +26,7 @@
       ...ev('morning', morning, 'FREQ=DAILY', '🥊 Morning log: sleep + nutrition', 'Log last night\'s sleep hours and whether you\'re following your nutrition plan today.'),
       ...ev('weighin', morning, 'FREQ=WEEKLY;BYDAY=MO,TH', '⚖️ Weigh-in day (Mon/Thu)', 'Weigh in before eating: after the bathroom, same scale, minimal clothing. Log the weight in the app.', wStart),
       ...ev('evening', evening, 'FREQ=DAILY', '🥊 Evening log: training + screen + family', 'Log training (done Y/N), recreational screen hours, family/friends time, and any notes (injuries, illness, soreness).'),
+      ...ev('weekly', '18:00', 'FREQ=WEEKLY;BYDAY=SU', 'Send weekly Fight Readiness report to Phill', 'Open the Fight Readiness app and tap "Send weekly report to Phill" (then pick Mail and tap Send).', sun),
       'END:VCALENDAR'];
     return lines.map(fold).join('\r\n') + '\r\n';
   }
