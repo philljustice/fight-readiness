@@ -15,7 +15,7 @@ const evs = ics.replace(/\r\n /g,'').split('BEGIN:VEVENT').slice(1).map(s => s.s
 assert.equal(evs.length, 4);
 const get = (e,k) => (e.find(l => l.startsWith(k+':'))||'').slice(k.length+1);
 const [m, w, e, s] = evs;
-assert.equal(get(s,'DTSTART'), '20261025T180000'); assert.equal(get(s,'RRULE'), 'FREQ=WEEKLY;BYDAY=SU'); assert.equal(get(s,'SUMMARY'), 'Send weekly Fight Readiness report to Phill'); assert(get(s,'DESCRIPTION').includes('Send weekly report to Phill'));
+assert.equal(get(s,'DTSTART'), '20261025T180000'); assert.equal(get(s,'RRULE'), 'FREQ=WEEKLY;BYDAY=SU'); assert.equal(get(s,'SUMMARY'), 'Send weekly FightReady report to Phill'); assert(get(s,'DESCRIPTION').includes('Send weekly report to Phill'));
 assert.equal(get(m,'DTSTART'), '20261019T063000'); assert.equal(get(m,'RRULE'), 'FREQ=DAILY');
 assert.equal(get(w,'DTSTART'), '20261019T063000'); assert.equal(get(w,'RRULE'), 'FREQ=WEEKLY;BYDAY=MO,TH'); assert(/before eating/.test(get(w,'DESCRIPTION')));
 assert.equal(get(e,'DTSTART'), '20261019T211500'); assert.equal(get(e,'RRULE'), 'FREQ=DAILY');

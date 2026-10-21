@@ -90,7 +90,7 @@ function weeklyCard() { const wk = Weekly.isDue(S.weeklySent||{}, new Date(), S.
 async function sendWeekly() { const wk = Weekly.pendingWeek(), name = (S.profile&&S.profile.name)||S.fighter||'Fighter';
   const subj = Weekly.subject(name, wk), sum = weeklySummary(), csv = Insights.toCSV(S.entries), to = Weekly.CONFIG.ADMIN_EMAIL;
   const mark = () => { S.weeklySent = Object.assign({}, S.weeklySent, {[wk]: new Date().toISOString()}); save(); show(cur); };
-  try { const file = new File([csv], `fight-log-${name.replace(/\W+/g,'-')}-${wk}.csv`, { type:'text/csv' });
+  try { const file = new File([csv], `FightReady-log-${name.replace(/\W+/g,'-')}-${wk}.csv`, { type:'text/csv' });
     if (navigator.canShare && navigator.canShare({ files:[file] })) {
       try { await navigator.share({ files:[file], title:subj, text:`To: ${to}\nSubject: ${subj}\n\n${sum}` }); mark(); }
       catch (e) { if (e.name !== 'AbortError') { location.href = Weekly.mailto(to, subj, sum, csv); mark(); } }
@@ -126,8 +126,8 @@ const V = {
   const dueNow = Reminders.due(S.entries.find(e=>e.date===today()), new Date(), S.reminders.morning, S.reminders.evening);
   return `${day1Banner(false)}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning log not done: sleep hours, nutrition plan, how you feel (energy, soreness, mood, stress)'+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: each training session (effort + minutes), screen hours, family/friends, notes'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${weeklyCard()}${fightCard()}${fightWeekCard()}${streakCard()}
   ${isWeighDay?'<div class="card hint">⚖️ It\'s a weigh-in day (Mon/Thu). Weigh in this morning, fasted, and log it.</div>':''}
-  ${r.locked?`<div class="card"><div class="muted" style="text-align:center">Fight Readiness Score</div><div class="big">🔒</div><p style="text-align:center"><b>${lockMsg(r)}</b></p><p class="muted" style="text-align:center">Days logged so far: ${r.daysLogged}</p>${todayRow()}</div>`:`
-  <div class="card"><div class="muted" style="text-align:center">Fight Readiness Score</div><div class="big">${r.daysLogged?r.score:'—'}</div>
+  ${r.locked?`<div class="card"><div class="muted" style="text-align:center">FightReady Score</div><div class="big">🔒</div><p style="text-align:center"><b>${lockMsg(r)}</b></p><p class="muted" style="text-align:center">Days logged so far: ${r.daysLogged}</p>${todayRow()}</div>`:`
+  <div class="card"><div class="muted" style="text-align:center">FightReady Score</div><div class="big">${r.daysLogged?r.score:'—'}</div>
   <p style="text-align:center">${r.daysLogged?esc(r.verdict):'No entries in the last 3 weeks yet.'}</p>
   <p class="muted" style="text-align:center">Base ${r.base.toFixed(1)} + bonus ${r.bonus} • Data Quality: ${esc(r.dataQuality)} (${r.daysLogged} days logged)</p></div>
   <div class="card"><h3>Categories (last 3 weeks)</h3>${catTable(r)}
@@ -201,7 +201,7 @@ const V = {
  },
  report() {
   const r = res(), notes = S.entries.filter(e=>e.notes && Scoring.dayNum(e.date) >= Scoring.dayNum(today())-14).sort((a,b)=>a.date<b.date?1:-1);
-  return `<div class="card"><h2 style="margin:0">🥊 Coach Report: Fight Readiness Summary</h2>
+  return `<div class="card"><h2 style="margin:0">🥊 Coach Report: FightReady Summary</h2>
   ${reportHeader(r)}<p class="muted">Report date: ${today()} • Data period: last 3 weeks (${r.daysLogged} days logged)</p></div>
   ${r.locked?`<div class="card"><p style="text-align:center"><b>${lockMsg(r)}</b><br>Days logged so far: ${r.daysLogged}</p>${todayRow()}</div>`:`<div class="card"><div class="big">${r.score}</div><p style="text-align:center">${esc(r.verdict)}</p></div>`}
   <div class="card"><h3>Weight & trend</h3>${verdictLine()}<p>Latest: ${r.latestWeight?r.latestWeight.weight+' lbs ('+r.latestWeight.date+')':'—'}${+S.targetWeight?' • Target: '+esc(S.targetWeight)+' lbs':''}<br>
@@ -256,7 +256,7 @@ const V = {
    <a class="btn alt" id="calLink" href="${calURL()}" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">📅 Add reminders to my calendar</a>
    <div class="hint" style="margin-top:10px"><b>iPhone:</b> tap the button above. Safari opens a calendar preview with 4 events. Tap <b>Add All</b> (top right), pick your calendar, then come back to the app.<br><b>Android:</b> open the downloaded file and choose your Calendar app to import it.</div>
    <a class="btn alt" id="calSub" href="${calURL().replace(/^https?:/,'webcal:')}" style="text-align:center;text-decoration:none">🔁 Or subscribe (webcal)</a>
-   <p class="muted">Subscribe also works. On iPhone, open Settings → Calendar → Accounts → Subscribed Calendars → Fight Readiness and turn <b>off</b> "Remove Alerts", or the alarms won't ring.</p>
+   <p class="muted">Subscribe also works. On iPhone, open Settings → Calendar → Accounts → Subscribed Calendars → FightReady and turn <b>off</b> "Remove Alerts", or the alarms won't ring.</p>
    <button class="btn alt" id="icsShare">📤 Share / save the calendar file</button>
    <p class="muted">The calendar file adds 4 repeating events with alarms: a daily morning log, a Mon/Thu weigh-in, a daily evening log, and a Sunday 6 PM reminder to send the weekly report to ${Weekly.CONFIG.ADMIN_NAME}. <b>Already added reminders before? Tap the button again to get the new Sunday reminder</b> (delete the old duplicates in your calendar). If you change the times, tap the button again and delete the old events in your calendar.</p></div>
   <div class="card"><h3>Backup & import</h3>
@@ -330,7 +330,7 @@ function refreshSched() { const sc = V._sched; if (!sc || !$('#schedCard')) retu
 function show(v) { if (!S.profile && v !== 'help') v = 'profile';
   if (v === 'profile' && !V._sched) V._sched = JSON.parse(JSON.stringify((S.profile && S.profile.schedule) || Profile.scheduleFromWeek(S.weeks[S.weekIdx])));
   if (v !== 'profile') V._sched = null; if (v !== 'log') V._keep = null; cur = v; $('#view').innerHTML = V[v](); document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.v===(v==='profile'?'setup':v)));
-  $('#title').textContent = 'Fight Readiness' + (S.fighter ? ' — ' + S.fighter : ''); if (v === 'profile') { refreshSched(); refreshCut(); } window.scrollTo(0,0); }
+  $('#title').textContent = 'FightReady' + (S.fighter ? ' — ' + S.fighter : ''); if (v === 'profile') { refreshSched(); refreshCut(); } window.scrollTo(0,0); }
 function upsert(list) { list.forEach(e => { const i = S.entries.findIndex(x=>x.date===e.date); if (i>=0) S.entries[i]=e; else S.entries.push(e); }); S.entries.sort((a,b)=>a.date<b.date?-1:1); save(); }
 function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text],{type})); a.download = name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 1000); }
 function parseCSV(text) {
@@ -348,8 +348,8 @@ function parseCSV(text) {
     return o; });
 }
 function shareText() { const r = res();
-  if (r.locked) return `🥊 Fight Readiness: ${S.fighter||'Fighter'} (${today()})\n${lockMsg(r)}\nDays logged so far: ${r.daysLogged}`;
-  return `🥊 Fight Readiness: ${S.fighter||'Fighter'} (${today()})${S.profile&&S.profile.gym?' • '+S.profile.gym:''}${S.profile&&Profile.countdown(S.profile.fightDate)?'\n'+Profile.countdown(S.profile.fightDate).text:''}\nScore: ${r.score}/100, ${r.verdict}\n` +
+  if (r.locked) return `🥊 FightReady: ${S.fighter||'Fighter'} (${today()})\n${lockMsg(r)}\nDays logged so far: ${r.daysLogged}`;
+  return `🥊 FightReady: ${S.fighter||'Fighter'} (${today()})${S.profile&&S.profile.gym?' • '+S.profile.gym:''}${S.profile&&Profile.countdown(S.profile.fightDate)?'\n'+Profile.countdown(S.profile.fightDate).text:''}\nScore: ${r.score}/100, ${r.verdict}\n` +
    CATS.map(([k,l])=>`${l}: ${r.cats[k].toFixed(0)}`).join(' | ') + `\nConsistency: ${r.consistency.toFixed(0)}% (+${r.bonus})\n` +
    `Weight: ${r.latestWeight?r.latestWeight.weight+' lbs':'—'}, trend ${r.delta==null?'—':r.delta+' lbs/wk'} ${r.trend.emoji}\nWeight verdict: ${Insights.weightVerdict(S.entries, S.profile||{}).word}\nTraining (7 days): ${tr7()}\n${Insights.reviewText(Insights.weekReview(S.entries, new Date(), S.params, S.profile||{}))}\nDays logged: ${r.daysLogged} (last 3 weeks) • Streak: ${Insights.streak(S.entries).current} days`; }
 
@@ -371,7 +371,7 @@ document.addEventListener('click', async ev => {
   const w = S.weeks[S.weekIdx];
   switch (t.id) {
     case 'showAll': V._all = true; return show('log');
-    case 'csvBtn': return download(`fight-log-${(S.fighter||'fighter').replace(/\W+/g,'-')}-${today()}.csv`, Insights.toCSV(S.entries), 'text/csv;charset=utf-8');
+    case 'csvBtn': return download(`FightReady-log-${(S.fighter||'fighter').replace(/\W+/g,'-')}-${today()}.csv`, Insights.toCSV(S.entries), 'text/csv;charset=utf-8');
     case 'delLog': if (confirm('Delete this day?')) { S.entries = S.entries.filter(x=>x.date!==V._e.date); save(); V._date=null; show('log'); } return;
     case 'wkPrev': S.weekIdx = Math.max(0, S.weekIdx-1); save(); return show('plan');
     case 'wkNext': S.weekIdx = Math.min(S.weeks.length-1, S.weekIdx+1); save(); return show('plan');
@@ -382,15 +382,15 @@ document.addEventListener('click', async ev => {
     case 'icsShare': return shareICS();
     case 'pushOn': { const b = t; b.disabled = true; b.textContent = 'Turning on…';
       try { await Push.enable(S.reminders, (S.profile&&S.profile.name)||S.fighter); S.push = true; S.notify = true; save(); alert('🔔 Notifications are on. You\'ll get your morning and evening check-ins, the Mon/Thu weigh-in, and the Sunday 6 PM report reminder, even when the app is closed.'); }
-      catch (e) { alert(e.message==='denied' ? 'Notifications were blocked. To allow them: iPhone Settings → Notifications → Fight Readiness. Calendar reminders below still work.' : 'Could not turn on notifications (' + e.message + '). Check your connection and try again, or use the calendar reminders.'); }
+      catch (e) { alert(e.message==='denied' ? 'Notifications were blocked. To allow them: iPhone Settings → Notifications → FightReady. Calendar reminders below still work.' : 'Could not turn on notifications (' + e.message + '). Check your connection and try again, or use the calendar reminders.'); }
       return show('setup'); }
     case 'pushOff': await Push.disable(); S.push = false; save(); alert('Notifications are off.'); return show('setup');
-    case 'pushTest': if (!navigator.serviceWorker) return; (await navigator.serviceWorker.ready).showNotification('🥊 Fight Readiness', { body:'Test: notifications work on this phone.', icon:'icons/icon-192.png', tag:'fr-test' }); return;
+    case 'pushTest': if (!navigator.serviceWorker) return; (await navigator.serviceWorker.ready).showNotification('🥊 FightReady', { body:'Test: notifications work on this phone.', icon:'icons/icon-192.png', tag:'fr-test' }); return;
     case 'notifBtn': if (!('Notification' in window)) return alert('Notifications are not supported here. Use the calendar reminders.');
       { const p = await Notification.requestPermission(); S.notify = p==='granted'; save(); alert(p==='granted'?'OK. You\'ll get a notification if the app is open at reminder time.':'Notifications are off. The calendar reminders still work.'); } return;
     case 'printBtn': return window.print();
     case 'shareBtn': { const txt = shareText();
-      if (navigator.share) { try { await navigator.share({ title:'Fight Readiness Report', text:txt }); } catch (e) {} }
+      if (navigator.share) { try { await navigator.share({ title:'FightReady Report', text:txt }); } catch (e) {} }
       else if (navigator.clipboard) { await navigator.clipboard.writeText(txt); alert('Summary copied to clipboard.'); } else alert(txt); return; }
     case 'saveProfile': { const keys = ['name','nickname','dob','discipline','gym','coach','coachContact','weightClass','startWeight','targetWeight','fightDate','emName','emPhone','medical'];
       const first = !S.profile, d = {}; keys.forEach(k => { const el = $('#p_'+k); d[k] = el ? el.value.trim() : ''; });
@@ -407,7 +407,7 @@ document.addEventListener('click', async ev => {
       const sum = CATS.reduce((s,c)=>s+(+np[c[2]]||0),0); if (Math.abs(sum-100) > 1e-9) return alert(`Category weights must add up to 100 (now ${sum}). Not saved.`);
       S.params = np; save(); alert('Saved ✔'); return show('dash'); }
     case 'resetParams': S.params = Object.assign({}, Scoring.DEFAULT_PARAMS); save(); return show('setup');
-    case 'exportBtn': return download(`fight-readiness-${(S.fighter||'fighter').replace(/\W+/g,'-')}-${today()}.json`, JSON.stringify(Object.assign({app:'fight-readiness',version:1,exported:new Date().toISOString()}, S), null, 1), 'application/json');
+    case 'exportBtn': return download(`FightReady-backup-${(S.fighter||'fighter').replace(/\W+/g,'-')}-${today()}.json`, JSON.stringify(Object.assign({app:'fight-readiness',version:1,exported:new Date().toISOString()}, S), null, 1), 'application/json');
     case 'wipeBtn': if (confirm('Erase ALL data on this phone? Export a backup first!') && confirm('Really erase?')) { localStorage.removeItem(KEY); S = load(); show('setup'); } return;
   }
 });
@@ -423,7 +423,7 @@ document.addEventListener('change', async ev => { const t = ev.target;
   if (t.id === 'w_start') return show('plan');
   if (t.id === 'f_date') { V._date = t.value; return show('log'); }
   if (t.id === 'importFile' && t.files[0]) { const text = await t.files[0].text();
-    try { if (/\.json$/i.test(t.files[0].name) || text.trim().startsWith('{')) { const d = JSON.parse(text); if (!Array.isArray(d.entries)) throw new Error('Not a Fight Readiness backup');
+    try { if (/\.json$/i.test(t.files[0].name) || text.trim().startsWith('{')) { const d = JSON.parse(text); if (!Array.isArray(d.entries)) throw new Error('Not a FightReady backup');
         if (!confirm(`Restore backup for "${d.fighter||'fighter'}" with ${d.entries.length} days? This replaces data on this phone.`)) return;
         delete d.app; delete d.version; delete d.exported; S = Object.assign(load(), d); S.params = Object.assign({}, Scoring.DEFAULT_PARAMS, d.params); save(); alert('Restored ✔'); }
       else { const rows = parseCSV(text); upsert(rows); alert(`Imported ${rows.length} days ✔`); }
@@ -431,18 +431,18 @@ document.addEventListener('change', async ev => { const t = ev.target;
 });
 function pushBox() { const st = Push.status();
   if (st === 'not-configured') return '<p class="muted">🔔 Push notifications are coming soon. Use the calendar reminders for now.</p>';
-  if (st === 'ios-install') return '<div class="hint">🔔 <b>Want notifications?</b> On iPhone they only work from the Home Screen app. In Safari tap Share → <b>Add to Home Screen</b>, open Fight Readiness from the new icon, then come back to Setup and tap <i>Turn on notifications</i>. (Needs iOS 16.4 or newer.)</div>';
+  if (st === 'ios-install') return '<div class="hint">🔔 <b>Want notifications?</b> On iPhone they only work from the Home Screen app. In Safari tap Share → <b>Add to Home Screen</b>, open FightReady from the new icon, then come back to Setup and tap <i>Turn on notifications</i>. (Needs iOS 16.4 or newer.)</div>';
   if (st === 'unsupported') return '<p class="muted">🔔 This browser can\'t receive notifications. Use the calendar reminders below.</p>';
   if (S.push && typeof Notification !== 'undefined' && Notification.permission === 'granted') return '<p>🔔 <b>Notifications are on.</b> Changing the times above updates them automatically.</p><button class="btn alt" id="pushTest">Send a test notification</button><button class="btn alt" id="pushOff">Turn off notifications</button>';
   return '<button class="btn" id="pushOn">🔔 Turn on notifications</button><p class="muted">Recommended. Sends your morning and evening check-ins, the Mon/Thu weigh-in, and the Sunday 6 PM weekly-report reminder, even when the app is closed. Only your reminder times, time zone and first name are sent to the reminder server; your logs stay on this phone.</p>'; }
 function calURL() { return new URL(Reminders.calFile(S.reminders.morning, S.reminders.evening), location.href.replace(/[#?].*$/,'')).href; }
-async function shareICS() { const url = calURL(), name = 'fight-readiness-reminders.ics';
+async function shareICS() { const url = calURL(), name = 'FightReady-reminders.ics';
   try { const txt = await (await fetch(url, { cache:'no-store' })).text(); const f = new File([txt], name, { type:'text/calendar' });
-    if (navigator.canShare && navigator.canShare({ files:[f] })) { try { await navigator.share({ files:[f], title:'Fight Readiness reminders' }); } catch (e) {} return; }
+    if (navigator.canShare && navigator.canShare({ files:[f] })) { try { await navigator.share({ files:[f], title:'FightReady reminders' }); } catch (e) {} return; }
     download(name, txt, 'text/calendar;charset=utf-8'); } catch (e) { location.href = url; } }
 function addToCalendar() {
   const ics = Reminders.buildICS({ morning:S.reminders.morning, evening:S.reminders.evening, fighter:S.fighter, url: location.origin + location.pathname.replace(/[^/]*$/, '') });
-  const name = 'fight-readiness-reminders.ics', ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+  const name = 'FightReady-reminders.ics', ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
   if (ios) { location.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics); return; } // Safari opens the "Add to Calendar" sheet
   download(name, ics, 'text/calendar;charset=utf-8');
 }
@@ -451,7 +451,7 @@ function reminderTick() {
   const d = Reminders.due(S.entries.find(e=>e.date===today()), new Date(), S.reminders.morning, S.reminders.evening);
   if (cur === 'dash' && d.length !== document.querySelectorAll('#view .hint a[data-goto]').length) show('dash');
   if (S.notify && 'Notification' in window && Notification.permission === 'granted') d.forEach(k => { const key = today()+k; if (!lastNotified[key]) { lastNotified[key] = 1;
-    try { new Notification('Fight Readiness', { body: k==='morning' ? 'Morning log: sleep + nutrition' : 'Evening log: training, screen, family, notes', icon:'icons/icon-192.png' }); } catch (e) {} } });
+    try { new Notification('FightReady', { body: k==='morning' ? 'Morning log: sleep + nutrition' : 'Evening log: training, screen, family, notes', icon:'icons/icon-192.png' }); } catch (e) {} } });
 }
 setInterval(reminderTick, 60000); document.addEventListener('visibilitychange', () => { if (!document.hidden) reminderTick(); });
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js');

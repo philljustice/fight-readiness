@@ -1,5 +1,5 @@
 // Optional insights: streaks, wellness (1-5), session load (sRPE x min), weight-cut safety, CSV export.
-// None of these change the core Fight Readiness Score (see scoring.js). Shared by app + node tests.
+// None of these change the core FightReady Score (see scoring.js). Shared by app + node tests.
 (function (root) {
   const S = root.Scoring || (typeof require !== 'undefined' ? require('./scoring.js') : null);
   const { dayNum, ymd } = S;

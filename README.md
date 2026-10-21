@@ -1,4 +1,4 @@
-# Fight Readiness Tracker (PWA)
+# FightReady (PWA)
 
 A phone app for MMA fighters. It's plain HTML/CSS/JS with no build step. It installs to the home screen and works offline. Each fighter's data stays in **their own phone's browser storage**. Nothing is uploaded.
 
@@ -28,7 +28,7 @@ Setup → Reminders: pick a morning time (default 7:00) and an evening time (def
 - a daily morning log (sleep hours + nutrition plan + energy/soreness/mood/stress)
 - a Mon/Thu weigh-in before eating
 - a daily evening log (each session + effort/minutes, screen hours, family/friends, notes)
-- a Sunday 6 PM reminder: "Send weekly Fight Readiness report to Phill" (users who added reminders before this must tap the button again)
+- a Sunday 6 PM reminder: "Send weekly FightReady report to Phill" (users who added reminders before this must tap the button again)
 
 Each event links back to the app.
 - **iPhone (Safari):** the file opens the "Add to Calendar" screen. Tap *Add All*.
@@ -87,4 +87,4 @@ Config lives in `weekly.js` → `CONFIG`:
 - `ADMIN_EMAIL: 'philljustice@gmail.com'` is the weekly report recipient.
 - `SHOW_COACH_CONTACT: false` hides the coach email/phone field on sign-up and profile. Existing saved values are kept untouched. The value is never shown on the Coach Report or in the share text. Set it to `true` to bring the field back.
 
-The report week runs Monday–Sunday. On Sunday, and on every open after that until it's sent, the Score screen shows **Send weekly report to Phill**. Tapping it uses the Web Share API with the CSV of all logs attached, plus a text summary: name, score, streak, training sessions done/scheduled + load, wellness average, weight trend, flags (weight-cut warnings, low wellness, notes). The fighter picks Mail. If file sharing isn't supported, it opens a `mailto:` to the admin with subject `Fight Readiness weekly – <fighter> – <Mon> to <Sun>` and the summary plus CSV rows in the body. The body is kept under about 1800 characters by cutting down to the last 14 days (or fewer). The week is marked sent in `weeklySent` (local only). There are manual **Send report to Phill** buttons in Setup and Report. Tested in `test-weekly.js`.
+The report week runs Monday–Sunday. On Sunday, and on every open after that until it's sent, the Score screen shows **Send weekly report to Phill**. Tapping it uses the Web Share API with the CSV of all logs attached, plus a text summary: name, score, streak, training sessions done/scheduled + load, wellness average, weight trend, flags (weight-cut warnings, low wellness, notes). The fighter picks Mail. If file sharing isn't supported, it opens a `mailto:` to the admin with subject `FightReady weekly – <fighter> – <Mon> to <Sun>` and the summary plus CSV rows in the body. The body is kept under about 1800 characters by cutting down to the last 14 days (or fewer). The week is marked sent in `weeklySent` (local only). There are manual **Send report to Phill** buttons in Setup and Report. Tested in `test-weekly.js`.

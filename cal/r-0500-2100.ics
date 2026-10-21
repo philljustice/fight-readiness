@@ -1,9 +1,9 @@
 BEGIN:VCALENDAR
 VERSION:2.0
-PRODID:-//Fight Readiness//Reminders//EN
+PRODID:-//FightReady//Reminders//EN
 CALSCALE:GREGORIAN
 METHOD:PUBLISH
-X-WR-CALNAME:Fight Readiness
+X-WR-CALNAME:FightReady
 BEGIN:VEVENT
 UID:team-morning@fight-readiness
 DTSTAMP:20261020T160000Z
@@ -65,15 +65,15 @@ DTSTAMP:20261020T160000Z
 DTSTART:20261025T180000
 DURATION:PT10M
 RRULE:FREQ=WEEKLY;BYDAY=SU
-SUMMARY:Send weekly Fight Readiness report to Phill
-DESCRIPTION:Open the Fight Readiness app and tap "Send weekly report to Phi
- ll" (then pick Mail and tap Send).\nOpen app: https://philljustice.github.
- io/fight-readiness/
+SUMMARY:Send weekly FightReady report to Phill
+DESCRIPTION:Open the FightReady app and tap "Send weekly report to Phill" (
+ then pick Mail and tap Send).\nOpen app: https://philljustice.github.io/fi
+ ght-readiness/
 URL:https://philljustice.github.io/fight-readiness/
 TRANSP:TRANSPARENT
 BEGIN:VALARM
 ACTION:DISPLAY
-DESCRIPTION:Send weekly Fight Readiness report to Phill
+DESCRIPTION:Send weekly FightReady report to Phill
 TRIGGER:-PT0M
 END:VALARM
 END:VEVENT

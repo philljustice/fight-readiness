@@ -7,7 +7,7 @@
   const weekLabel = sun => { const d = new Date(sun+'T12:00'); d.setDate(d.getDate()-6); return ymd(d)+' to '+sun; };
   function isDue(sent = {}, now = new Date(), startDate = null) { const w = pendingWeek(now);
     if (sent[w] || !startDate || startDate > w) return null; return w; }
-  const subject = (fighter, week) => `Fight Readiness weekly – ${fighter || 'Fighter'} – ${weekLabel(week)}`;
+  const subject = (fighter, week) => `FightReady weekly – ${fighter || 'Fighter'} – ${weekLabel(week)}`;
   function mailto(to, subj, summary, csv, max = CONFIG.MAILTO_MAX) {
     const lines = csv.trim().split(/\r?\n/), head = lines[0], rows = lines.slice(1);
     const mk = (r, note) => `mailto:${to}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(summary + '\n\nCSV' + note + ':\n' + [head].concat(r).join('\n'))}`;
