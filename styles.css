@@ -13,7 +13,11 @@ label{display:block;margin:14px 0 6px;font-weight:600}input,textarea,select{widt
 .btn{display:block;width:100%;padding:15px;font-size:1.05rem;border:0;border-radius:10px;background:#c62828;color:#fff;margin-top:12px}.btn.alt{background:#333}
 .hint{background:#3e2723;border-left:4px solid #ff9800;padding:10px;border-radius:6px}table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #333;padding:6px;text-align:left;vertical-align:top}
 .day input,.day select{margin-bottom:6px;padding:9px;font-size:.95rem}svg{width:100%;height:auto}
-@media print{body{background:#fff;color:#000;padding:0}header,nav,.noprint{display:none!important}.card{background:#fff;border:1px solid #ccc;break-inside:avoid;padding:8px;margin-bottom:8px}main{max-width:none;padding:0}.muted{color:#444}.bar{background:#ddd}.bar i{background:#c62828}@page{margin:10mm}body{font-size:11px}.big{font-size:2.6rem}h2{font-size:1.1rem}h3{margin:2px 0;font-size:.95rem}p{margin:3px 0}svg{max-height:110px}td,th{padding:2px 4px}}
+.card{background:#1c1c1f;border:1px solid #3a3a40;border-radius:14px;padding:16px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.card>h3:first-child,.card>.row:first-child h3{margin-top:0;padding-left:10px;border-left:3px solid #ff5252}
+.card>h2:first-child{margin-top:0}
+details.opt{border:1px solid #3a3a40;background:#232327}
+@media print{.card{box-shadow:none}.card>h3:first-child{border-left:0;padding-left:0}body{background:#fff;color:#000;padding:0}header,nav,.noprint{display:none!important}.card{background:#fff;border:1px solid #ccc;break-inside:avoid;padding:8px;margin-bottom:8px}main{max-width:none;padding:0}.muted{color:#444}.bar{background:#ddd}.bar i{background:#c62828}@page{margin:10mm}body{font-size:11px}.big{font-size:2.6rem}h2{font-size:1.1rem}h3{margin:2px 0;font-size:.95rem}p{margin:3px 0}svg{max-height:110px}td,th{padding:2px 4px}}
 .err{color:#ff8a80;margin:4px 0 0;font-size:.9rem}input:disabled{opacity:.6}.hdr td{border:0;padding:4px 6px;width:33%}
 .grid{display:grid;grid-template-columns:repeat(14,1fr);gap:3px;margin-top:10px}.grid i{aspect-ratio:1;border-radius:3px;background:#333}.grid i.done{background:#e53935}.grid i.partial{background:#ef6c00}
 .chips{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}.chips button{flex:1;padding:9px 0;border-radius:8px;border:1px solid #444;background:#222;color:#ccc;font-size:.95rem}.chips button.on{background:#c62828;border-color:#c62828;color:#fff}
