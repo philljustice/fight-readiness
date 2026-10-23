@@ -45,7 +45,7 @@ Home-screen (standalone) PWAs on iOS ignore `data:`/`blob:` .ics downloads. The 
 Setup → *Export backup (JSON)* saves a file. *Restore* on any phone loads it back. You can also import a FightLog CSV (Date, Nutrition, Training, Sleep_Hours, Screen_Hours, Family_Friends, Weight, Notes). Deleting browser data, or iOS clearing storage for an app that hasn't been opened in weeks, will erase entries. **Export weekly.**
 
 ## Files
-`index.html`, `styles.css`, `app.js` (UI), `scoring.js` (scoring), `reminders.js` (calendar file + reminder checks), `profile.js` (profile validation, countdown), `manifest.webmanifest`, `sw.js`, `icons/`, `test.js`, `test-reminders.js`, `test-profile.js` (`node test.js && node test-reminders.js && node test-profile.js`).
+`index.html`, `styles.css`, `app.js` (UI), `scoring.js` (scoring), `reminders.js` (calendar file + reminder checks), `profile.js` (profile validation, countdown), `manifest.webmanifest`, `sw.js`, `icons/`, `test.js`, `test-reminders.js`, `test-profile.js`, `early.js` (day-1 daily score, feedback, badges, chart data; tested in `test-early.js`) (`for t in test*.js; do node $t; done`).
 
 
 ## Scoring (v2)

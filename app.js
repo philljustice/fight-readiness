@@ -41,7 +41,7 @@ function streakCard() { const st = Insights.streak(S.entries), g = Insights.grid
   return `<div class="card"><div class="row" style="margin:0"><div><div class="muted">Logging streak</div><div style="font-size:1.8rem;font-weight:800">🔥 ${st.current} day${st.current==1?'':'s'}</div></div>
    <div style="text-align:right"><div class="muted">Best</div><b>${st.best}</b></div></div>
    <div class="grid" aria-label="Last 28 days">${g.map(x=>`<i class="${x.status}" title="${x.date}: ${x.status}"></i>`).join('')}</div>
-   <p class="muted" style="margin:4px 0 0">Last 28 days: 🟥 full log • 🟧 partial • ⬛ none.${st.todayDone?' Today is done ✔':' Finish today to keep the streak.'}</p></div>`; }
+   <p class="muted" style="margin:4px 0 0">Last 28 days: 🟥 full log • 🟧 partial • ⬛ none.${st.todayDone?' Today is done ✔':' Finish today to keep the streak.'}</p>${badgeRow()}</div>`; }
 function cutWarn(ws) { const c = Insights.cutSafety(S.entries, new Date(), S.profile||{}); let h = '';
   if (c.level) h += `<div class="hint ${c.level}">⚠️ ${esc(c.msg)}</div>`;
   const p = S.profile||{}, lw = res().latestWeight; h += planBox(lw ? lw.weight : p.startWeight, p.targetWeight, p.fightDate);
@@ -96,7 +96,7 @@ async function sendWeekly() { const wk = Weekly.pendingWeek(), name = (S.profile
       catch (e) { if (e.name !== 'AbortError') { location.href = Weekly.mailto(to, subj, sum, csv); mark(); } }
       return; } } catch (e) {}
   location.href = Weekly.mailto(to, subj, sum, csv); setTimeout(mark, 500); }
-const lockMsg = r => `🔒 Trends unlock in ${r.unlockIn} day${r.unlockIn==1?'':'s'}. Keep logging!`;
+const lockMsg = r => `🔒 Weekly trends unlock in ${r.unlockIn} day${r.unlockIn==1?'':'s'}. Keep logging!`;
 const ynI = v => v===true?'✅':v===false?'❌':'—';
 const todayRow = () => { const e = S.entries.find(x=>x.date===today()); return e ? `<p>Today: Nutrition ${ynI(e.nutrition)} • Training ${trainTxt(e)} • Sleep ${e.sleep===''?'—':e.sleep+'h'} • Screen ${e.screen===''?'—':e.screen+'h'} • Family ${ynI(e.family)}${+e.weight?' • '+e.weight+' lbs':''}</p>` : '<p class="muted">Nothing logged today yet.</p>'; };
 const trainTxt = e => Array.isArray(e.sessions) ? (e.sessions.length ? e.sessions.filter(x=>x.done===true).length+'/'+e.sessions.length+(e.sessions.some(x=>x.done==null)?'…':'') : 'Rest')+(e.extra&&e.extra.label?' +extra':'') : e.training==null?'—':e.training?'Y':'N';
@@ -106,7 +106,7 @@ function weightChart() {
   const pts = S.entries.filter(e => +e.weight > 0).sort((a,b)=>a.date<b.date?-1:1).slice(-30);
   if (pts.length < 2) return '<p class="muted">Log 2+ weigh-ins to see the chart.</p>';
   const W=320,H=150,P=28, xs=pts.map(p=>Scoring.dayNum(p.date)), ys=pts.map(p=>+p.weight);
-  const tw=+S.targetWeight>0?+S.targetWeight:null; const all=tw?ys.concat(tw):ys;
+  const tgt=+S.targetWeight||+((S.profile||{}).targetWeight), tw=tgt>0?tgt:null; const all=tw?ys.concat(tw):ys;
   const x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...all)-1, y1=Math.max(...all)+1;
   const X=x=>P+(x-x0)/((x1-x0)||1)*(W-P-8), Y=y=>H-20-(y-y0)/(y1-y0)*(H-30);
   const line = pts.map((p,i)=>(i?'L':'M')+X(xs[i]).toFixed(1)+','+Y(ys[i]).toFixed(1)).join(' ');
@@ -119,6 +119,29 @@ function weightChart() {
 function catTable(r) {
   return CATS.map(([k,l,w]) => `<div class="row"><span style="width:110px">${l} (${S.params[w]}%)</span><div class="bar"><i style="width:${r.cats[k]}%"></i></div><b style="width:70px;text-align:right">${r.cats[k].toFixed(0)} → ${(r.cats[k]*S.params[w]/100).toFixed(1)}</b></div>`).join('');
 }
+
+function savedMsg() { const d = V._date||today(), e = S.entries.find(x=>x.date===d), ds = Early.daily(e, S.params); if (!ds) return '<p class="saved">💾 Saved</p>';
+  const f = Early.feedback(ds, e); return `<p class="saved">💾 Saved • ${d===today()?'Today':d}: <b>${ds.score}/100</b><br><span style="font-weight:400">${esc(f.text)}</span></p>`; }
+function todayCard(title) { const e = S.entries.find(x=>x.date===(V._date||today())), d = Early.daily(e, S.params); if (!d) return '';
+  const f = Early.feedback(d, e);
+  return `<div class="card" id="todayCard"><div class="row" style="margin:0"><h3 style="margin:0">${title||"Today's score"}</h3><b style="font-size:1.8rem">${d.score}</b></div>
+   ${CATS.map(([k,l,w]) => `<div class="row"><span style="width:110px">${l}</span><div class="bar"><i style="width:${d.cats[k]}%"></i></div><b style="width:44px;text-align:right">${(d.cats[k]*S.params[w]/100).toFixed(0)}/${S.params[w]}</b></div>`).join('')}
+   <p style="margin:6px 0 0">${esc(f.text)}</p></div>`; }
+function badgeRow() { return `<div class="badges">${Early.badges(S.entries, S.params).map(b=>`<span class="badge ${b.got?'on':''}" title="${esc(b.label)}">${b.icon} ${esc(b.label)}</span>`).join('')}</div>`; }
+function earlyCard(r) { const pr = Early.progress(r, S.params.unlockDays||7);
+  return `<div class="card"><div class="muted" style="text-align:center">FightReady Score</div><div class="big">${r.daysLogged?r.score:'—'}</div>
+   <p style="text-align:center"><b>Early score – based on ${r.daysLogged} day${r.daysLogged==1?'':'s'}</b></p>
+   <div class="bar" style="margin:6px 0"><i style="width:${pr.pct}%"></i></div>
+   <p class="muted" style="text-align:center">Full score unlocks in ${pr.unlockIn} day${pr.unlockIn==1?'':'s'}. Same weights as the full score, it just firms up as you log more days.</p></div>`; }
+function spark(vals, opts = {}) { const v = vals.filter(x => x.y != null); if (v.length < 2) return `<p class="muted">${opts.empty||'Log 2+ days to see this chart.'}</p>`;
+  const W=320,H=70,P=4, ys=v.map(x=>x.y).concat(opts.ref!=null?[opts.ref]:[]), y0=opts.min??Math.min(...ys), y1=opts.max??Math.max(...ys);
+  const X=i=>P+i/(v.length-1)*(W-2*P), Y=y=>H-P-(y-y0)/((y1-y0)||1)*(H-2*P);
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.label||'chart')}">${opts.ref!=null?`<line x1="0" x2="${W}" y1="${Y(opts.ref)}" y2="${Y(opts.ref)}" stroke="#4caf50" stroke-dasharray="4"/>`:''}
+   <path d="${v.map((x,i)=>(i?'L':'M')+X(i).toFixed(1)+','+Y(x.y).toFixed(1)).join(' ')}" fill="none" stroke="#ff5252" stroke-width="2.5"/>${v.map((x,i)=>`<circle cx="${X(i)}" cy="${Y(x.y)}" r="3" fill="#ff5252"><title>${x.date}: ${x.y}</title></circle>`).join('')}</svg>
+   <p class="muted" style="margin:0">${v[0].date} → ${v[v.length-1].date} • latest <b>${v[v.length-1].y}</b>${opts.unit||''}${opts.ref!=null?' • target '+opts.ref+(opts.unit||''):''}</p>`; }
+function miniCharts() { const es = S.entries.slice().sort((a,b)=>a.date<b.date?-1:1).slice(-21);
+  return `<div class="card"><h3>📈 Daily score</h3>${spark(Early.series(S.entries, S.params).map(x=>({date:x.date,y:x.score})),{min:0,max:100,label:'Daily score'})}
+   <h3>😴 Sleep hours</h3>${spark(es.map(e=>({date:e.date,y:e.sleep===''||e.sleep==null?null:+e.sleep})),{ref:S.params.idealSleep||8,unit:'h',label:'Sleep hours'})}</div>`; }
 const V = {
  dash() {
   const r = res(), lw = r.latestWeight;
@@ -126,7 +149,7 @@ const V = {
   const dueNow = Reminders.due(S.entries.find(e=>e.date===today()), new Date(), S.reminders.morning, S.reminders.evening);
   return `${day1Banner(false)}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning log not done: sleep hours, nutrition plan, how you feel (energy, soreness, mood, stress)'+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: each training session (effort + minutes), screen hours, family/friends, notes'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${weeklyCard()}${fightCard()}${fightWeekCard()}${streakCard()}
   ${isWeighDay?'<div class="card hint">⚖️ It\'s a weigh-in day (Mon/Thu). Weigh in this morning, fasted, and log it.</div>':''}
-  ${r.locked?`<div class="card"><div class="muted" style="text-align:center">FightReady Score</div><div class="big">🔒</div><p style="text-align:center"><b>${lockMsg(r)}</b></p><p class="muted" style="text-align:center">Days logged so far: ${r.daysLogged}</p>${todayRow()}</div>`:`
+  ${r.locked?`${earlyCard(r)}${todayCard()}<div class="card"><h3>Categories so far (${r.daysLogged} day${r.daysLogged==1?'':'s'})</h3>${catTable(r)}<p class="muted">Consistency bonus: 🔒 unlocks in ${r.unlockIn} day${r.unlockIn==1?'':'s'}.</p></div>`:`${todayCard()}
   <div class="card"><div class="muted" style="text-align:center">FightReady Score</div><div class="big">${r.daysLogged?r.score:'—'}</div>
   <p style="text-align:center">${r.daysLogged?esc(r.verdict):'No entries in the last 3 weeks yet.'}</p>
   <p class="muted" style="text-align:center">Base ${r.base.toFixed(1)} + bonus ${r.bonus} • Data Quality: ${esc(r.dataQuality)} (${r.daysLogged} days logged)</p></div>
@@ -134,7 +157,7 @@ const V = {
   <p>Core consistency (Nutrition + Training both Y): <b>${r.consistency.toFixed(0)}%</b> → ${r.bonus?'+'+r.bonus+' pts for daily discipline!':'Build streaks on both key plans'}</p>
   <p class="muted">Bonus: +5 at ≥90%, +3 at ≥75%, +1 at ≥60%.</p></div>`}
   <div class="card"><h3>🥊 Weight</h3>${verdictLine()}<p>Latest: <b>${lw?lw.weight+' lbs':'—'}</b> ${lw?'<span class="muted">('+lw.date+')</span>':''}${+S.targetWeight?` • Target ${esc(S.targetWeight)} lbs`:''}</p>
-  ${r.locked?`<p>7-day trend: ${lockMsg(r)}</p>`:`<p>7-day trend: <b>${r.delta==null?'—':(r.delta>0?'+':'')+r.delta+' lbs/wk'}</b></p><p>${r.trend.emoji} ${esc(r.trend.label)}</p>`}${cutWarn()}${weightChart()}</div>${wellCard(false)}`;
+  ${r.locked?`<p>7-day trend: ${lockMsg(r)}</p>`:`<p>7-day trend: <b>${r.delta==null?'—':(r.delta>0?'+':'')+r.delta+' lbs/wk'}</b></p><p>${r.trend.emoji} ${esc(r.trend.label)}</p>`}${cutWarn()}${weightChart()}</div>${miniCharts()}${wellCard(false)}`;
  },
  log() {
   const d = V._date || today(), ex = S.entries.find(x=>x.date===d), e = blankOr(ex, d);
@@ -148,21 +171,21 @@ const V = {
   const step = (k,l,st) => `<label>${l}</label><div class="step"><button data-step="${k}" data-d="-${st}">−</button><input id="f_${k}" type="number" inputmode="decimal" step="${st}" min="0" max="24" value="${esc(e[k])}"><button data-step="${k}" data-d="${st}">+</button></div>`;
   const chips = (k, vals) => `<div class="chips">${vals.map(v=>`<button data-chip="${k}" data-val="${v}" class="${+e[k]===v&&e[k]!==''?'on':''}">${v}h</button>`).join('')}</div>`;
   const wd = [1,4].includes(new Date(d+'T12:00').getDay()), st = Insights.sections(ex), nDone = Object.values(st).filter(Boolean).length, left = missingToday(ex);
-  const head = (key, title) => `<div class="row" style="margin:0 0 4px"><h3 style="margin:0">${title}</h3><span class="secok ${st[key]?'on':''}" id="ok_${key}">${st[key]?'✓ Done':'…'}</span></div>${V._flash===key?'<p class="saved">💾 Saved</p>':''}`;
+  const head = (key, title) => `<div class="row" style="margin:0 0 4px"><h3 style="margin:0">${title}</h3><span class="secok ${st[key]?'on':''}" id="ok_${key}">${st[key]?'✓ Done':'…'}</span></div>${V._flash===key?savedMsg():''}`;
   const sbtn = (key, l) => `<button class="btn sm" data-save="${key}">💾 ${l}</button>`;
   const sessCard = () => legacy ? `${yn('training','Training session completed?')}${sbtn('training','Save training')}` :
     (e.sessions.length ? e.sessions.map((x,i)=>{ const ok = ex && ex.sessions && ex.sessions[i] && ex.sessions[i].done != null && (ex.sessions[i].done === false || (ex.sessions[i].rpe > 0 && ex.sessions[i].mins > 0));
       return `<div class="sess"><p style="margin:8px 0 6px"><b>Did you complete session ${i+1}${x.label?' ('+esc(x.label)+')':''}?</b> ${ok?'<span class="secok on">✓</span>':''}</p>
      <div class="yn" data-k="sess" data-i="${i}"><button class="y ${x.done===true?'on':''}" data-val="1">✅ Yes</button><button class="n ${x.done===false?'on':''}" data-val="0">❌ No</button></div>
      <div class="row sx" id="sx_${i}" style="${x.done===true?'':'display:none'}"><div style="flex:1"><label>Effort (RPE 1–10) *</label><select data-srpe="${i}">${opt10(x.rpe)}</select></div>
-     <div style="flex:1"><label>Minutes *</label><input data-smin="${i}" type="number" inputmode="numeric" min="1" max="600" step="5" value="${esc(x.mins)}"></div></div>${sbtn('sess-'+i,'Save session '+(i+1))}${V._flash==='sess-'+i?'<p class="saved">💾 Saved</p>':''}</div>`; }).join('') : '<p class="hint">🛌 Rest day: training counts 100% when you rest.</p>') +
+     <div style="flex:1"><label>Minutes *</label><input data-smin="${i}" type="number" inputmode="numeric" min="1" max="600" step="5" value="${esc(x.mins)}"></div></div>${sbtn('sess-'+i,'Save session '+(i+1))}${V._flash==='sess-'+i?savedMsg():''}</div>`; }).join('') : '<p class="hint">🛌 Rest day: training counts 100% when you rest.</p>') +
     `<details class="opt" ${e.extra&&e.extra.label?'open':''}><summary>➕ Extra session (not on your schedule)</summary>
     <label for="f_xlabel">What was it?</label><input id="f_xlabel" maxlength="40" placeholder="e.g. Open mat" value="${esc(e.extra&&e.extra.label)}">
     <div class="row"><div style="flex:1"><label>Effort (RPE 1–10)</label><select id="f_xrpe">${opt10(e.extra&&e.extra.rpe)}</select></div><div style="flex:1"><label>Minutes</label><input id="f_xmin" type="number" inputmode="numeric" min="1" max="600" step="5" value="${esc(e.extra&&e.extra.mins)}"></div></div>
-    <p class="muted">Logged and added to your load. Doesn't change the training %. Clear all three fields and save to remove it.</p>${sbtn('extra','Save extra session')}${V._flash==='extra'?'<p class="saved">💾 Saved</p>':''}</details>
+    <p class="muted">Logged and added to your load. Doesn't change the training %. Clear all three fields and save to remove it.</p>${sbtn('extra','Save extra session')}${V._flash==='extra'?savedMsg():''}</details>
    <p class="muted">RPE: 1 very easy, 3 moderate, 5 hard, 7 very hard, 10 max. Load = RPE × minutes.</p>`;
   V._e = JSON.parse(JSON.stringify(e)); V._legacy = legacy; V._flash = null;
-  return `${d===today()?day1Banner(true):''}<div class="card"><label>Date</label><input id="f_date" type="date" value="${d}" max="${today()}">
+  return `${d===today()?day1Banner(true):''}${todayCard(d===today()?"Today's score":'Score for '+d)}<div class="card"><label>Date</label><input id="f_date" type="date" value="${d}" max="${today()}">
    <p id="progress" style="margin:10px 0 0;font-weight:700">${nDone===4?'✅ ':''}${nDone} of 4 sections done</p>
    <p class="muted" id="stillToLog" style="margin:4px 0 0">${left.length?'Still to log: '+left.join(', '):'All done for this day 🎉'}</p></div>
   <div class="card" id="sec_morning">${head('morning','🌅 Morning')}
@@ -221,7 +244,7 @@ const V = {
   const fld = (k, l, attrs='', req=false) => `<label for="p_${k}">${l}${req?' *':''}</label><input id="p_${k}" ${attrs} value="${v(k)}">${er[k]?`<p class="err">${esc(er[k])}</p>`:''}`;
   const sel = (k, l, opts) => `<label for="p_${k}">${l}</label><select id="p_${k}"><option value="">—</option>${opts.map(o=>`<option ${(V._pdraft?V._pdraft[k]:p[k])===o?'selected':''}>${o}</option>`).join('')}</select>${er[k]?`<p class="err">${esc(er[k])}</p>`:''}`;
   const num = 'type="number" inputmode="decimal" step="0.1" min="60" max="400"';
-  return `${first?'<div class="card"><h2 style="margin:0">🥊 Welcome! Sign up</h2><p class="muted">Set up your fighter profile. It stays on this phone only and is included in your backups. You can edit it later in Setup.</p></div><div class="card hint" id="day1note">📅 <b>Your sign-up day is Day 1 of tracking.</b> After you sign up, finish today&#39;s log tonight: nutrition, each training session (with effort + minutes), sleep, how you feel (energy, soreness, mood, stress), screen time, and family/friends. Trends unlock after 7 days.</div>':'<div class="card"><h2 style="margin:0">Fighter profile</h2></div>'}
+  return `${first?'<div class="card"><h2 style="margin:0">🥊 Welcome! Sign up</h2><p class="muted">Set up your fighter profile. It stays on this phone only and is included in your backups. You can edit it later in Setup.</p></div><div class="card hint" id="day1note">📅 <b>Your sign-up day is Day 1 of tracking.</b> After you sign up, finish today&#39;s log tonight: nutrition, each training session (with effort + minutes), sleep, how you feel (energy, soreness, mood, stress), screen time, and family/friends. You get a daily score and an early FightReady Score from your first log. The full score and weekly trends unlock after 7 days.</div>':'<div class="card"><h2 style="margin:0">Fighter profile</h2></div>'}
   ${Object.keys(er).length?'<div class="card hint">Please fix the highlighted fields.</div>':''}
   <div class="card"><h3>Fighter</h3>${fld('name','Fighter name','autocomplete="name" maxlength="60" required',true)}${fld('nickname','Nickname','maxlength="40"')}
    ${fld('dob','Date of birth','type="date" max="'+today()+'"')}${p.dob&&!V._pdraft?`<p class="muted">Age ${Profile.age(p.dob)}</p>`:''}
@@ -268,8 +291,8 @@ const V = {
  help() {
   return `<div class="card"><h3>How to use</h3>
   <p><b>Install:</b> open the link in Safari (iPhone: Share → Add to Home Screen) or Chrome (Android: menu → Install app). Works offline after first load.</p>
-  <p><b>First week:</b> the score, weight trend and bonus unlock 7 days after you finish Setup. Only days since then count.</p>
-  <p><b>Day 1:</b> your sign-up day is Day 1. Finish that day's log that night. Trends unlock after 7 days.</p>
+  <p><b>First week:</b> from your first log you see a daily score, an early FightReady Score (same weights, based on the days logged so far), badges and mini charts. The full 21-day score, weight trend and consistency bonus unlock 7 days after you finish Setup. Only days since then count.</p>
+  <p><b>Day 1:</b> your sign-up day is Day 1. Finish that day's log that night to get your first score.</p>
   <p><b>Profile:</b> on first open, sign up with your name (required) and optional team, weight, fight date and safety details. Edit it anytime in Setup → Edit profile. Your starting weight becomes your first weigh-in. The Dashboard shows your fight countdown and lbs to go.</p>
   <p><b>Daily log (about 30 sec):</b> tap Log. It's split into 4 cards, each with its own Save: 🌅 <b>Morning</b> (sleep, weight on Mon/Thu, how you feel), 🍽️ <b>Nutrition</b>, 🥊 <b>Training</b> (save each session on its own, plus any extra session) and 🌙 <b>Evening</b> (screen time, family/friends, notes). Each card shows ✓ Done when it's complete, and the top line shows "X of 4 sections done" plus what's still to log. Nutrition = followed your plan (macros, timing, hydration). <b>Training:</b> for each session on your schedule today, answer "Did you complete session N?" and, if yes, its effort (RPE 1–10) and minutes (both required). Rest days need nothing. Add an unscheduled extra session if you did one. Sleep = hours slept last night. Screen = recreational screen time only (not film study or school). Family/Friends = real quality time without heavy screens. <b>How you feel</b> (required daily, 1–5): Energy (5 = fresh), Soreness (5 = no soreness), Mood (5 = great), Stress (5 = no stress).</p>
   <p><b>Training schedule:</b> set at sign-up (once or twice a day, then Rest / 1 / 2 sessions per weekday with optional labels). Edit it in Setup → Edit profile & training schedule. Saving it updates this week's and future Weekly Outlines.</p>
