@@ -129,7 +129,7 @@ function todayCard(title) { const e = S.entries.find(x=>x.date===(V._date||today
    <p style="margin:6px 0 0">${esc(f.text)}</p></div>`; }
 function badgeRow() { return `<div class="badges">${Early.badges(S.entries, S.params).map(b=>`<span class="badge ${b.got?'on':''}" title="${esc(b.label)}">${b.icon} ${esc(b.label)}</span>`).join('')}</div>`; }
 function earlyCard(r) { const pr = Early.progress(r, S.params.unlockDays||7);
-  return `<div class="card"><div class="muted" style="text-align:center">FightReady Score</div><div class="big">${r.daysLogged?r.score:'—'}</div>
+  return `<div class="card"><div class="muted" style="text-align:center">FightReady Score</div><div class="big">${r.daysLogged?Math.round(r.base):'—'}</div>
    <p style="text-align:center"><b>Early score – based on ${r.daysLogged} day${r.daysLogged==1?'':'s'}</b></p>
    <div class="bar" style="margin:6px 0"><i style="width:${pr.pct}%"></i></div>
    <p class="muted" style="text-align:center">Full score unlocks in ${pr.unlockIn} day${pr.unlockIn==1?'':'s'}. Same weights as the full score, it just firms up as you log more days.</p></div>`; }
