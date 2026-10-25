@@ -87,12 +87,35 @@ function weeklySummary() { const r = res(), st = Insights.streak(S.entries), w =
    Insights.reviewText(Insights.weekReview(S.entries, new Date(), S.params, p)) + '\n' +
    `Flags: ${flags.length?flags.join('; '):'none'}${notes.length?'\nNotes: '+notes.join(' | '):''}`; }
 function weeklyCard() { const wk = Weekly.isDue(S.weeklySent||{}, new Date(), S.startDate); if (!wk) return '';
-  return `<div class="card hint warn" id="weeklyCard">📧 <b>Weekly report due</b> (week ${Weekly.weekLabel(wk)}). Testing phase: please send it to ${Weekly.CONFIG.ADMIN_NAME}.<button class="btn" id="weeklyBtn">📧 Email weekly report to ${Weekly.CONFIG.ADMIN_NAME}</button><button class="btn alt" data-sharefile="1">📎 Share full log file (CSV)</button></div>`; }
+  return `<div class="card hint warn" id="weeklyCard">📧 <b>Weekly report due</b> (week ${Weekly.weekLabel(wk)}). Testing phase: please send it to ${Weekly.CONFIG.ADMIN_NAME}.<button class="btn" data-send="1">🖼️ Send report with charts to ${Weekly.CONFIG.ADMIN_NAME}</button><button class="btn alt" data-sharefile="1">📎 Share full log file (CSV)</button></div>`; }
 function weeklyParts() { const wk = Weekly.pendingWeek(), name = (S.profile&&S.profile.name)||S.fighter||'Fighter';
   return { wk, name, subj: Weekly.subject(name, wk), sum: weeklySummary(), csv: Insights.toCSV(S.entries), to: Weekly.CONFIG.ADMIN_EMAIL }; }
 const markWeekly = wk => { S.weeklySent = Object.assign({}, S.weeklySent, {[wk]: new Date().toISOString()}); save(); show(cur); };
-// Primary: mailto so To + Subject (fighter name + date range) are always pre-filled.
-function sendWeekly() { const p = weeklyParts(); location.href = Weekly.mailto(p.to, p.subj, p.sum, p.csv); setTimeout(() => markWeekly(p.wk), 500); }
+// Weekly report = PNG of the Coach Report (charts) via the share sheet. Subject + To repeated in the text.
+function reportData() { const r = res(), p = S.profile||{}, P = weeklyParts(), w = Insights.wellness(S.entries), L = Insights.load(S.entries), cd = Profile.countdown(p.fightDate);
+  const lw = r.latestWeight, ws = Profile.weightStatus(lw && lw.weight, p.targetWeight || S.targetWeight), t = Scoring.dayNum(today());
+  const wk = S.entries.filter(e => Scoring.dayNum(e.date) > t-7), es = S.entries.slice().sort((a,b)=>a.date<b.date?-1:1).slice(-21);
+  const c = Insights.cutSafety(S.entries, new Date(), p), cp = Insights.cutPlan(lw ? lw.weight : p.startWeight, p.targetWeight, p.fightDate), flags = [];
+  if (c.level) flags.push(`Weight loss ${-c.pctPerWeek}%/week (${c.level})`); if (cp && cp.level !== 'ok') flags.push(`Target needs ${cp.perWeek} lbs/week (${cp.pct}%), ${cp.short} lbs short at a safe pace`);
+  if (w.dropping) flags.push('Wellness below normal'); w.flags.forEach(f => flags.push(`Low ${f.item} (${f.value}/5) on ${f.date.slice(5)}`));
+  const lp = L.weeks[2] ? Math.round((L.weeks[3]-L.weeks[2])/L.weeks[2]*100) : null; if (lp != null && lp > 15) flags.push(`Training load up ${lp}% vs last week`);
+  const rpes = wk.flatMap(e => Scoring.sessionsDone(e)).map(x => +x.rpe).filter(x => x > 0), sl = wk.map(e => +e.sleep).filter(x => x > 0), avg = a => a.length ? (a.reduce((s,x)=>s+x,0)/a.length).toFixed(1) : '—';
+  return { subject: P.subj, name: P.name, meta: [p.gym && 'Gym: '+p.gym, p.coach && 'Coach: '+p.coach, p.weightClass].filter(Boolean).join(' • '),
+    score: r.daysLogged ? (r.locked ? Math.round(r.base) : r.score) : null, scoreLabel: r.locked ? `Early FightReady Score (${r.daysLogged} day${r.daysLogged==1?'':'s'})` : 'FightReady Score (3 weeks)',
+    verdict: r.locked ? lockMsg(r).replace('🔒 ','') : r.verdict,
+    head: [['Days logged this week', `${wk.length}/7`], ['Streak', `${Insights.streak(S.entries).current} days`], ['Weight vs target', ws ? `${ws.current} lbs • ${ws.text}` : (lw ? lw.weight+' lbs' : '—')], ['Fight', cd ? cd.text : '—'],
+      ['Wellness (1–5)', w.avg7==null?'—':w.avg7.toFixed(1)], ['Avg sleep', sl.length ? avg(sl)+' h' : '—']],
+    cats: CATS.map(([k,l,wt]) => [l, r.cats[k], S.params[wt]]), daily: Early.series(S.entries, S.params).map(x=>({date:x.date,y:x.score})),
+    weight: es.filter(e => +e.weight > 0).map(e => ({date:e.date, y:+e.weight})), target: +(p.targetWeight || S.targetWeight) || null,
+    sleep: es.map(e => ({date:e.date, y: e.sleep===''||e.sleep==null ? null : +e.sleep})), idealSleep: S.params.idealSleep||8,
+    loadWeeks: L.weeks, training: `${tr7().split(' • ')[0]} • load ${L.week} AU${lp!=null?` (${lp>=0?'+':''}${lp}% vs last week)`:''} • avg effort RPE ${avg(rpes)}`,
+    flags, review: Insights.weekReview(S.entries, new Date(), S.params, p) }; }
+async function sendWeekly() { const P = weeklyParts(), d = reportData(), cv = Report.draw(document.createElement('canvas'), d);
+  const blob = await new Promise(r => cv.toBlob(r, 'image/png')), file = new File([blob], Report.fileName(P.name, P.wk), { type:'image/png' });
+  const text = Report.shareText(P.to, P.subj, [`FightReady ${d.score ?? '—'} • ${d.head[0][0]}: ${d.head[0][1]}`, d.flags.length ? 'Flags: '+d.flags.join('; ') : 'No flags', 'Charts attached.']);
+  if (navigator.canShare && navigator.canShare({ files:[file] })) { try { await navigator.share({ files:[file], title:P.subj, text }); markWeekly(P.wk); } catch (e) {} return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; a.click(); markWeekly(P.wk);
+  alert(`Report image downloaded. Email it to ${P.to} with subject:\n${P.subj}`); }
 // Secondary: share the full CSV as a file (subject may not carry over in Mail, so it is repeated in the text).
 async function shareWeeklyFile() { const p = weeklyParts();
   const file = new File([p.csv], `FightReady-${p.name.replace(/\W+/g,'-')}-${p.wk}.csv`, { type:'text/csv' });
@@ -241,7 +264,7 @@ const V = {
    ${CATS.map(([k,l,w])=>`<tr><td>${l}</td><td>${r.cats[k].toFixed(0)}</td><td>${S.params[w]}%</td><td>${(r.cats[k]*S.params[w]/100).toFixed(1)}</td></tr>`).join('')}
    ${r.locked?`<tr><td colspan="4">Base score & consistency bonus: ${lockMsg(r)}</td></tr>`:`<tr><th>Base score</th><td></td><td></td><th>${r.base.toFixed(1)}</th></tr><tr><td>Consistency bonus</td><td>${r.consistency.toFixed(0)}%</td><td></td><td>+${r.bonus}</td></tr>`}</table></div>
   <div class="card"><h3>Recent injury / illness notes (last 14 days)</h3>${notes.length?notes.slice(0,6).map(n=>`<p><b>${n.date}:</b> ${esc(n.notes)}</p>`).join(''):'<p>No notes logged in the last 14 days.</p>'}</div>
-  <div class="card noprint"><button class="btn" id="printBtn">🖨️ Print / Save as PDF</button><button class="btn alt" id="shareBtn">📤 Share text summary</button><button class="btn alt" id="csvBtn">📊 Export log as CSV (for coach / Excel)</button><button class="btn alt" data-send="1">📧 Email report to ${Weekly.CONFIG.ADMIN_NAME}</button><button class="btn alt" data-sharefile="1">📎 Share full log file (CSV)</button></div>`;
+  <div class="card noprint"><button class="btn" data-send="1">🖼️ Send report with charts to ${Weekly.CONFIG.ADMIN_NAME}</button><button class="btn alt" id="printBtn">🖨️ Print / Save as PDF</button><button class="btn alt" id="shareBtn">📤 Share text summary</button><button class="btn alt" id="csvBtn">📊 Export log as CSV (for coach / Excel)</button><button class="btn alt" data-sharefile="1">📎 Share full log file (CSV)</button></div>`;
  },
  profile() {
   const p = S.profile || {}, first = !S.profile, er = V._perr || {}, v = k => esc(V._pdraft ? V._pdraft[k] : p[k]);
@@ -287,7 +310,7 @@ const V = {
    <button class="btn alt" id="icsShare">📤 Share / save the calendar file</button>
    <p class="muted">The calendar file adds 4 repeating events with alarms: a daily morning log, a Mon/Thu weigh-in, a daily evening log, and a Sunday 6 PM reminder to send the weekly report to ${Weekly.CONFIG.ADMIN_NAME}. <b>Already added reminders before? Tap the button again to get the new Sunday reminder</b> (delete the old duplicates in your calendar). If you change the times, tap the button again and delete the old events in your calendar.</p></div>
   <div class="card"><h3>Backup & import</h3>
-   <button class="btn" id="exportBtn">⬇️ Export backup (JSON)</button><button class="btn alt" id="csvBtn">📊 Export log as CSV (Excel / Google Sheets)</button><button class="btn alt" data-send="1">📧 Email report to ${Weekly.CONFIG.ADMIN_NAME}</button><button class="btn alt" data-sharefile="1">📎 Share full log file (CSV)</button>
+   <button class="btn" data-send="1">🖼️ Send report with charts to ${Weekly.CONFIG.ADMIN_NAME}</button><button class="btn alt" id="exportBtn">⬇️ Export backup (JSON)</button><button class="btn alt" id="csvBtn">📊 Export log as CSV (Excel / Google Sheets)</button><button class="btn alt" data-sharefile="1">📎 Share full log file (CSV)</button>
    <label>Restore backup (JSON) or import FightLog CSV</label><input type="file" id="importFile" accept=".json,.csv,application/json,text/csv">
    <p class="muted">CSV columns: Date, Nutrition, Training, Sleep_Hours, Screen_Hours, Family_Friends, [Sleep_Score, Screen_Score,] Weight, Notes, plus optional Energy, Soreness, Mood, Stress, RPE, Session_Min. Existing dates are overwritten.</p>
    <button class="btn alt" id="wipeBtn" style="background:#5d1010">🗑️ Erase all data on this phone</button></div>`;
@@ -310,7 +333,7 @@ const V = {
   <p><b>Weekly review:</b> the Coach Report, weekly email and share text include an automatic "What went well / What was missed / Focus for next week" from your last 7 days (best and worst categories, missed sessions, 🚩 flags, weight verdict).</p>
   <p><b>Wellness & load:</b> wellness ratings of 1–2 get a 🚩 flag for your coach, and a drop below your normal is highlighted. Session load = RPE × minutes summed over all sessions (two-a-days add up). It's shown on the Dashboard and Coach Report and doesn't change the score.</p>
   <p><b>Safe weight cut:</b> the app warns if you lose more than 1%/week of bodyweight (caution) or 1.5%/week (warning), or if your target and fight date would need a faster pace. Sports-nutrition guidance for combat sports is a gradual ~0.5–1 kg (1–2 lbs) per week. Never cut by skipping meals or dehydrating without coach supervision.</p>
-  <p><b>Weekly report (testing phase):</b> every Sunday (and on the first open after, until it's sent) the Score screen shows a <i>Send weekly report to ${Weekly.CONFIG.ADMIN_NAME}</i> card. Tap <i>Email weekly report</i>: your mail app opens with To (${Weekly.CONFIG.ADMIN_EMAIL}), the subject (your name + the report dates, e.g. "Pablo – FightReady weekly report – Oct 19 to Oct 25, 2026") and a short summary plus recent log rows already filled in. Just tap Send. To send the full log as a file, use <i>Share full log file (CSV)</i>. You can send anytime from Setup or Report → <i>Send report to ${Weekly.CONFIG.ADMIN_NAME}</i>. A calendar reminder fires Sundays at 6 PM.</p>
+  <p><b>Weekly report (testing phase):</b> every Sunday (and on the first open after, until it's sent) the Score screen shows a <i>Send weekly report to ${Weekly.CONFIG.ADMIN_NAME}</i> card. Tap <i>🖼️ Send report with charts</i>: the app makes a one-page report image (score, category bars, daily score, weight vs target, sleep and training load charts, flags) and opens the share sheet. Pick Mail: the report is attached and the text starts with the subject (your name + report dates, e.g. "Pablo – FightReady weekly report – Oct 19 to Oct 25, 2026") and To (${Weekly.CONFIG.ADMIN_EMAIL}). If Mail leaves the To or Subject blank, copy them from the first lines. To send the full log as a file, use <i>Share full log file (CSV)</i>. You can send anytime from Setup or the Report screen. A calendar reminder fires Sundays at 6 PM.</p>
   <p><b>Notes:</b> injuries, illness, soreness, bad sleep causes, low energy. These show up on the Coach Report.</p></div>
   <div class="card"><h3>Scoring</h3><p>Score 0–100 from the last 3 weeks of logs. Nutrition 25%, Training 25%, Sleep 15%, Wellness 15%, Screen 10%, Family 10% (editable in Setup, must add up to 100).</p>
   <p>• Nutrition / Family = % of logged days marked Yes.<br>• Training = average daily % of scheduled sessions completed (rest day = 100%; older days: Yes = 100).<br>• Wellness = average of Energy, Soreness, Mood, Stress mapped 1→0, 2→25, 3→50, 4→75, 5→100 (days with all 4 rated).<br>• Sleep: 100 at 8h, −25 per hour off (6h or 10h = 50).<br>• Screen: 100 if ≤2h, −40 per extra hour (3h = 60, 4h = 20).<br>
@@ -394,7 +417,7 @@ document.addEventListener('click', async ev => {
   if (t.dataset.step) { const i = $('#f_'+t.dataset.step); i.value = Math.max(0, Math.min(24, (+i.value||0) + +t.dataset.d)); return; }
   if (t.dataset.edit) { ev.preventDefault(); V._date = t.dataset.edit; return show('log'); }
   if (t.dataset.save) return saveSection(t.dataset.save);
-  if (t.dataset.send || t.id === 'weeklyBtn') return sendWeekly();
+  if (t.dataset.send || false) return sendWeekly();
   if (t.dataset.sharefile) return shareWeeklyFile();
   const w = S.weeks[S.weekIdx];
   switch (t.id) {
