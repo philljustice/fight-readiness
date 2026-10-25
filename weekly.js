@@ -7,7 +7,11 @@
   const weekLabel = sun => { const d = new Date(sun+'T12:00'); d.setDate(d.getDate()-6); return ymd(d)+' to '+sun; };
   function isDue(sent = {}, now = new Date(), startDate = null) { const w = pendingWeek(now);
     if (sent[w] || !startDate || startDate > w) return null; return w; }
-  const subject = (fighter, week) => `FightReady weekly – ${fighter || 'Fighter'} – ${weekLabel(week)}`;
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  // "Pablo – FightReady weekly report – Oct 19 to Oct 25, 2026" (start gets its year only if it differs)
+  const prettyRange = sun => { const e = new Date(sun+'T12:00'), b = new Date(e); b.setDate(b.getDate()-6);
+    return `${MON[b.getMonth()]} ${b.getDate()}${b.getFullYear()!==e.getFullYear()?', '+b.getFullYear():''} to ${MON[e.getMonth()]} ${e.getDate()}, ${e.getFullYear()}`; };
+  const subject = (fighter, week) => `${String(fighter||'').trim() || 'Fighter'} – FightReady weekly report – ${prettyRange(week)}`;
   function mailto(to, subj, summary, csv, max = CONFIG.MAILTO_MAX) {
     const lines = csv.trim().split(/\r?\n/), head = lines[0], rows = lines.slice(1);
     const mk = (r, note) => `mailto:${to}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(summary + '\n\nCSV' + note + ':\n' + [head].concat(r).join('\n'))}`;
@@ -17,6 +21,6 @@
     if (u.length > max) u = `mailto:${to}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(summary.slice(0, 1200))}`;
     return u;
   }
-  const api = { CONFIG, pendingWeek, weekLabel, isDue, subject, mailto };
+  const api = { CONFIG, pendingWeek, weekLabel, prettyRange, isDue, subject, mailto };
   if (typeof module !== 'undefined') module.exports = api; else root.Weekly = api;
 })(this);

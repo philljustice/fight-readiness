@@ -87,16 +87,18 @@ function weeklySummary() { const r = res(), st = Insights.streak(S.entries), w =
    Insights.reviewText(Insights.weekReview(S.entries, new Date(), S.params, p)) + '\n' +
    `Flags: ${flags.length?flags.join('; '):'none'}${notes.length?'\nNotes: '+notes.join(' | '):''}`; }
 function weeklyCard() { const wk = Weekly.isDue(S.weeklySent||{}, new Date(), S.startDate); if (!wk) return '';
-  return `<div class="card hint warn" id="weeklyCard">📧 <b>Weekly report due</b> (week ${Weekly.weekLabel(wk)}). Testing phase: please send it to ${Weekly.CONFIG.ADMIN_NAME}.<button class="btn" id="weeklyBtn">📤 Send weekly report to ${Weekly.CONFIG.ADMIN_NAME}</button></div>`; }
-async function sendWeekly() { const wk = Weekly.pendingWeek(), name = (S.profile&&S.profile.name)||S.fighter||'Fighter';
-  const subj = Weekly.subject(name, wk), sum = weeklySummary(), csv = Insights.toCSV(S.entries), to = Weekly.CONFIG.ADMIN_EMAIL;
-  const mark = () => { S.weeklySent = Object.assign({}, S.weeklySent, {[wk]: new Date().toISOString()}); save(); show(cur); };
-  try { const file = new File([csv], `FightReady-log-${name.replace(/\W+/g,'-')}-${wk}.csv`, { type:'text/csv' });
-    if (navigator.canShare && navigator.canShare({ files:[file] })) {
-      try { await navigator.share({ files:[file], title:subj, text:`To: ${to}\nSubject: ${subj}\n\n${sum}` }); mark(); }
-      catch (e) { if (e.name !== 'AbortError') { location.href = Weekly.mailto(to, subj, sum, csv); mark(); } }
-      return; } } catch (e) {}
-  location.href = Weekly.mailto(to, subj, sum, csv); setTimeout(mark, 500); }
+  return `<div class="card hint warn" id="weeklyCard">📧 <b>Weekly report due</b> (week ${Weekly.weekLabel(wk)}). Testing phase: please send it to ${Weekly.CONFIG.ADMIN_NAME}.<button class="btn" id="weeklyBtn">📧 Email weekly report to ${Weekly.CONFIG.ADMIN_NAME}</button><button class="btn alt" data-sharefile="1">📎 Share full log file (CSV)</button></div>`; }
+function weeklyParts() { const wk = Weekly.pendingWeek(), name = (S.profile&&S.profile.name)||S.fighter||'Fighter';
+  return { wk, name, subj: Weekly.subject(name, wk), sum: weeklySummary(), csv: Insights.toCSV(S.entries), to: Weekly.CONFIG.ADMIN_EMAIL }; }
+const markWeekly = wk => { S.weeklySent = Object.assign({}, S.weeklySent, {[wk]: new Date().toISOString()}); save(); show(cur); };
+// Primary: mailto so To + Subject (fighter name + date range) are always pre-filled.
+function sendWeekly() { const p = weeklyParts(); location.href = Weekly.mailto(p.to, p.subj, p.sum, p.csv); setTimeout(() => markWeekly(p.wk), 500); }
+// Secondary: share the full CSV as a file (subject may not carry over in Mail, so it is repeated in the text).
+async function shareWeeklyFile() { const p = weeklyParts();
+  const file = new File([p.csv], `FightReady-${p.name.replace(/\W+/g,'-')}-${p.wk}.csv`, { type:'text/csv' });
+  if (navigator.canShare && navigator.canShare({ files:[file] })) {
+    try { await navigator.share({ files:[file], title:p.subj, text:`To: ${p.to}\nSubject: ${p.subj}\n\n${p.sum}` }); } catch (e) {} return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; a.click(); }
 const lockMsg = r => `🔒 Weekly trends unlock in ${r.unlockIn} day${r.unlockIn==1?'':'s'}. Keep logging!`;
 const ynI = v => v===true?'✅':v===false?'❌':'—';
 const todayRow = () => { const e = S.entries.find(x=>x.date===today()); return e ? `<p>Today: Nutrition ${ynI(e.nutrition)} • Training ${trainTxt(e)} • Sleep ${e.sleep===''?'—':e.sleep+'h'} • Screen ${e.screen===''?'—':e.screen+'h'} • Family ${ynI(e.family)}${+e.weight?' • '+e.weight+' lbs':''}</p>` : '<p class="muted">Nothing logged today yet.</p>'; };
@@ -239,7 +241,7 @@ const V = {
    ${CATS.map(([k,l,w])=>`<tr><td>${l}</td><td>${r.cats[k].toFixed(0)}</td><td>${S.params[w]}%</td><td>${(r.cats[k]*S.params[w]/100).toFixed(1)}</td></tr>`).join('')}
    ${r.locked?`<tr><td colspan="4">Base score & consistency bonus: ${lockMsg(r)}</td></tr>`:`<tr><th>Base score</th><td></td><td></td><th>${r.base.toFixed(1)}</th></tr><tr><td>Consistency bonus</td><td>${r.consistency.toFixed(0)}%</td><td></td><td>+${r.bonus}</td></tr>`}</table></div>
   <div class="card"><h3>Recent injury / illness notes (last 14 days)</h3>${notes.length?notes.slice(0,6).map(n=>`<p><b>${n.date}:</b> ${esc(n.notes)}</p>`).join(''):'<p>No notes logged in the last 14 days.</p>'}</div>
-  <div class="card noprint"><button class="btn" id="printBtn">🖨️ Print / Save as PDF</button><button class="btn alt" id="shareBtn">📤 Share text summary</button><button class="btn alt" id="csvBtn">📊 Export log as CSV (for coach / Excel)</button><button class="btn alt" data-send="1">📧 Send report to ${Weekly.CONFIG.ADMIN_NAME}</button></div>`;
+  <div class="card noprint"><button class="btn" id="printBtn">🖨️ Print / Save as PDF</button><button class="btn alt" id="shareBtn">📤 Share text summary</button><button class="btn alt" id="csvBtn">📊 Export log as CSV (for coach / Excel)</button><button class="btn alt" data-send="1">📧 Email report to ${Weekly.CONFIG.ADMIN_NAME}</button><button class="btn alt" data-sharefile="1">📎 Share full log file (CSV)</button></div>`;
  },
  profile() {
   const p = S.profile || {}, first = !S.profile, er = V._perr || {}, v = k => esc(V._pdraft ? V._pdraft[k] : p[k]);
@@ -285,7 +287,7 @@ const V = {
    <button class="btn alt" id="icsShare">📤 Share / save the calendar file</button>
    <p class="muted">The calendar file adds 4 repeating events with alarms: a daily morning log, a Mon/Thu weigh-in, a daily evening log, and a Sunday 6 PM reminder to send the weekly report to ${Weekly.CONFIG.ADMIN_NAME}. <b>Already added reminders before? Tap the button again to get the new Sunday reminder</b> (delete the old duplicates in your calendar). If you change the times, tap the button again and delete the old events in your calendar.</p></div>
   <div class="card"><h3>Backup & import</h3>
-   <button class="btn" id="exportBtn">⬇️ Export backup (JSON)</button><button class="btn alt" id="csvBtn">📊 Export log as CSV (Excel / Google Sheets)</button><button class="btn alt" data-send="1">📧 Send report to ${Weekly.CONFIG.ADMIN_NAME}</button>
+   <button class="btn" id="exportBtn">⬇️ Export backup (JSON)</button><button class="btn alt" id="csvBtn">📊 Export log as CSV (Excel / Google Sheets)</button><button class="btn alt" data-send="1">📧 Email report to ${Weekly.CONFIG.ADMIN_NAME}</button><button class="btn alt" data-sharefile="1">📎 Share full log file (CSV)</button>
    <label>Restore backup (JSON) or import FightLog CSV</label><input type="file" id="importFile" accept=".json,.csv,application/json,text/csv">
    <p class="muted">CSV columns: Date, Nutrition, Training, Sleep_Hours, Screen_Hours, Family_Friends, [Sleep_Score, Screen_Score,] Weight, Notes, plus optional Energy, Soreness, Mood, Stress, RPE, Session_Min. Existing dates are overwritten.</p>
    <button class="btn alt" id="wipeBtn" style="background:#5d1010">🗑️ Erase all data on this phone</button></div>`;
@@ -308,7 +310,7 @@ const V = {
   <p><b>Weekly review:</b> the Coach Report, weekly email and share text include an automatic "What went well / What was missed / Focus for next week" from your last 7 days (best and worst categories, missed sessions, 🚩 flags, weight verdict).</p>
   <p><b>Wellness & load:</b> wellness ratings of 1–2 get a 🚩 flag for your coach, and a drop below your normal is highlighted. Session load = RPE × minutes summed over all sessions (two-a-days add up). It's shown on the Dashboard and Coach Report and doesn't change the score.</p>
   <p><b>Safe weight cut:</b> the app warns if you lose more than 1%/week of bodyweight (caution) or 1.5%/week (warning), or if your target and fight date would need a faster pace. Sports-nutrition guidance for combat sports is a gradual ~0.5–1 kg (1–2 lbs) per week. Never cut by skipping meals or dehydrating without coach supervision.</p>
-  <p><b>Weekly report (testing phase):</b> every Sunday (and on the first open after, until it's sent) the Score screen shows a <i>Send weekly report to ${Weekly.CONFIG.ADMIN_NAME}</i> card. Tap it, pick <b>Mail</b>, check the To address is ${Weekly.CONFIG.ADMIN_EMAIL}, and tap Send. It attaches your log as a CSV plus a short summary (name, score, streak, weight trend, flags). If your phone can't share files, it opens a pre-filled email instead. You can send anytime from Setup or Report → <i>Send report to ${Weekly.CONFIG.ADMIN_NAME}</i>. A calendar reminder fires Sundays at 6 PM.</p>
+  <p><b>Weekly report (testing phase):</b> every Sunday (and on the first open after, until it's sent) the Score screen shows a <i>Send weekly report to ${Weekly.CONFIG.ADMIN_NAME}</i> card. Tap <i>Email weekly report</i>: your mail app opens with To (${Weekly.CONFIG.ADMIN_EMAIL}), the subject (your name + the report dates, e.g. "Pablo – FightReady weekly report – Oct 19 to Oct 25, 2026") and a short summary plus recent log rows already filled in. Just tap Send. To send the full log as a file, use <i>Share full log file (CSV)</i>. You can send anytime from Setup or Report → <i>Send report to ${Weekly.CONFIG.ADMIN_NAME}</i>. A calendar reminder fires Sundays at 6 PM.</p>
   <p><b>Notes:</b> injuries, illness, soreness, bad sleep causes, low energy. These show up on the Coach Report.</p></div>
   <div class="card"><h3>Scoring</h3><p>Score 0–100 from the last 3 weeks of logs. Nutrition 25%, Training 25%, Sleep 15%, Wellness 15%, Screen 10%, Family 10% (editable in Setup, must add up to 100).</p>
   <p>• Nutrition / Family = % of logged days marked Yes.<br>• Training = average daily % of scheduled sessions completed (rest day = 100%; older days: Yes = 100).<br>• Wellness = average of Energy, Soreness, Mood, Stress mapped 1→0, 2→25, 3→50, 4→75, 5→100 (days with all 4 rated).<br>• Sleep: 100 at 8h, −25 per hour off (6h or 10h = 50).<br>• Screen: 100 if ≤2h, −40 per extra hour (3h = 60, 4h = 20).<br>
@@ -393,6 +395,7 @@ document.addEventListener('click', async ev => {
   if (t.dataset.edit) { ev.preventDefault(); V._date = t.dataset.edit; return show('log'); }
   if (t.dataset.save) return saveSection(t.dataset.save);
   if (t.dataset.send || t.id === 'weeklyBtn') return sendWeekly();
+  if (t.dataset.sharefile) return shareWeeklyFile();
   const w = S.weeks[S.weekIdx];
   switch (t.id) {
     case 'showAll': V._all = true; return show('log');
