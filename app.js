@@ -1,3 +1,4 @@
+const APP_VERSION='fr-v25';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -315,7 +316,8 @@ const V = {
    <button class="btn" data-send="1">🖼️ Send report with charts to ${Weekly.CONFIG.ADMIN_NAME}</button><button class="btn alt" id="exportBtn">⬇️ Export backup (JSON)</button><button class="btn alt" id="csvBtn">📊 Export log as CSV (Excel / Google Sheets)</button><button class="btn alt" data-sharefile="1">📎 Share full log file (CSV)</button>
    <label>Restore backup (JSON) or import FightLog CSV</label><input type="file" id="importFile" accept=".json,.csv,application/json,text/csv">
    <p class="muted">CSV columns: Date, Nutrition, Training, Sleep_Hours, Screen_Hours, Family_Friends, [Sleep_Score, Screen_Score,] Weight, Notes, plus optional Energy, Soreness, Mood, Stress, RPE, Session_Min. Existing dates are overwritten.</p>
-   <button class="btn alt" id="wipeBtn" style="background:#5d1010">🗑️ Erase all data on this phone</button></div>`;
+   <button class="btn alt" id="wipeBtn" style="background:#5d1010">🗑️ Erase all data on this phone</button></div>
+  <div class="card"><button class="btn alt" id="updBtn">🔄 Check for update</button><p class="muted" style="text-align:center;font-size:12px">Version ${APP_VERSION}</p></div>`;
  },
  help() {
   return `<div class="card"><h3>How to use</h3>
@@ -478,6 +480,7 @@ document.addEventListener('click', async ev => {
   const w = S.weeks[S.weekIdx];
   switch (t.id) {
     case 'showAll': V._all = true; return show('log');
+    case 'updBtn': { t.textContent='Checking…'; try { const r = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if (r) await r.update(); } catch (e) {} setTimeout(() => location.reload(), 1500); return; }
     case 'csvBtn': return download(`FightReady-log-${(S.fighter||'fighter').replace(/\W+/g,'-')}-${today()}.csv`, Insights.toCSV(S.entries), 'text/csv;charset=utf-8');
     case 'saveDay': return saveDay();
     case 'delLog': if (confirm('Delete this day?')) { S.entries = S.entries.filter(x=>x.date!==V._e.date); save(); V._date=null; show('log'); sendStatusNow(); } return;
@@ -566,7 +569,11 @@ function reminderTick() {
     try { new Notification('FightReady', { body: k==='morning' ? 'Morning log: sleep + nutrition' : 'Evening log: training, screen, family, notes', icon:'icons/icon-192.png' }); } catch (e) {} } });
 }
 setInterval(reminderTick, 60000); document.addEventListener('visibilitychange', () => { if (document.hidden) { if (_stTimer) sendStatusNow(); } else reminderTick(); });
-if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js');
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  const hadCtl = !!navigator.serviceWorker.controller; let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (!hadCtl || reloaded || sessionStorage.getItem('frReload')===APP_VERSION) return; reloaded = true; sessionStorage.setItem('frReload', APP_VERSION); location.reload(); });
+  navigator.serviceWorker.register('sw.js', { updateViaCache:'none' }).then(reg => { reg.update().catch(()=>{}); document.addEventListener('visibilitychange', () => { if (document.visibilityState==='visible') reg.update().catch(()=>{}); }); }).catch(()=>{});
+}
 if (!S.profile && S.fighter) S.profile = { name:S.fighter, coach:S.coach||'', targetWeight:S.targetWeight||'', startWeight:'' }; // migrate older installs
 { const q = new URLSearchParams(location.search).get('tab'); show(['dash','log','plan','report','setup','help'].includes(q) ? q : 'dash'); }
 if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.tab) { V._date = null; V._sec = null; show(e.data.tab); } });
