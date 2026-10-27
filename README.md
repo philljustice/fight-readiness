@@ -45,7 +45,7 @@ Home-screen (standalone) PWAs on iOS ignore `data:`/`blob:` .ics downloads. The 
 Setup → *Export backup (JSON)* saves a file. *Restore* on any phone loads it back. You can also import a FightLog CSV (Date, Nutrition, Training, Sleep_Hours, Screen_Hours, Family_Friends, Weight, Notes). Deleting browser data, or iOS clearing storage for an app that hasn't been opened in weeks, will erase entries. **Export weekly.**
 
 ## Files
-`index.html`, `styles.css`, `app.js` (UI), `scoring.js` (scoring), `reminders.js` (calendar file + reminder checks), `profile.js` (profile validation, countdown), `manifest.webmanifest`, `sw.js`, `icons/`, `test.js`, `test-reminders.js`, `test-profile.js`, `early.js` (day-1 daily score, feedback, badges, chart data; tested in `test-early.js`) (`for t in test*.js; do node $t; done`).
+`index.html`, `styles.css`, `app.js` (UI), `scoring.js` (scoring), `reminders.js` (calendar file + reminder checks), `profile.js` (profile validation, countdown), `manifest.webmanifest`, `sw.js`, `icons/`, `test.js`, `test-reminders.js`, `test-profile.js`, `push.js` (Web Push client + completion flag), `early.js` (day-1 daily score, feedback, badges, chart data; tested in `test-early.js`) (`for t in test*.js; do node $t; done`).
 
 
 ## Scoring (v2)
@@ -57,14 +57,13 @@ The default weights are Nutrition 25, Training 25, Sleep 15, **Wellness 15**, Sc
 ## Training schedule
 Sign-up (and Setup → Edit profile & training schedule) asks "Do you train once or twice a day?", then Rest / 1 / 2 sessions for each weekday with optional labels. It's pre-filled from the Weekly Outline (sessions 1–2; "Rest/Recovery" focus = rest day). Saving the schedule writes the labels into the current and future Weekly Outlines. The daily log asks "Did you complete session N (label)?" for each of today's sessions. RPE (1–10) and minutes are required for each completed session. Session load is the sum of RPE × minutes over all sessions plus the extra one, so two-a-days add up correctly in the weekly load bars and the acute:chronic ratio.
 
-## Log screen sections
-The Log screen is split into cards, and each card saves on its own straight into that date's entry:
-1. 🌅 **Morning:** sleep (required), weight (optional, with a Mon/Thu prompt) and the 4 wellness ratings (required).
-2. 🍽️ **Nutrition:** Y/N.
-3. 🥊 **Training:** one Save per scheduled session (Y/N; RPE and minutes required if done), plus the extra session (RPE and minutes required if given; clear all fields to remove it). Legacy days keep a single Y/N.
-4. 🌙 **Evening:** screen hours and family/friends (both required), plus notes.
+## Log screen: autosave + one Save button
+The Log screen is split into four cards (🌅 Morning, 🍽️ Nutrition, 🥊 Training, 🌙 Evening). **There are no per-section Save buttons.** Every field autosaves silently into that date's entry in localStorage as it is entered (same key and entry format as before, so existing data is untouched). Out-of-range numbers (sleep/screen 0–24, weight 60–400 lbs) keep the last good value, and an extra session is stored only once effort and minutes are both filled in (or cleared).
 
-Each card shows ✓ Done from `Insights.sections()`, which matches the completeness rules. The top shows "N of 4 sections done" and the still-to-log list. Unsaved taps in other cards survive a section save.
+A single **💾 Save today's log** button sits at the bottom. It saves, re-checks the day with `Insights.checklist()` (same rules as `missing()`), and either shows ✅ complete plus today's score card, or "Saved, but N things are still missing" with a tappable list that scrolls to and highlights each field. A small "N of 4 sections done" line and the per-card ✓ Done marks stay live at the top (`Insights.sections()`).
+
+## Follow-up reminders until the log is done
+Push only (calendar alarms can't be conditional). Setup → Reminders has **Remind me until today's log is done** (default ON, stored as `S.reminders.untilDone`). Whenever today's log changes (debounced 3 s, and on Save / app hidden / app open) the app sends the Worker `POST /status {endpoint, date, complete, missing}`: just a per-day completion flag and a count of open items from `Insights.dayStatus()`, never any log data. The Worker (see `fight-readiness-push`) then, in the subscriber's own time zone: sends the normal evening reminder (skipped if today is already complete), a follow-up 2 hours later, and a last call at 9:30 PM, dropping any that would land under 30 min after the previous one or after 23:00. All stop as soon as the log is complete or the toggle is off. Flags expire after 2 days (KV TTL). Older app versions never send the flag/toggle, so they keep the old single evening reminder.
 
 ## Complete days, streaks, banners
 A day logged in v2 is complete only when it has nutrition, every scheduled session answered (with RPE + minutes if done), sleep, screen, family and all 4 wellness ratings. Days stored before v2 keep the old 5-item rule, so existing streaks stay valid. The Day-1 banner, the "still to log" message after saving, and the morning/evening reminders use the same rules. Morning = sleep + nutrition + wellness. Evening = sessions + screen + family.

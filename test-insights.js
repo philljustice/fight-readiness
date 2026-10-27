@@ -69,4 +69,15 @@ sx = I.sections(v2({})); assert.ok(sx.morning && sx.nutrition && sx.training && 
 sx = I.sections(v2({energy:'', screen:''})); assert.deepEqual(sx, {morning:false,nutrition:true,training:true,evening:false});
 sx = I.sections(v2({sessions:[{done:true,rpe:'',mins:60}]})); assert.equal(sx.training,false);
 assert.ok(I.sections(full(0)).morning); // legacy day: no wellness needed
+// checklist: lists exactly what is missing, one item per field, and is empty iff the day is complete
+assert.deepEqual(I.checklist(v2({})), []);
+assert.deepEqual(I.checklist(v2({energy:'', stress:null})).map(x=>x.key), ['well-energy','well-stress']);
+assert.deepEqual(I.checklist(v2({sessions:[{done:true,rpe:'',mins:60},{done:null},{done:false}]})).map(x=>x.key), ['sessfx-0','sess-1']);
+assert.deepEqual(I.checklist(undefined).map(x=>x.key), ['nutrition','training','sleep','well-energy','well-soreness','well-stress','well-mood','screen','family']);
+assert.deepEqual(I.checklist(full(0,{training:null})).map(x=>x.key), ['training']); // legacy day
+for (const e of [undefined, full(0), full(0,{sleep:''}), v2({}), v2({mood:''}), v2({nutrition:null,family:null}), v2({sessions:[]}), v2({sessions:[{done:true,rpe:5,mins:0}]}), {date:d(0),v:2,sessions:[],nutrition:null}])
+  assert.equal(I.checklist(e).length === 0, I.isComplete(e), JSON.stringify(e));
+// dayStatus = the only per-day info sent to the push server (flag + count, no log data)
+assert.deepEqual(I.dayStatus(v2({})), {complete:true, missing:0}); assert.deepEqual(I.dayStatus(undefined), {complete:false, missing:6});
+assert.deepEqual(Object.keys(I.dayStatus(v2({notes:'secret', weight:180}))).sort(), ['complete','missing']);
 console.log('All insights tests passed');

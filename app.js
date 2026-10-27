@@ -14,13 +14,13 @@ const newWeek = start => ({ start, coach:'', phase:'', goals:'', coachNotes:'',
   days: DAYS.map((d,i)=>({ day:d, focus:SAMPLE_WEEK[i][0], s1:SAMPLE_WEEK[i][1], s2:SAMPLE_WEEK[i][2], s3:SAMPLE_WEEK[i][3], hrs:SAMPLE_WEEK[i][4], intensity:SAMPLE_WEEK[i][5], notes:'' })) });
 function load() {
   try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.entries) return s; } catch (e) {}
-  return { fighter:'', coach:'', targetWeight:'', params:Object.assign({}, Scoring.DEFAULT_PARAMS), entries:[], weeks:[newWeek(mondayOf(new Date()))], weekIdx:0, reminders:{morning:'07:00', evening:'21:00'} };
+  return { fighter:'', coach:'', targetWeight:'', params:Object.assign({}, Scoring.DEFAULT_PARAMS), entries:[], weeks:[newWeek(mondayOf(new Date()))], weekIdx:0, reminders:{morning:'07:00', evening:'21:00', untilDone:true} };
 }
 function migrate(S) {
   if (S.params && S.params.wWellness == null) Object.assign(S.params, { wNutrition:25, wTraining:25, wSleep:15, wWellness:15, wScreen:10, wFamily:10 }); // v2: Wellness enters the score
   if (S.profile && !S.profile.schedule) S.profile.schedule = Profile.scheduleFromWeek(S.weeks[S.weekIdx||0]);
   return S; }
-let S = migrate(load()); S.reminders = Object.assign({morning:'07:00', evening:'21:00'}, S.reminders);
+let S = migrate(load()); S.reminders = Object.assign({morning:'07:00', evening:'21:00', untilDone:true}, S.reminders);
 const save = () => localStorage.setItem(KEY, JSON.stringify(S));
 const $ = s => document.querySelector(s), esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const today = () => Scoring.ymd(new Date());
@@ -146,8 +146,6 @@ function catTable(r) {
   return CATS.map(([k,l,w]) => `<div class="row"><span style="width:110px">${l} (${S.params[w]}%)</span><div class="bar"><i style="width:${r.cats[k]}%"></i></div><b style="width:70px;text-align:right">${r.cats[k].toFixed(0)} → ${(r.cats[k]*S.params[w]/100).toFixed(1)}</b></div>`).join('');
 }
 
-function savedMsg() { const d = V._date||today(), e = S.entries.find(x=>x.date===d), ds = Early.daily(e, S.params); if (!ds) return '<p class="saved">💾 Saved</p>';
-  const f = Early.feedback(ds, e); return `<p class="saved">💾 Saved • ${d===today()?'Today':d}: <b>${ds.score}/100</b><br><span style="font-weight:400">${esc(f.text)}</span></p>`; }
 function todayCard(title) { const e = S.entries.find(x=>x.date===(V._date||today())), d = Early.daily(e, S.params); if (!d) return '';
   const f = Early.feedback(d, e);
   return `<div class="card" id="todayCard"><div class="row" style="margin:0"><h3 style="margin:0">${title||"Today's score"}</h3><b style="font-size:1.8rem">${d.score}</b></div>
@@ -188,48 +186,44 @@ const V = {
  log() {
   const d = V._date || today(), ex = S.entries.find(x=>x.date===d), e = blankOr(ex, d);
   const legacy = ex && !Array.isArray(ex.sessions) && ex.v !== 2;
-  const k = V._keep && V._keep.date === d ? V._keep : null; // unsaved taps in other sections survive a section save
-  if (k) { ['nutrition','training','family',...Scoring.WELL_KEYS].forEach(f => { if (k[f] != null && k[f] !== '') e[f] = k[f]; });
-    (k.sessions||[]).forEach((x,i) => { if (e.sessions && e.sessions[i] && x.done != null) e.sessions[i].done = x.done; }); }
-  V._keep = null;
   const opt10 = (v) => `<option value="">—</option>${[1,2,3,4,5,6,7,8,9,10].map(n=>`<option ${+v===n?'selected':''}>${n}</option>`).join('')}`;
   const yn = (k,l) => `<label>${l}</label><div class="yn" data-k="${k}"><button class="y ${e[k]===true?'on':''}" data-val="1">✅ Yes</button><button class="n ${e[k]===false?'on':''}" data-val="0">❌ No</button></div>`;
   const step = (k,l,st) => `<label>${l}</label><div class="step"><button data-step="${k}" data-d="-${st}">−</button><input id="f_${k}" type="number" inputmode="decimal" step="${st}" min="0" max="24" value="${esc(e[k])}"><button data-step="${k}" data-d="${st}">+</button></div>`;
   const chips = (k, vals) => `<div class="chips">${vals.map(v=>`<button data-chip="${k}" data-val="${v}" class="${+e[k]===v&&e[k]!==''?'on':''}">${v}h</button>`).join('')}</div>`;
   const wd = [1,4].includes(new Date(d+'T12:00').getDay()), st = Insights.sections(ex), nDone = Object.values(st).filter(Boolean).length, left = missingToday(ex);
-  const head = (key, title) => `<div class="row" style="margin:0 0 4px"><h3 style="margin:0">${title}</h3><span class="secok ${st[key]?'on':''}" id="ok_${key}">${st[key]?'✓ Done':'…'}</span></div>${V._flash===key?savedMsg():''}`;
-  const sbtn = (key, l) => `<button class="btn sm" data-save="${key}">💾 ${l}</button>`;
-  const sessCard = () => legacy ? `${yn('training','Training session completed?')}${sbtn('training','Save training')}` :
+  const head = (key, title) => `<div class="row" style="margin:0 0 4px"><h3 style="margin:0">${title}</h3><span class="secok ${st[key]?'on':''}" id="ok_${key}">${st[key]?'✓ Done':'…'}</span></div>`;
+  const sessCard = () => legacy ? `${yn('training','Training session completed?')}` :
     (e.sessions.length ? e.sessions.map((x,i)=>{ const ok = ex && ex.sessions && ex.sessions[i] && ex.sessions[i].done != null && (ex.sessions[i].done === false || (ex.sessions[i].rpe > 0 && ex.sessions[i].mins > 0));
-      return `<div class="sess"><p style="margin:8px 0 6px"><b>Did you complete session ${i+1}${x.label?' ('+esc(x.label)+')':''}?</b> ${ok?'<span class="secok on">✓</span>':''}</p>
-     <div class="yn" data-k="sess" data-i="${i}"><button class="y ${x.done===true?'on':''}" data-val="1">✅ Yes</button><button class="n ${x.done===false?'on':''}" data-val="0">❌ No</button></div>
+      return `<div class="sess"><p style="margin:8px 0 6px" id="sessq_${i}"><b>Did you complete session ${i+1}${x.label?' ('+esc(x.label)+')':''}?</b> ${ok?'<span class="secok on">✓</span>':''}</p>
+     <div class="yn" id="sess_${i}" data-k="sess" data-i="${i}"><button class="y ${x.done===true?'on':''}" data-val="1">✅ Yes</button><button class="n ${x.done===false?'on':''}" data-val="0">❌ No</button></div>
      <div class="row sx" id="sx_${i}" style="${x.done===true?'':'display:none'}"><div style="flex:1"><label>Effort (RPE 1–10) *</label><select data-srpe="${i}">${opt10(x.rpe)}</select></div>
-     <div style="flex:1"><label>Minutes *</label><input data-smin="${i}" type="number" inputmode="numeric" min="1" max="600" step="5" value="${esc(x.mins)}"></div></div>${sbtn('sess-'+i,'Save session '+(i+1))}${V._flash==='sess-'+i?savedMsg():''}</div>`; }).join('') : '<p class="hint">🛌 Rest day: training counts 100% when you rest.</p>') +
+     <div style="flex:1"><label>Minutes *</label><input data-smin="${i}" type="number" inputmode="numeric" min="1" max="600" step="5" value="${esc(x.mins)}"></div></div></div>`; }).join('') : '<p class="hint">🛌 Rest day: training counts 100% when you rest.</p>') +
     `<details class="opt" ${e.extra&&e.extra.label?'open':''}><summary>➕ Extra session (not on your schedule)</summary>
     <label for="f_xlabel">What was it?</label><input id="f_xlabel" maxlength="40" placeholder="e.g. Open mat" value="${esc(e.extra&&e.extra.label)}">
     <div class="row"><div style="flex:1"><label>Effort (RPE 1–10)</label><select id="f_xrpe">${opt10(e.extra&&e.extra.rpe)}</select></div><div style="flex:1"><label>Minutes</label><input id="f_xmin" type="number" inputmode="numeric" min="1" max="600" step="5" value="${esc(e.extra&&e.extra.mins)}"></div></div>
-    <p class="muted">Logged and added to your load. Doesn't change the training %. Clear all three fields and save to remove it.</p>${sbtn('extra','Save extra session')}${V._flash==='extra'?savedMsg():''}</details>
+    <p class="muted">Logged and added to your load. Doesn't change the training %. Clear all three fields to remove it.</p></details>
    <p class="muted">RPE: 1 very easy, 3 moderate, 5 hard, 7 very hard, 10 max.</p>
    <p class="muted">Load (AU = arbitrary units) = effort (RPE 1–10) × minutes. E.g. 60 min at RPE 7 = 420 AU. A sudden jump in weekly load (more than ~10–15% over last week) raises injury and overtraining risk.</p>`;
-  V._e = JSON.parse(JSON.stringify(e)); V._legacy = legacy; V._flash = null;
-  return `${d===today()?day1Banner(true):''}${todayCard(d===today()?"Today's score":'Score for '+d)}<div class="card"><label>Date</label><input id="f_date" type="date" value="${d}" max="${today()}">
+  V._e = JSON.parse(JSON.stringify(e)); V._legacy = legacy;
+  return `${d===today()?day1Banner(true):''}<div id="todayWrap">${todayCard(d===today()?"Today's score":'Score for '+d)}</div><div class="card"><label>Date</label><input id="f_date" type="date" value="${d}" max="${today()}">
    <p id="progress" style="margin:10px 0 0;font-weight:700">${nDone===4?'✅ ':''}${nDone} of 4 sections done</p>
-   <p class="muted" id="stillToLog" style="margin:4px 0 0">${left.length?'Still to log: '+left.join(', '):'All done for this day 🎉'}</p></div>
+   <p class="muted" id="stillToLog" style="margin:4px 0 0">${left.length?'Still to log: '+left.join(', '):'All done for this day 🎉'}</p>
+   <p class="muted" style="margin:6px 0 0">Everything you enter saves automatically on this phone. Tap <b>Save today's log</b> at the bottom when you're done to see what's still missing and your score.</p></div>
   <div class="card" id="sec_morning">${head('morning','🌅 Morning')}
    ${step('sleep','Sleep last night (hours) *',0.5)}${chips('sleep',[6,7,7.5,8,8.5,9])}
    <label>Weight (lbs) ${wd?'<span style="color:#ff9800">— weigh-in day! ⚖️ Weigh in before eating.</span>':'<span class="muted">(Mon/Thu mornings)</span>'}</label>
    <input id="f_weight" type="number" inputmode="decimal" step="0.1" value="${esc(e.weight)}">
    <p style="margin:14px 0 0"><b>How do you feel? *</b></p>
    ${Insights.WELL.map(([k,l,lo,hi])=>`<label>${l} <span class="muted">(${lo} … ${hi})</span></label><div class="sc" data-k="${k}">${[1,2,3,4,5].map(n=>`<button class="${+e[k]===n?'on':''}" data-val="${n}">${n}</button>`).join('')}</div>`).join('')}
-   ${sbtn('morning','Save morning')}</div>
-  <div class="card" id="sec_nutrition">${head('nutrition','🍽️ Nutrition')}${yn('nutrition','Nutrition plan followed today?')}${sbtn('nutrition','Save nutrition')}</div>
+   </div>
+  <div class="card" id="sec_nutrition">${head('nutrition','🍽️ Nutrition')}${yn('nutrition','Nutrition plan followed today?')}</div>
   <div class="card" id="sec_training">${head('training','🥊 Training')}${sessCard()}</div>
   <div class="card" id="sec_evening">${head('evening','🌙 Evening')}
    ${step('screen','Recreational screen time (hours) *',0.5)}${chips('screen',[0,1,2,3,4])}
    ${yn('family','Quality time with family/friends? *')}
    <label>Notes (injuries, illness, soreness, energy, mood)</label><textarea id="f_notes" rows="3">${esc(e.notes)}</textarea>
-   ${sbtn('evening','Save evening')}
    ${ex?'<button class="btn alt" id="delLog">Delete this day</button>':''}</div>
+  <div class="card" id="saveCard"><button class="btn big-save" id="saveDay">💾 Save ${d===today()?"today's":'this day\'s'} log</button><div id="saveResult" aria-live="polite"></div></div>
   <div class="card"><h3>Recent entries</h3><table><tr><th>Date</th><th>N</th><th>T</th><th>Sl</th><th>Sc</th><th>F</th><th>Wt</th><th>✓</th></tr>
   ${S.entries.slice().sort((a,b)=>a.date<b.date?1:-1).slice(0,V._all?1e9:21).map(x=>`<tr data-date="${x.date}"><td><a href="#" data-edit="${x.date}">${x.date.slice(5)}</a></td><td>${x.nutrition==null?'—':x.nutrition?'Y':'N'}</td><td>${trainTxt(x)}</td><td>${x.sleep??''}</td><td>${x.screen??''}</td><td>${x.family==null?'—':x.family?'Y':'N'}</td><td>${x.weight||''}</td><td>${Insights.isComplete(x)?'✅':'…'}</td></tr>`).join('')}</table>
   <p class="muted">Tap a date to view or edit that day.</p>${S.entries.length>21&&!V._all?`<button class="btn alt" id="showAll">Show all ${S.entries.length} days</button>`:''}</div>`;
@@ -301,6 +295,7 @@ const V = {
   <div class="card" id="remCard"><h3>⏰ Reminders</h3>
    <label for="r_morning">Morning reminder</label><select id="r_morning">${Reminders.MORNING_TIMES.map(t=>`<option ${t===Reminders.nearest(S.reminders.morning,Reminders.MORNING_TIMES)?'selected':''}>${t}</option>`).join('')}</select>
    <label for="r_evening">Evening reminder</label><select id="r_evening">${Reminders.EVENING_TIMES.map(t=>`<option ${t===Reminders.nearest(S.reminders.evening,Reminders.EVENING_TIMES)?'selected':''}>${t}</option>`).join('')}</select>
+   <label class="chkrow"><input type="checkbox" id="r_untilDone" ${S.reminders.untilDone!==false?'checked':''}> <span><b>Remind me until today's log is done</b><br><span class="muted">If your log isn't finished after your evening reminder, you get a follow-up 2 hours later and a last one at 9:30 PM, and they stop as soon as it's done. Needs notifications turned on below.</span></span></label>
    <div id="pushBox">${pushBox()}</div>
    <p class="muted" style="margin-top:12px"><b>Or use calendar reminders</b> (backup option):</p>
    <a class="btn alt" id="calLink" href="${calURL()}" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">📅 Add reminders to my calendar</a>
@@ -321,9 +316,9 @@ const V = {
   <p><b>First week:</b> from your first log you see a daily score, an early FightReady Score (same weights, based on the days logged so far), badges and mini charts. The full 21-day score, weight trend and consistency bonus unlock 7 days after you finish Setup. Only days since then count.</p>
   <p><b>Day 1:</b> your sign-up day is Day 1. Finish that day's log that night to get your first score.</p>
   <p><b>Profile:</b> on first open, sign up with your name (required) and optional team, weight, fight date and safety details. Edit it anytime in Setup → Edit profile. Your starting weight becomes your first weigh-in. The Dashboard shows your fight countdown and lbs to go.</p>
-  <p><b>Daily log (about 30 sec):</b> tap Log. It's split into 4 cards, each with its own Save: 🌅 <b>Morning</b> (sleep, weight on Mon/Thu, how you feel), 🍽️ <b>Nutrition</b>, 🥊 <b>Training</b> (save each session on its own, plus any extra session) and 🌙 <b>Evening</b> (screen time, family/friends, notes). Each card shows ✓ Done when it's complete, and the top line shows "X of 4 sections done" plus what's still to log. Nutrition = followed your plan (macros, timing, hydration). <b>Training:</b> for each session on your schedule today, answer "Did you complete session N?" and, if yes, its effort (RPE 1–10) and minutes (both required). Rest days need nothing. Add an unscheduled extra session if you did one. Sleep = hours slept last night. Screen = recreational screen time only (not film study or school). Family/Friends = real quality time without heavy screens. <b>How you feel</b> (required daily, 1–5): Energy (5 = fresh), Soreness (5 = no soreness), Mood (5 = great), Stress (5 = no stress).</p>
+  <p><b>Daily log (about 30 sec):</b> tap Log. Everything you enter <b>saves automatically</b> on your phone as you go, so nothing is lost if you close the app. It's split into 4 cards: 🌅 <b>Morning</b> (sleep, weight on Mon/Thu, how you feel), 🍽️ <b>Nutrition</b>, 🥊 <b>Training</b> (each session, plus any extra session) and 🌙 <b>Evening</b> (screen time, family/friends, notes). Each card shows ✓ Done when it's complete, and the top line shows "X of 4 sections done". When you're finished, tap the big <b>💾 Save today's log</b> button at the bottom: if anything is missing it lists exactly what, and tapping an item jumps to it; if everything's in, you see your score. Nutrition = followed your plan (macros, timing, hydration). <b>Training:</b> for each session on your schedule today, answer "Did you complete session N?" and, if yes, its effort (RPE 1–10) and minutes (both required). Rest days need nothing. Add an unscheduled extra session if you did one. Sleep = hours slept last night. Screen = recreational screen time only (not film study or school). Family/Friends = real quality time without heavy screens. <b>How you feel</b> (required daily, 1–5): Energy (5 = fresh), Soreness (5 = no soreness), Mood (5 = great), Stress (5 = no stress).</p>
   <p><b>Training schedule:</b> set at sign-up (once or twice a day, then Rest / 1 / 2 sessions per weekday with optional labels). Edit it in Setup → Edit profile & training schedule. Saving it updates this week's and future Weekly Outlines.</p>
-  <p><b>Reminders:</b> Setup → Reminders → pick a morning (5:00–10:00) and evening (18:00–23:00) time in 30-min steps → tap <i>Add reminders to my calendar</i>. <b>On iPhone</b> Safari opens a calendar preview: tap <b>Add All</b>. This works from the home-screen app too. You get a daily morning and evening alarm, a Mon/Thu weigh-in, and a Sunday 6 PM weekly-report reminder, even when the app is closed. Alternatives: <i>Subscribe (webcal)</i> (then turn off "Remove Alerts" in Settings → Calendar → Accounts → Subscribed Calendars) or <i>Share / save the calendar file</i>. The app also shows a banner if today's morning or evening items aren't logged after those times.</p>
+  <p><b>Reminders:</b> Setup → Reminders → pick a morning (5:00–10:00) and evening (18:00–23:00) time in 30-min steps → tap <i>Add reminders to my calendar</i>. <b>On iPhone</b> Safari opens a calendar preview: tap <b>Add All</b>. This works from the home-screen app too. You get a daily morning and evening alarm, a Mon/Thu weigh-in, and a Sunday 6 PM weekly-report reminder, even when the app is closed. (Push notifications, which you turn on in the same Reminders card, also follow up until your log is finished; calendar alarms can't.) Alternatives: <i>Subscribe (webcal)</i> (then turn off "Remove Alerts" in Settings → Calendar → Accounts → Subscribed Calendars) or <i>Share / save the calendar file</i>. The app also shows a banner if today's morning or evening items aren't logged after those times.</p>
   <p><b>Weight:</b> weigh Monday & Thursday mornings: fasted, after the bathroom, same scale, minimal clothing.</p>
   <p><b>Streak:</b> 🔥 counts days in a row with a full log (nutrition, every scheduled session with effort + minutes, sleep, screen, family, and all 4 wellness ratings). Today not done yet doesn't break it. Miss a whole day and it resets.</p>
   <p><b>How you feel (Hooper-style check-in):</b> four quick 1–5 ratings modelled on the Hooper Index used by pro teams: fatigue/energy, muscle soreness, stress and mood (5 = best). Sleep is logged separately as hours. It's 15% of the score.</p>
@@ -346,31 +341,58 @@ let cur = 'dash';
 function blankOr(ex, d) { const e = JSON.parse(JSON.stringify(ex || {date:d, v:2, nutrition:null, training:null, family:null, sleep:'', screen:'', weight:'', notes:''}));
   if (!(ex && !Array.isArray(ex.sessions) && ex.v !== 2) && !Array.isArray(e.sessions)) { e.sessions = Profile.sessionsFor(S.profile && S.profile.schedule, d) || []; e.v = 2; }
   return e; }
-function saveSection(sec) { const d = $('#f_date').value || today(), ex = S.entries.find(x=>x.date===d), b = blankOr(ex, d), u = V._e, nv = id => { const v = $(id).value; return v===''?'':+v; };
-  if (sec === 'morning') { const sl = nv('#f_sleep'), w = nv('#f_weight');
-    if (sl === '' || sl < 0 || sl > 24) return alert('Morning: enter sleep hours (0–24).');
-    if (w !== '' && (w < 60 || w > 400)) return alert('Morning: weight should be between 60 and 400 lbs.');
-    const miss = Insights.WELL.filter(([k]) => !(u[k] >= 1)).map(x=>x[1]); if (miss.length) return alert('Morning: rate ' + miss.join(', ') + ' (1–5).');
-    b.sleep = sl; b.weight = w; Scoring.WELL_KEYS.forEach(k => b[k] = u[k]); }
-  else if (sec === 'nutrition') { if (u.nutrition == null) return alert('Nutrition: tap Yes or No.'); b.nutrition = u.nutrition; }
-  else if (sec === 'training') { if (u.training == null) return alert('Training: tap Yes or No.'); b.training = u.training; }
-  else if (sec.startsWith('sess-')) { const i = +sec.slice(5), x = u.sessions[i], r = document.querySelector(`[data-srpe="${i}"]`).value, m = document.querySelector(`[data-smin="${i}"]`).value;
-    if (x.done == null) return alert(`Session ${i+1}: tap Yes or No.`);
-    if (x.done && !(+r > 0 && +m > 0)) return alert(`Session ${i+1}: add effort (RPE) and minutes.`);
-    b.sessions[i] = { label: b.sessions[i] ? b.sessions[i].label : x.label, done: x.done, rpe: x.done ? +r : '', mins: x.done ? +m : '' }; }
-  else if (sec === 'extra') { const xl = $('#f_xlabel').value.trim(), xr = $('#f_xrpe').value, xm = $('#f_xmin').value;
-    if (!xl && !xr && !xm) b.extra = null; else { if (!(+xr > 0 && +xm > 0)) return alert('Extra session: add effort (RPE) and minutes.'); b.extra = { label: xl || 'Extra session', rpe:+xr, mins:+xm }; } }
-  else if (sec === 'evening') { const sc = nv('#f_screen');
-    if (sc === '' || sc < 0 || sc > 24) return alert('Evening: enter screen hours (0–24).'); if (u.family == null) return alert('Evening: tap Yes or No for family/friends.');
-    b.screen = sc; b.family = u.family; b.notes = $('#f_notes').value.trim(); }
-  if (Array.isArray(b.sessions)) { b.v = 2; b.training = b.sessions.some(x => x.done == null) ? null : Scoring.trainingPct(b) === 100; }
-  upsert([b]);
-  // keep unsaved inputs from other sections across the re-render
-  const vals = {}; document.querySelectorAll('#view input[id],#view select[id],#view textarea[id],#view [data-srpe],#view [data-smin]').forEach(el => { const key = el.id || (el.dataset.srpe!=null?'srpe'+el.dataset.srpe:'smin'+el.dataset.smin); vals[key] = el.value; });
-  V._keep = Object.assign({}, u, { date:d }); V._date = d; V._flash = sec; const y = window.scrollY; show('log');
-  const own = { morning:['f_sleep','f_weight'], evening:['f_screen','f_notes'], extra:['f_xlabel','f_xrpe','f_xmin'] }[sec] || (sec.startsWith('sess-') ? ['srpe'+sec.slice(5),'smin'+sec.slice(5)] : []);
-  Object.entries(vals).forEach(([key,v]) => { if (key === 'f_date' || own.includes(key)) return; const el = key.startsWith('srpe') ? document.querySelector(`[data-srpe="${key.slice(4)}"]`) : key.startsWith('smin') ? document.querySelector(`[data-smin="${key.slice(4)}"]`) : document.getElementById(key); if (el) el.value = v; });
-  window.scrollTo(0, y); }
+// ---- Log screen: every field autosaves silently; one Save button validates and reports what's missing ----
+const hasData = b => ['nutrition','training','family'].some(k => b[k] === true || b[k] === false) || ['sleep','screen','weight'].some(k => b[k] !== '' && b[k] != null) || Scoring.WELL_KEYS.some(k => +b[k] > 0)
+  || !!(b.notes && String(b.notes).trim()) || !!b.extra || (Array.isArray(b.sessions) && b.sessions.some(x => x.done != null));
+// Build the day's entry from what is on screen + the taps held in V._e. Out-of-range numbers keep the last good value (and show up at Save).
+function readDraft() { const u = V._e; if (!u || !$('#f_sleep')) return null;
+  const d = u.date, b = blankOr(S.entries.find(x => x.date === d), d), nv = id => { const v = $(id).value; return v === '' ? '' : (isNaN(+v) ? NaN : +v); };
+  const rng = (v, old, lo, hi) => v === '' ? '' : (v >= lo && v <= hi ? v : old);
+  b.sleep = rng(nv('#f_sleep'), b.sleep, 0, 24); b.screen = rng(nv('#f_screen'), b.screen, 0, 24); b.weight = rng(nv('#f_weight'), b.weight, 60, 400);
+  b.notes = $('#f_notes').value; b.nutrition = u.nutrition ?? null; b.family = u.family ?? null; Scoring.WELL_KEYS.forEach(k => { b[k] = u[k] ?? ''; });
+  if (V._legacy) b.training = u.training ?? null;
+  else if (Array.isArray(b.sessions)) { b.v = 2; b.sessions = b.sessions.map((x, i) => { const us = (u.sessions || [])[i] || {}, done = us.done == null ? null : us.done;
+    const r = document.querySelector(`[data-srpe="${i}"]`), m = document.querySelector(`[data-smin="${i}"]`);
+    return { label: x.label, done, rpe: done ? (+(r && r.value) > 0 ? +r.value : '') : '', mins: done ? (+(m && m.value) > 0 ? +m.value : '') : '' }; }); }
+  const xl = $('#f_xlabel').value.trim(), xr = $('#f_xrpe').value, xm = $('#f_xmin').value;
+  if (!xl && !xr && !xm) b.extra = null; else if (+xr > 0 && +xm > 0) b.extra = { label: xl || 'Extra session', rpe:+xr, mins:+xm };
+  if (Array.isArray(b.sessions) && !V._legacy) b.training = b.sessions.some(x => x.done == null) ? null : Scoring.trainingPct(b) === 100;
+  return b; }
+function autosave() { const b = readDraft(); if (!b) return null;
+  if (!S.entries.some(x => x.date === b.date) && !hasData(b)) return b;
+  upsert([b]); refreshProgress(b); if (b.date === today()) scheduleStatus(); return b; }
+function refreshProgress(b) { const st = Insights.sections(b), n = Object.values(st).filter(Boolean).length, left = Insights.missing(b);
+  Object.keys(st).forEach(k => { const el = $('#ok_' + k); if (el) { el.classList.toggle('on', !!st[k]); el.textContent = st[k] ? '✓ Done' : '…'; } });
+  const pr = $('#progress'); if (pr) pr.textContent = (n === 4 ? '✅ ' : '') + n + ' of 4 sections done';
+  const sl = $('#stillToLog'); if (sl) sl.textContent = left.length ? 'Still to log: ' + left.join(', ') : 'All done for this day 🎉';
+  (b.sessions || []).forEach((x, i) => { const q = $('#sessq_' + i); if (!q) return; const ok = x.done === false || (x.done === true && +x.rpe > 0 && +x.mins > 0), m = q.querySelector('.secok');
+    if (ok && !m) q.insertAdjacentHTML('beforeend', ' <span class="secok on">✓</span>'); else if (!ok && m) m.remove(); }); }
+// Where each missing item lives on the screen (tap in the checklist to jump there)
+function fieldFor(key) { const q = s => document.querySelector(s);
+  if (key.startsWith('sessfx-')) { const i = key.slice(7), r = q(`[data-srpe="${i}"]`); return r && r.value === '' ? r : q(`[data-smin="${i}"]`); }
+  if (key.startsWith('sess-')) return q('#' + key.replace('-', '_'));
+  if (key.startsWith('well-')) return q(`.sc[data-k="${key.slice(5)}"]`);
+  if (key === 'extra') return q('#f_xrpe');
+  return q({ nutrition:'.yn[data-k="nutrition"]', training:'.yn[data-k="training"]', family:'.yn[data-k="family"]', sleep:'#f_sleep', screen:'#f_screen', weight:'#f_weight' }[key]); }
+function jumpTo(key) { const el = fieldFor(key); if (!el) return; const det = el.closest('details'); if (det) det.open = true;
+  el.scrollIntoView({ behavior:'smooth', block:'center' }); const box = el.closest('.yn,.sc,.step,.row') || el; box.classList.add('flash'); setTimeout(() => box.classList.remove('flash'), 2200);
+  if (el.focus && /INPUT|SELECT|TEXTAREA/.test(el.tagName)) setTimeout(() => el.focus({ preventScroll:true }), 400); }
+function saveDay() { const b = autosave(); if (!b) return; const date = b.date;
+  const items = Insights.checklist(b).slice(), bad = (id, lo, hi) => { const el = $(id); return el && el.value !== '' && !(+el.value >= lo && +el.value <= hi); };
+  if (bad('#f_weight', 60, 400)) items.push({ key:'weight', label:'Weight: should be between 60 and 400 lbs' });
+  if (bad('#f_sleep', 0, 24) && !items.some(x => x.key === 'sleep')) items.push({ key:'sleep', label:'Sleep: enter hours between 0 and 24' });
+  if (bad('#f_screen', 0, 24) && !items.some(x => x.key === 'screen')) items.push({ key:'screen', label:'Screen time: enter hours between 0 and 24' });
+  const xl = $('#f_xlabel').value.trim(), xr = $('#f_xrpe').value, xm = $('#f_xmin').value; if ((xl || xr || xm) && !(+xr > 0 && +xm > 0)) items.push({ key:'extra', label:'Extra session: add effort (RPE) and minutes, or clear it' });
+  sendStatusNow();
+  const box = $('#saveResult'), w = $('#todayWrap'); if (w) w.innerHTML = todayCard(date === today() ? "Today's score" : 'Score for ' + date);
+  if (!items.length) box.innerHTML = `<div class="hint ok" id="saveOk">✅ <b>${date === today() ? "Today's log is complete" : 'This day is complete'} and saved.</b> Great work. See your score above.</div>`;
+  else box.innerHTML = `<div class="hint warn" id="saveMissing">💾 <b>Saved, but ${items.length} thing${items.length === 1 ? ' is' : 's are'} still missing.</b> Tap one to jump to it:<ul class="chk">${items.map(x => `<li><a href="#" data-jump="${x.key}">${esc(x.label)}</a></li>`).join('')}</ul></div>`;
+  (items.length ? box : (w && w.firstElementChild) || box).scrollIntoView({ behavior:'smooth', block: items.length ? 'center' : 'start' }); }
+// Tell the reminder server only whether today's log is complete (plus how many items are open). Never any log data.
+let _stTimer = null, _stSent = '';
+function statusNow() { return Object.assign({ date: today() }, Insights.dayStatus(S.entries.find(e => e.date === today()))); }
+function sendStatusNow() { clearTimeout(_stTimer); if (!S.push) return; const st = statusNow(), key = JSON.stringify(st); if (key === _stSent) return; _stSent = key; Push.setDayStatus(st).catch(() => { _stSent = ''; }); }
+function scheduleStatus() { if (!S.push) return; clearTimeout(_stTimer); _stTimer = setTimeout(sendStatusNow, 3000); }
 function refreshCut() { const b = $('#cutBox'); if (!b) return; const lw = res().latestWeight, sw = $('#p_startWeight');
   b.innerHTML = planBox(lw ? lw.weight : sw && sw.value, $('#p_targetWeight').value, $('#p_fightDate').value); }
 function refreshSched() { const sc = V._sched; if (!sc || !$('#schedCard')) return;
@@ -379,7 +401,7 @@ function refreshSched() { const sc = V._sched; if (!sc || !$('#schedCard')) retu
     [0,1].forEach(j => { const inp = document.querySelector(`[data-sl="${i}-${j}"]`); inp.value = d.labels[j] || ''; inp.style.display = d.n > j ? '' : 'none'; }); }); }
 function show(v) { if (!S.profile && v !== 'help') v = 'profile';
   if (v === 'profile' && !V._sched) V._sched = JSON.parse(JSON.stringify((S.profile && S.profile.schedule) || Profile.scheduleFromWeek(S.weeks[S.weekIdx])));
-  if (v !== 'profile') V._sched = null; if (v !== 'log') V._keep = null; cur = v; $('#view').innerHTML = V[v](); document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.v===(v==='profile'?'setup':v)));
+  if (v !== 'profile') V._sched = null; cur = v; $('#view').innerHTML = V[v](); document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.v===(v==='profile'?'setup':v)));
   $('#title').textContent = 'FightReady' + (S.fighter ? ' — ' + S.fighter : ''); if (v === 'profile') { refreshSched(); refreshCut(); } window.scrollTo(0,0); }
 function upsert(list) { list.forEach(e => { const i = S.entries.findIndex(x=>x.date===e.date); if (i>=0) S.entries[i]=e; else S.entries.push(e); }); S.entries.sort((a,b)=>a.date<b.date?-1:1); save(); }
 function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text],{type})); a.download = name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 1000); }
@@ -408,22 +430,23 @@ document.addEventListener('click', async ev => {
   if (t.dataset.v) return show(t.dataset.v);
   if (t.dataset.goto) { ev.preventDefault(); V._date = null; return show(t.dataset.goto); }
   if (t.closest('.yn') && t.closest('.yn').dataset.k === 'sess') { const i = +t.closest('.yn').dataset.i, on = t.dataset.val==='1'; V._e.sessions[i].done = on;
-    t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t)); $('#sx_'+i).style.display = on ? '' : 'none'; return; }
+    t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t)); $('#sx_'+i).style.display = on ? '' : 'none'; autosave(); return; }
   if (t.dataset.sd != null) { const i = +t.dataset.sd, n = +t.dataset.n, sd = V._sched.days[i]; sd.n = n; refreshSched(); return; }
   if (t.dataset.perday) { V._sched.perDay = +t.dataset.perday; V._sched.days.forEach(d => { if (d.n) d.n = V._sched.perDay; }); refreshSched(); return; }
-  if (t.closest('.yn')) { const k = t.closest('.yn').dataset.k; V._e[k] = t.dataset.val==='1'; t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t)); return; }
-  if (t.closest('.sc')) { const k = t.closest('.sc').dataset.k, n = +t.dataset.val; V._e[k] = V._e[k]===n ? '' : n; t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t && V._e[k]!=='')); return; }
-  if (t.dataset.chip) { $('#f_'+t.dataset.chip).value = t.dataset.val; t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t)); return; }
-  if (t.dataset.step) { const i = $('#f_'+t.dataset.step); i.value = Math.max(0, Math.min(24, (+i.value||0) + +t.dataset.d)); return; }
+  if (t.closest('.yn')) { const k = t.closest('.yn').dataset.k; V._e[k] = t.dataset.val==='1'; t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t)); autosave(); return; }
+  if (t.closest('.sc')) { const k = t.closest('.sc').dataset.k, n = +t.dataset.val; V._e[k] = V._e[k]===n ? '' : n; t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t && V._e[k]!=='')); autosave(); return; }
+  if (t.dataset.chip) { $('#f_'+t.dataset.chip).value = t.dataset.val; t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t)); autosave(); return; }
+  if (t.dataset.step) { const i = $('#f_'+t.dataset.step); i.value = Math.max(0, Math.min(24, (+i.value||0) + +t.dataset.d)); autosave(); return; }
+  if (t.dataset.jump) { ev.preventDefault(); return jumpTo(t.dataset.jump); }
   if (t.dataset.edit) { ev.preventDefault(); V._date = t.dataset.edit; return show('log'); }
-  if (t.dataset.save) return saveSection(t.dataset.save);
   if (t.dataset.send || false) return sendWeekly();
   if (t.dataset.sharefile) return shareWeeklyFile();
   const w = S.weeks[S.weekIdx];
   switch (t.id) {
     case 'showAll': V._all = true; return show('log');
     case 'csvBtn': return download(`FightReady-log-${(S.fighter||'fighter').replace(/\W+/g,'-')}-${today()}.csv`, Insights.toCSV(S.entries), 'text/csv;charset=utf-8');
-    case 'delLog': if (confirm('Delete this day?')) { S.entries = S.entries.filter(x=>x.date!==V._e.date); save(); V._date=null; show('log'); } return;
+    case 'saveDay': return saveDay();
+    case 'delLog': if (confirm('Delete this day?')) { S.entries = S.entries.filter(x=>x.date!==V._e.date); save(); V._date=null; show('log'); sendStatusNow(); } return;
     case 'wkPrev': S.weekIdx = Math.max(0, S.weekIdx-1); save(); return show('plan');
     case 'wkNext': S.weekIdx = Math.min(S.weeks.length-1, S.weekIdx+1); save(); return show('plan');
     case 'wkDup': { const c = JSON.parse(JSON.stringify(w)); const d = new Date(w.start+'T12:00'); d.setDate(d.getDate()+7); c.start = Scoring.ymd(d); c.coachNotes=''; c.days.forEach(x=>x.notes='');
@@ -432,7 +455,7 @@ document.addEventListener('click', async ev => {
     case 'icsBtn': return addToCalendar();
     case 'icsShare': return shareICS();
     case 'pushOn': { const b = t; b.disabled = true; b.textContent = 'Turning on…';
-      try { await Push.enable(S.reminders, (S.profile&&S.profile.name)||S.fighter); S.push = true; S.notify = true; save(); alert('🔔 Notifications are on. You\'ll get your morning and evening check-ins, the Mon/Thu weigh-in, and the Sunday 6 PM report reminder, even when the app is closed.'); }
+      try { await Push.enable(S.reminders, (S.profile&&S.profile.name)||S.fighter); S.push = true; S.notify = true; save(); sendStatusNow(); alert('🔔 Notifications are on. You\'ll get your morning and evening check-ins, follow-ups if today\'s log isn\'t finished, the Mon/Thu weigh-in, and the Sunday 6 PM report reminder, even when the app is closed.'); }
       catch (e) { alert(e.message==='denied' ? 'Notifications were blocked. To allow them: iPhone Settings → Notifications → FightReady. Calendar reminders below still work.' : 'Could not turn on notifications (' + e.message + '). Check your connection and try again, or use the calendar reminders.'); }
       return show('setup'); }
     case 'pushOff': await Push.disable(); S.push = false; save(); alert('Notifications are off.'); return show('setup');
@@ -462,13 +485,17 @@ document.addEventListener('click', async ev => {
     case 'wipeBtn': if (confirm('Erase ALL data on this phone? Export a backup first!') && confirm('Really erase?')) { localStorage.removeItem(KEY); S = load(); show('setup'); } return;
   }
 });
+const LOGF = ['f_sleep','f_screen','f_weight','f_notes','f_xlabel','f_xrpe','f_xmin'];
 document.addEventListener('input', ev => { const t = ev.target, w = S.weeks[S.weekIdx];
+  if (cur === 'log' && (LOGF.includes(t.id) || t.dataset.srpe != null || t.dataset.smin != null)) return void autosave();
   if (['p_startWeight','p_targetWeight','p_fightDate'].includes(t.id)) refreshCut();
   if (t.dataset.sl && V._sched) { const [i,j] = t.dataset.sl.split('-').map(Number); V._sched.days[i].labels[j] = t.value; return; }
   if (t.dataset.d !== undefined && t.dataset.k) { w.days[+t.dataset.d][t.dataset.k] = t.value; save(); }
   else if (t.id && t.id.startsWith('w_')) { w[t.id.slice(2)] = t.value; save(); }
 });
 document.addEventListener('change', async ev => { const t = ev.target;
+  if (cur === 'log' && (LOGF.includes(t.id) || t.dataset.srpe != null || t.dataset.smin != null)) return void autosave();
+  if (t.id === 'r_untilDone') { S.reminders.untilDone = t.checked; save(); if (S.push) Push.update(S.reminders, (S.profile&&S.profile.name)||S.fighter).catch(()=>{}); return; }
   if (t.id === 'r_morning' || t.id === 'r_evening') { if (t.value) { S.reminders[t.id.slice(2)] = t.value; save(); if (S.push) Push.update(S.reminders, (S.profile&&S.profile.name)||S.fighter).catch(()=>{}); $('#calLink').href = calURL(); $('#calSub').href = calURL().replace(/^https?:/,'webcal:'); } return; }
   if (t.id === 'wkSel') { S.weekIdx = +t.value; save(); return show('plan'); }
   if (t.id === 'w_start') return show('plan');
@@ -485,7 +512,7 @@ function pushBox() { const st = Push.status();
   if (st === 'ios-install') return '<div class="hint">🔔 <b>Want notifications?</b> On iPhone they only work from the Home Screen app. In Safari tap Share → <b>Add to Home Screen</b>, open FightReady from the new icon, then come back to Setup and tap <i>Turn on notifications</i>. (Needs iOS 16.4 or newer.)</div>';
   if (st === 'unsupported') return '<p class="muted">🔔 This browser can\'t receive notifications. Use the calendar reminders below.</p>';
   if (S.push && typeof Notification !== 'undefined' && Notification.permission === 'granted') return '<p>🔔 <b>Notifications are on.</b> Changing the times above updates them automatically.</p><button class="btn alt" id="pushTest">Send a test notification</button><button class="btn alt" id="pushOff">Turn off notifications</button>';
-  return '<button class="btn" id="pushOn">🔔 Turn on notifications</button><p class="muted">Recommended. Sends your morning and evening check-ins, the Mon/Thu weigh-in, and the Sunday 6 PM weekly-report reminder, even when the app is closed. Only your reminder times, time zone and first name are sent to the reminder server; your logs stay on this phone.</p>'; }
+  return '<button class="btn" id="pushOn">🔔 Turn on notifications</button><p class="muted">Recommended. Sends your morning and evening check-ins, follow-ups until today\'s log is done, the Mon/Thu weigh-in, and the Sunday 6 PM weekly-report reminder, even when the app is closed. Only your reminder times, time zone, first name and whether today\'s log is finished (yes/no) are sent to the reminder server; your logs stay on this phone.</p>'; }
 function calURL() { return new URL(Reminders.calFile(S.reminders.morning, S.reminders.evening), location.href.replace(/[#?].*$/,'')).href; }
 async function shareICS() { const url = calURL(), name = 'FightReady-reminders.ics';
   try { const txt = await (await fetch(url, { cache:'no-store' })).text(); const f = new File([txt], name, { type:'text/calendar' });
@@ -504,9 +531,9 @@ function reminderTick() {
   if (S.notify && 'Notification' in window && Notification.permission === 'granted') d.forEach(k => { const key = today()+k; if (!lastNotified[key]) { lastNotified[key] = 1;
     try { new Notification('FightReady', { body: k==='morning' ? 'Morning log: sleep + nutrition' : 'Evening log: training, screen, family, notes', icon:'icons/icon-192.png' }); } catch (e) {} } });
 }
-setInterval(reminderTick, 60000); document.addEventListener('visibilitychange', () => { if (!document.hidden) reminderTick(); });
+setInterval(reminderTick, 60000); document.addEventListener('visibilitychange', () => { if (document.hidden) { if (_stTimer) sendStatusNow(); } else reminderTick(); });
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js');
 if (!S.profile && S.fighter) S.profile = { name:S.fighter, coach:S.coach||'', targetWeight:S.targetWeight||'', startWeight:'' }; // migrate older installs
 { const q = new URLSearchParams(location.search).get('tab'); show(['dash','log','plan','report','setup','help'].includes(q) ? q : 'dash'); }
 if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.tab) { V._date = null; show(e.data.tab); } });
-if (S.push) Push.update(S.reminders, (S.profile&&S.profile.name)||S.fighter).catch(()=>{});
+if (S.push) Push.update(S.reminders, (S.profile&&S.profile.name)||S.fighter).then(sendStatusNow).catch(()=>{});

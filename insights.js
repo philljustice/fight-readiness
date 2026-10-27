@@ -20,6 +20,19 @@
   function sections(e) { const ms = missing(e);
     return { morning: !ms.includes('sleep') && !ms.some(m => m.startsWith('wellness')), nutrition: !ms.includes('nutrition'),
       training: !ms.includes('training') && !ms.includes('session effort + minutes'), evening: !ms.includes('screen time') && !ms.includes('family/friends') }; }
+  // Same rules as missing(), but one entry per field the fighter must fill, with a key the Log screen maps to an input (tap to jump).
+  function checklist(e) { const c = [], v2 = !!e && e.v >= 2, ss = e && Array.isArray(e.sessions) ? e.sessions : [];
+    if (!e || e.nutrition == null) c.push({ key:'nutrition', label:'Nutrition plan: tap Yes or No' });
+    if (!e || (v2 ? !Array.isArray(e.sessions) : e.training == null)) c.push({ key:'training', label:'Training: tap Yes or No' });
+    else if (v2) ss.forEach((x, i) => { if (x.done == null) c.push({ key:'sess-' + i, label:`Session ${i+1}: tap Yes or No` });
+      else if (x.done === true && !(num(x.rpe) && num(x.mins) && +x.mins > 0)) c.push({ key:'sessfx-' + i, label:`Session ${i+1}: add effort (RPE) and minutes` }); });
+    if (!e || !num(e.sleep)) c.push({ key:'sleep', label:'Sleep: enter hours slept last night' });
+    if ((!e || e.v >= 2)) WELL.forEach(([k, l]) => { if (!e || !(num(e[k]) && +e[k] >= 1)) c.push({ key:'well-' + k, label:`How you feel: rate ${l.split(' / ')[0].toLowerCase()} (1–5)` }); });
+    if (!e || !num(e.screen)) c.push({ key:'screen', label:'Screen time: enter hours' });
+    if (!e || e.family == null) c.push({ key:'family', label:'Family/friends: tap Yes or No' });
+    return c; }
+  // The only thing the push server ever learns about a day: is it complete, and how many items are still open.
+  const dayStatus = e => ({ complete: isComplete(e), missing: missing(e).length });
   // Legacy (pre-v2) days with the old 5 items stay complete.
   const isComplete = e => !!e && !missing(e).length;
   const isPartial = e => !!e && !isComplete(e) && (CORE.some(k => num(e[k]) || e[k] === true || e[k] === false) || num(e.weight));
@@ -154,6 +167,6 @@
       return [e.date,e.nutrition,S.trainingPct(e)===100,e.sleep,e.screen,e.family,e.weight,e.notes,e.energy,e.soreness,e.mood,e.stress,ws==null?'':ws,Array.isArray(e.sessions)?ss.length:'',ss.filter(s=>s.done===true).length,Math.round(S.trainingPct(e)),...sc(0),...sc(1),x.label,x.rpe,x.mins,sessionLoad(e),isComplete(e)?'Y':'N'].map(csvCell).join(','); });
     return [CSV_COLS.join(',')].concat(rows).join('\r\n') + '\r\n';
   }
-  const api = { sections, cutPlan, weightVerdict, fightWeek, weekReview, reviewText, WELL, missing, isComplete, isPartial, streak, grid, dayWellness, sessionLoad, wellness, load, cutSafety, toCSV, CSV_COLS };
+  const api = { checklist, dayStatus, sections, cutPlan, weightVerdict, fightWeek, weekReview, reviewText, WELL, missing, isComplete, isPartial, streak, grid, dayWellness, sessionLoad, wellness, load, cutSafety, toCSV, CSV_COLS };
   if (typeof module !== 'undefined') module.exports = api; else root.Insights = api;
 })(this);
