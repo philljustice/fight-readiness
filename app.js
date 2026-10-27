@@ -1,4 +1,4 @@
-const APP_VERSION='fr-v25';
+const APP_VERSION='fr-v26';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
