@@ -34,3 +34,12 @@ details.opt{margin-top:14px;border:1px solid #333;border-radius:10px;padding:10p
 ul.chk{margin:8px 0 0;padding-left:20px}ul.chk li{margin:6px 0}ul.chk a{color:#ffb74d;font-weight:600}
 .flash{animation:frflash 2.2s ease-out}@keyframes frflash{0%,60%{outline:3px solid #ffb74d;outline-offset:3px;border-radius:8px}100%{outline:3px solid transparent;outline-offset:3px}}
 .chkrow{display:flex;gap:10px;align-items:flex-start;margin:14px 0 4px}.chkrow input{width:auto;margin-top:4px;transform:scale(1.3)}
+/* Log menu tiles: light blue = not logged yet, grey + check = complete */
+#tiles{margin:0 0 14px}
+.tile{display:flex;align-items:center;gap:14px;width:100%;min-height:76px;padding:14px 16px;margin:0 0 12px;border-radius:14px;border:2px solid #b9e3ff;background:#8fd0fb;color:#08263d;text-align:left;font:inherit;font-size:1rem;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.4);-webkit-tap-highlight-color:transparent}
+.tile:active{transform:scale(.99);filter:brightness(.95)}
+.tile .ti{font-size:1.9rem;flex:none}.tile .tt{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}.tile .tt b{font-size:1.15rem}.tile .ts{font-size:.9rem;opacity:.85}
+.tile .tk{flex:none;font-size:1.7rem;font-weight:800;line-height:1}
+.tile.done{background:#3a3a40;border-color:#5b5b64;color:#c4c4cc;box-shadow:none}.tile.done .tk{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:#555560;color:#9be29f;font-size:1.2rem}
+.secbar{margin:0 0 12px}.btn.secback{width:auto;display:inline-block;margin:0;padding:12px 18px}
+#secDone{margin:0}

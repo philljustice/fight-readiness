@@ -81,3 +81,14 @@ for (const e of [undefined, full(0), full(0,{sleep:''}), v2({}), v2({mood:''}), 
 assert.deepEqual(I.dayStatus(v2({})), {complete:true, missing:0}); assert.deepEqual(I.dayStatus(undefined), {complete:false, missing:6});
 assert.deepEqual(Object.keys(I.dayStatus(v2({notes:'secret', weight:180}))).sort(), ['complete','missing']);
 console.log('All insights tests passed');
+// log menu: sectionInfo agrees with sections()/checklist() and maps every item to a tile
+{ const W = {energy:4,soreness:4,mood:4,stress:4}, base = { date:d(0), v:2, nutrition:null, training:null, family:null, sleep:'', screen:'', sessions:[{label:'A',done:null,rpe:'',mins:''},{label:'B',done:null,rpe:'',mins:''}] };
+  const cases = [undefined, base, Object.assign({}, base, {sleep:8}, W), Object.assign({}, base, {nutrition:true, sleep:8, screen:1, family:true}, W, {sessions:[{label:'A',done:true,rpe:7,mins:60},{label:'B',done:true,rpe:'',mins:''}]}),
+    Object.assign({}, base, {nutrition:false, sleep:7, screen:2, family:false}, W, {sessions:[{done:true,rpe:7,mins:60},{done:false,rpe:'',mins:''}]}), Object.assign({}, base, {sessions:[]}), full(0)];
+  cases.forEach(c => { const info = I.sectionInfo(c), st = I.sections(c); assert.deepEqual(info.map(x => x.key), ['morning','nutrition','training','evening']);
+    info.forEach(x => { assert.equal(x.done, st[x.key]); assert.equal(x.items.length === 0, st[x.key], x.key + ' ' + JSON.stringify(c)); assert.ok(x.title && x.icon); });
+    assert.equal(info.reduce((n, x) => n + x.items.length, 0), I.checklist(c).length); assert.equal(info.every(x => x.done), I.isComplete(c) || !c && false); });
+  assert.deepEqual(['sleep','well-mood','nutrition','training','sess-1','sessfx-0','screen','family'].map(I.sectionOf), ['morning','morning','nutrition','training','training','training','evening','evening']);
+  const rest = I.sectionInfo(Object.assign({}, base, {sessions:[]})); assert.equal(rest.find(x => x.key === 'training').done, true, 'rest day tile is complete');
+  const done = I.sectionInfo(cases[4]); assert.deepEqual(done.map(x => x.done), [true, true, true, true]); }
+console.log('menu sectionInfo ok');

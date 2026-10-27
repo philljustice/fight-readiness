@@ -190,7 +190,7 @@ const V = {
   const yn = (k,l) => `<label>${l}</label><div class="yn" data-k="${k}"><button class="y ${e[k]===true?'on':''}" data-val="1">✅ Yes</button><button class="n ${e[k]===false?'on':''}" data-val="0">❌ No</button></div>`;
   const step = (k,l,st) => `<label>${l}</label><div class="step"><button data-step="${k}" data-d="-${st}">−</button><input id="f_${k}" type="number" inputmode="decimal" step="${st}" min="0" max="24" value="${esc(e[k])}"><button data-step="${k}" data-d="${st}">+</button></div>`;
   const chips = (k, vals) => `<div class="chips">${vals.map(v=>`<button data-chip="${k}" data-val="${v}" class="${+e[k]===v&&e[k]!==''?'on':''}">${v}h</button>`).join('')}</div>`;
-  const wd = [1,4].includes(new Date(d+'T12:00').getDay()), st = Insights.sections(ex), nDone = Object.values(st).filter(Boolean).length, left = missingToday(ex);
+  const wd = [1,4].includes(new Date(d+'T12:00').getDay()), st = Insights.sections(e), nDone = Object.values(st).filter(Boolean).length, left = missingToday(e);
   const head = (key, title) => `<div class="row" style="margin:0 0 4px"><h3 style="margin:0">${title}</h3><span class="secok ${st[key]?'on':''}" id="ok_${key}">${st[key]?'✓ Done':'…'}</span></div>`;
   const sessCard = () => legacy ? `${yn('training','Training session completed?')}` :
     (e.sessions.length ? e.sessions.map((x,i)=>{ const ok = ex && ex.sessions && ex.sessions[i] && ex.sessions[i].done != null && (ex.sessions[i].done === false || (ex.sessions[i].rpe > 0 && ex.sessions[i].mins > 0));
@@ -205,28 +205,35 @@ const V = {
    <p class="muted">RPE: 1 very easy, 3 moderate, 5 hard, 7 very hard, 10 max.</p>
    <p class="muted">Load (AU = arbitrary units) = effort (RPE 1–10) × minutes. E.g. 60 min at RPE 7 = 420 AU. A sudden jump in weekly load (more than ~10–15% over last week) raises injury and overtraining risk.</p>`;
   V._e = JSON.parse(JSON.stringify(e)); V._legacy = legacy;
-  return `${d===today()?day1Banner(true):''}<div id="todayWrap">${todayCard(d===today()?"Today's score":'Score for '+d)}</div><div class="card"><label>Date</label><input id="f_date" type="date" value="${d}" max="${today()}">
-   <p id="progress" style="margin:10px 0 0;font-weight:700">${nDone===4?'✅ ':''}${nDone} of 4 sections done</p>
-   <p class="muted" id="stillToLog" style="margin:4px 0 0">${left.length?'Still to log: '+left.join(', '):'All done for this day 🎉'}</p>
-   <p class="muted" style="margin:6px 0 0">Everything you enter saves automatically on this phone. Tap <b>Save today's log</b> at the bottom when you're done to see what's still missing and your score.</p></div>
-  <div class="card" id="sec_morning">${head('morning','🌅 Morning')}
+  const cards = {
+   morning: `<div class="card" id="sec_morning">${head('morning','🌅 Morning check-in')}
    ${step('sleep','Sleep last night (hours) *',0.5)}${chips('sleep',[6,7,7.5,8,8.5,9])}
    <label>Weight (lbs) ${wd?'<span style="color:#ff9800">— weigh-in day! ⚖️ Weigh in before eating.</span>':'<span class="muted">(Mon/Thu mornings)</span>'}</label>
    <input id="f_weight" type="number" inputmode="decimal" step="0.1" value="${esc(e.weight)}">
    <p style="margin:14px 0 0"><b>How do you feel? *</b></p>
    ${Insights.WELL.map(([k,l,lo,hi])=>`<label>${l} <span class="muted">(${lo} … ${hi})</span></label><div class="sc" data-k="${k}">${[1,2,3,4,5].map(n=>`<button class="${+e[k]===n?'on':''}" data-val="${n}">${n}</button>`).join('')}</div>`).join('')}
-   </div>
-  <div class="card" id="sec_nutrition">${head('nutrition','🍽️ Nutrition')}${yn('nutrition','Nutrition plan followed today?')}</div>
-  <div class="card" id="sec_training">${head('training','🥊 Training')}${sessCard()}</div>
-  <div class="card" id="sec_evening">${head('evening','🌙 Evening')}
+   </div>`,
+   nutrition: `<div class="card" id="sec_nutrition">${head('nutrition','🍽️ Nutrition')}${yn('nutrition','Nutrition plan followed today?')}</div>`,
+   training: `<div class="card" id="sec_training">${head('training','🥊 Training')}${sessCard()}</div>`,
+   evening: `<div class="card" id="sec_evening">${head('evening','🌙 Evening')}
    ${step('screen','Recreational screen time (hours) *',0.5)}${chips('screen',[0,1,2,3,4])}
    ${yn('family','Quality time with family/friends? *')}
    <label>Notes (injuries, illness, soreness, energy, mood)</label><textarea id="f_notes" rows="3">${esc(e.notes)}</textarea>
-   ${ex?'<button class="btn alt" id="delLog">Delete this day</button>':''}</div>
-  <div class="card" id="saveCard"><button class="btn big-save" id="saveDay">💾 Save ${d===today()?"today's":'this day\'s'} log</button><div id="saveResult" aria-live="polite"></div></div>
+   </div>` };
+  if (V._sec && cards[V._sec]) return sectionView(V._sec, cards[V._sec], d, e);
+  const info = Insights.sectionInfo(e), nDoneM = info.filter(x => x.done).length, all = nDoneM === info.length, dl = Early.daily(e, S.params);
+  return `${d===today()?day1Banner(true):''}<div class="card" id="menuTop"><div class="row" style="margin:0"><div style="flex:1;min-width:0"><p id="progress" style="margin:0;font-weight:700;font-size:1.1rem">${all?'✅ ':''}${nDoneM} of ${info.length} sections done</p>
+   <p class="muted" id="stillToLog" style="margin:4px 0 0">${left.length?'Still to log: '+left.join(', '):'All done for this day 🎉'}</p></div>
+   ${dl?`<div style="text-align:center;flex:none"><div class="muted" style="font-size:.75rem">${d===today()?'Today':'Day'}'s score</div><b id="topScore" style="font-size:2rem;line-height:1">${dl.score}</b></div>`:''}</div>
+   <label for="f_date" style="margin-top:12px">Date</label><input id="f_date" type="date" value="${d}" max="${today()}"></div>
+  <div id="tiles" role="list">${info.map(x => tileHtml(x, e)).join('')}</div>
+  <p class="muted" style="margin:-2px 4px 14px">Tap a section to log it, then tap <b>Done</b> (or go back) to return here. Everything saves automatically on this phone.</p>
+  <div class="card" id="saveCard"><button class="btn big-save" id="saveDay">${all?'✅':'💾'} Save ${d===today()?"today's":"this day's"} log</button><div id="saveResult" aria-live="polite">${all?allDoneHtml(d):''}</div>${ex?'<button class="btn alt" id="delLog">Delete this day</button>':''}</div>
+  <div id="todayWrap">${todayCard(d===today()?"Today's score":'Score for '+d)}</div>
   <div class="card"><h3>Recent entries</h3><table><tr><th>Date</th><th>N</th><th>T</th><th>Sl</th><th>Sc</th><th>F</th><th>Wt</th><th>✓</th></tr>
   ${S.entries.slice().sort((a,b)=>a.date<b.date?1:-1).slice(0,V._all?1e9:21).map(x=>`<tr data-date="${x.date}"><td><a href="#" data-edit="${x.date}">${x.date.slice(5)}</a></td><td>${x.nutrition==null?'—':x.nutrition?'Y':'N'}</td><td>${trainTxt(x)}</td><td>${x.sleep??''}</td><td>${x.screen??''}</td><td>${x.family==null?'—':x.family?'Y':'N'}</td><td>${x.weight||''}</td><td>${Insights.isComplete(x)?'✅':'…'}</td></tr>`).join('')}</table>
   <p class="muted">Tap a date to view or edit that day.</p>${S.entries.length>21&&!V._all?`<button class="btn alt" id="showAll">Show all ${S.entries.length} days</button>`:''}</div>`;
+
  },
  plan() {
   const w = S.weeks[S.weekIdx], f = (i,k,ph) => `<input data-d="${i}" data-k="${k}" placeholder="${ph}" value="${esc(w.days[i][k])}">`;
@@ -316,7 +323,7 @@ const V = {
   <p><b>First week:</b> from your first log you see a daily score, an early FightReady Score (same weights, based on the days logged so far), badges and mini charts. The full 21-day score, weight trend and consistency bonus unlock 7 days after you finish Setup. Only days since then count.</p>
   <p><b>Day 1:</b> your sign-up day is Day 1. Finish that day's log that night to get your first score.</p>
   <p><b>Profile:</b> on first open, sign up with your name (required) and optional team, weight, fight date and safety details. Edit it anytime in Setup → Edit profile. Your starting weight becomes your first weigh-in. The Dashboard shows your fight countdown and lbs to go.</p>
-  <p><b>Daily log (about 30 sec):</b> tap Log. Everything you enter <b>saves automatically</b> on your phone as you go, so nothing is lost if you close the app. It's split into 4 cards: 🌅 <b>Morning</b> (sleep, weight on Mon/Thu, how you feel), 🍽️ <b>Nutrition</b>, 🥊 <b>Training</b> (each session, plus any extra session) and 🌙 <b>Evening</b> (screen time, family/friends, notes). Each card shows ✓ Done when it's complete, and the top line shows "X of 4 sections done". When you're finished, tap the big <b>💾 Save today's log</b> button at the bottom: if anything is missing it lists exactly what, and tapping an item jumps to it; if everything's in, you see your score. Nutrition = followed your plan (macros, timing, hydration). <b>Training:</b> for each session on your schedule today, answer "Did you complete session N?" and, if yes, its effort (RPE 1–10) and minutes (both required). Rest days need nothing. Add an unscheduled extra session if you did one. Sleep = hours slept last night. Screen = recreational screen time only (not film study or school). Family/Friends = real quality time without heavy screens. <b>How you feel</b> (required daily, 1–5): Energy (5 = fresh), Soreness (5 = no soreness), Mood (5 = great), Stress (5 = no stress).</p>
+  <p><b>Daily log (about 30 sec):</b> tap Log. You see a menu of 4 tiles: 🌅 <b>Morning check-in</b> (sleep, weight on Mon/Thu, how you feel), 🍽️ <b>Nutrition</b>, 🥊 <b>Training</b> (each session, plus any extra session) and 🌙 <b>Evening</b> (screen time, family/friends, notes). <b>Light blue</b> tiles aren't logged yet. Tap one to open it, fill it in and tap <b>Done</b> (or swipe back / press Back) to return to the menu. When a section is complete its tile turns <b>grey with a ✓</b>. Everything you enter <b>saves automatically</b> on your phone as you go, so nothing is lost if you close the app. When all 4 tiles are grey your day is complete; the <b>💾 Save today's log</b> button at the bottom confirms it, or lists exactly what's missing (tap an item to jump to it). Nutrition = followed your plan (macros, timing, hydration). <b>Training:</b> for each session on your schedule today, answer "Did you complete session N?" and, if yes, its effort (RPE 1–10) and minutes (both required). Rest days need nothing. Add an unscheduled extra session if you did one. Sleep = hours slept last night. Screen = recreational screen time only (not film study or school). Family/Friends = real quality time without heavy screens. <b>How you feel</b> (required daily, 1–5): Energy (5 = fresh), Soreness (5 = no soreness), Mood (5 = great), Stress (5 = no stress).</p>
   <p><b>Training schedule:</b> set at sign-up (once or twice a day, then Rest / 1 / 2 sessions per weekday with optional labels). Edit it in Setup → Edit profile & training schedule. Saving it updates this week's and future Weekly Outlines.</p>
   <p><b>Reminders:</b> Setup → Reminders → pick a morning (5:00–10:00) and evening (18:00–23:00) time in 30-min steps → tap <i>Add reminders to my calendar</i>. <b>On iPhone</b> Safari opens a calendar preview: tap <b>Add All</b>. This works from the home-screen app too. You get a daily morning and evening alarm, a Mon/Thu weigh-in, and a Sunday 6 PM weekly-report reminder, even when the app is closed. (Push notifications, which you turn on in the same Reminders card, also follow up until your log is finished; calendar alarms can't.) Alternatives: <i>Subscribe (webcal)</i> (then turn off "Remove Alerts" in Settings → Calendar → Accounts → Subscribed Calendars) or <i>Share / save the calendar file</i>. The app also shows a banner if today's morning or evening items aren't logged after those times.</p>
   <p><b>Weight:</b> weigh Monday & Thursday mornings: fasted, after the bathroom, same scale, minimal clothing.</p>
@@ -341,21 +348,45 @@ let cur = 'dash';
 function blankOr(ex, d) { const e = JSON.parse(JSON.stringify(ex || {date:d, v:2, nutrition:null, training:null, family:null, sleep:'', screen:'', weight:'', notes:''}));
   if (!(ex && !Array.isArray(ex.sessions) && ex.v !== 2) && !Array.isArray(e.sessions)) { e.sessions = Profile.sessionsFor(S.profile && S.profile.schedule, d) || []; e.v = 2; }
   return e; }
+// ---- Log menu: one tile per section; tapping opens that section full-screen, Done / back returns to the menu ----
+function tileSummary(x, e) { const has = k => x.items.some(i => k.test(i.key));
+  if (x.key === 'morning') { if (x.done) { const w = Insights.dayWellness(e); return [e.sleep + 'h sleep', +e.weight > 0 ? e.weight + ' lbs' : '', w != null ? 'feel ' + w.toFixed(1) + '/5' : ''].filter(Boolean).join(' · '); }
+    return 'To log: ' + [has(/^sleep$/) ? 'sleep' : '', has(/^well-/) ? 'how you feel' : ''].filter(Boolean).join(' + '); }
+  if (x.key === 'nutrition') return x.done ? (e.nutrition ? 'Followed plan ✅' : 'Plan not followed ❌') : 'Tap Yes or No';
+  if (x.key === 'training') { const ss = Array.isArray(e.sessions) ? e.sessions : [], ex = e.extra && e.extra.label ? ' + extra' : '';
+    if (x.done) return (ss.length ? ss.filter(s => s.done === true).length + ' of ' + ss.length + ' sessions done' : (e.v >= 2 ? 'Rest day' : e.training ? 'Session done' : 'Session skipped')) + ex;
+    const ok = ss.filter(s => s.done === false || (s.done === true && +s.rpe > 0 && +s.mins > 0)).length; return ss.length ? ok + ' of ' + ss.length + ' sessions logged' : 'Tap Yes or No'; }
+  return x.done ? [e.screen + 'h screen', e.family ? 'family time ✅' : 'no family time'].join(' · ') : 'To log: ' + [has(/^screen$/) ? 'screen time' : '', has(/^family$/) ? 'family/friends' : ''].filter(Boolean).join(' + '); }
+function tileHtml(x, e) { const sm = tileSummary(x, e);
+  return `<button class="tile ${x.done ? 'done' : 'todo'}" data-sec="${x.key}" role="listitem" aria-label="${esc(x.title)}: ${x.done ? 'done' : 'not logged yet'}. ${esc(sm)}">
+   <span class="ti">${x.icon}</span><span class="tt"><b>${esc(x.title)}</b><span class="ts">${esc(sm)}</span></span><span class="tk">${x.done ? '✓' : '›'}</span></button>`; }
+const allDoneHtml = d => `<div class="hint ok" id="saveOk">✅ <b>${d === today() ? "Today's log is complete" : 'This day is complete'} and saved.</b> Great work. Your score is below.</div>`;
+function sectionView(key, card, d, e) { const m = Insights.SECTION_META.find(x => x[0] === key);
+  return `<div class="secbar"><button class="btn alt secback" id="secBack" data-back="1">‹ Back to menu</button></div>
+   ${d !== today() ? `<div class="hint">✏️ Editing <b>${d}</b></div>` : ''}${card}
+   <div class="card"><button class="btn big-save" id="secDone">✓ Done, back to menu</button></div>`; }
+function openSection(key) { V._sec = key; try { history.pushState({ frSec:key }, ''); } catch (e) {} show('log'); }
+function leaveSection() { autosave(); V._sec = null; show('log'); sendStatusNow(); }
+function closeSection() { if (history.state && history.state.frSec) return history.back(); leaveSection(); } // popstate does the rest
+window.addEventListener('popstate', () => { if (cur === 'log' && V._sec) leaveSection(); });
+try { if (history.state && history.state.frSec) history.replaceState(null, ''); } catch (e) {}
 // ---- Log screen: every field autosaves silently; one Save button validates and reports what's missing ----
 const hasData = b => ['nutrition','training','family'].some(k => b[k] === true || b[k] === false) || ['sleep','screen','weight'].some(k => b[k] !== '' && b[k] != null) || Scoring.WELL_KEYS.some(k => +b[k] > 0)
   || !!(b.notes && String(b.notes).trim()) || !!b.extra || (Array.isArray(b.sessions) && b.sessions.some(x => x.done != null));
 // Build the day's entry from what is on screen + the taps held in V._e. Out-of-range numbers keep the last good value (and show up at Save).
-function readDraft() { const u = V._e; if (!u || !$('#f_sleep')) return null;
-  const d = u.date, b = blankOr(S.entries.find(x => x.date === d), d), nv = id => { const v = $(id).value; return v === '' ? '' : (isNaN(+v) ? NaN : +v); };
+function readDraft() { const u = V._e; if (!u) return null;
+  const d = u.date, b = blankOr(S.entries.find(x => x.date === d), d), has = id => !!$(id), nv = id => { const v = $(id).value; return v === '' ? '' : (isNaN(+v) ? NaN : +v); };
   const rng = (v, old, lo, hi) => v === '' ? '' : (v >= lo && v <= hi ? v : old);
-  b.sleep = rng(nv('#f_sleep'), b.sleep, 0, 24); b.screen = rng(nv('#f_screen'), b.screen, 0, 24); b.weight = rng(nv('#f_weight'), b.weight, 60, 400);
-  b.notes = $('#f_notes').value; b.nutrition = u.nutrition ?? null; b.family = u.family ?? null; Scoring.WELL_KEYS.forEach(k => { b[k] = u[k] ?? ''; });
+  // Only one section is on screen at a time: fields that aren't on screen keep their stored value.
+  if (has('#f_sleep')) b.sleep = rng(nv('#f_sleep'), b.sleep, 0, 24); if (has('#f_screen')) b.screen = rng(nv('#f_screen'), b.screen, 0, 24); if (has('#f_weight')) b.weight = rng(nv('#f_weight'), b.weight, 60, 400);
+  if (has('#f_notes')) b.notes = $('#f_notes').value; b.nutrition = u.nutrition ?? null; b.family = u.family ?? null; Scoring.WELL_KEYS.forEach(k => { b[k] = u[k] ?? ''; });
   if (V._legacy) b.training = u.training ?? null;
   else if (Array.isArray(b.sessions)) { b.v = 2; b.sessions = b.sessions.map((x, i) => { const us = (u.sessions || [])[i] || {}, done = us.done == null ? null : us.done;
     const r = document.querySelector(`[data-srpe="${i}"]`), m = document.querySelector(`[data-smin="${i}"]`);
+    if (!r && !m) return { label: x.label, done, rpe: done ? (x.rpe > 0 ? x.rpe : '') : '', mins: done ? (x.mins > 0 ? x.mins : '') : '' };
     return { label: x.label, done, rpe: done ? (+(r && r.value) > 0 ? +r.value : '') : '', mins: done ? (+(m && m.value) > 0 ? +m.value : '') : '' }; }); }
-  const xl = $('#f_xlabel').value.trim(), xr = $('#f_xrpe').value, xm = $('#f_xmin').value;
-  if (!xl && !xr && !xm) b.extra = null; else if (+xr > 0 && +xm > 0) b.extra = { label: xl || 'Extra session', rpe:+xr, mins:+xm };
+  if (has('#f_xlabel')) { const xl = $('#f_xlabel').value.trim(), xr = $('#f_xrpe').value, xm = $('#f_xmin').value;
+    if (!xl && !xr && !xm) b.extra = null; else if (+xr > 0 && +xm > 0) b.extra = { label: xl || 'Extra session', rpe:+xr, mins:+xm }; }
   if (Array.isArray(b.sessions) && !V._legacy) b.training = b.sessions.some(x => x.done == null) ? null : Scoring.trainingPct(b) === 100;
   return b; }
 function autosave() { const b = readDraft(); if (!b) return null;
@@ -382,10 +413,10 @@ function saveDay() { const b = autosave(); if (!b) return; const date = b.date;
   if (bad('#f_weight', 60, 400)) items.push({ key:'weight', label:'Weight: should be between 60 and 400 lbs' });
   if (bad('#f_sleep', 0, 24) && !items.some(x => x.key === 'sleep')) items.push({ key:'sleep', label:'Sleep: enter hours between 0 and 24' });
   if (bad('#f_screen', 0, 24) && !items.some(x => x.key === 'screen')) items.push({ key:'screen', label:'Screen time: enter hours between 0 and 24' });
-  const xl = $('#f_xlabel').value.trim(), xr = $('#f_xrpe').value, xm = $('#f_xmin').value; if ((xl || xr || xm) && !(+xr > 0 && +xm > 0)) items.push({ key:'extra', label:'Extra session: add effort (RPE) and minutes, or clear it' });
+  const xlE = $('#f_xlabel'), xl = xlE ? xlE.value.trim() : '', xr = xlE ? $('#f_xrpe').value : '', xm = xlE ? $('#f_xmin').value : ''; if ((xl || xr || xm) && !(+xr > 0 && +xm > 0)) items.push({ key:'extra', label:'Extra session: add effort (RPE) and minutes, or clear it' });
   sendStatusNow();
-  const box = $('#saveResult'), w = $('#todayWrap'); if (w) w.innerHTML = todayCard(date === today() ? "Today's score" : 'Score for ' + date);
-  if (!items.length) box.innerHTML = `<div class="hint ok" id="saveOk">✅ <b>${date === today() ? "Today's log is complete" : 'This day is complete'} and saved.</b> Great work. See your score above.</div>`;
+  const box = $('#saveResult'), w = $('#todayWrap'); if (w) w.innerHTML = todayCard(date === today() ? "Today's score" : 'Score for ' + date); { const ts = $('#topScore'), dd = Early.daily(b, S.params); if (ts && dd) ts.textContent = dd.score; }
+  if (!items.length) box.innerHTML = `<div class="hint ok" id="saveOk">✅ <b>${date === today() ? "Today's log is complete" : 'This day is complete'} and saved.</b> Great work. Your score is below.</div>`;
   else box.innerHTML = `<div class="hint warn" id="saveMissing">💾 <b>Saved, but ${items.length} thing${items.length === 1 ? ' is' : 's are'} still missing.</b> Tap one to jump to it:<ul class="chk">${items.map(x => `<li><a href="#" data-jump="${x.key}">${esc(x.label)}</a></li>`).join('')}</ul></div>`;
   (items.length ? box : (w && w.firstElementChild) || box).scrollIntoView({ behavior:'smooth', block: items.length ? 'center' : 'start' }); }
 // Tell the reminder server only whether today's log is complete (plus how many items are open). Never any log data.
@@ -401,7 +432,7 @@ function refreshSched() { const sc = V._sched; if (!sc || !$('#schedCard')) retu
     [0,1].forEach(j => { const inp = document.querySelector(`[data-sl="${i}-${j}"]`); inp.value = d.labels[j] || ''; inp.style.display = d.n > j ? '' : 'none'; }); }); }
 function show(v) { if (!S.profile && v !== 'help') v = 'profile';
   if (v === 'profile' && !V._sched) V._sched = JSON.parse(JSON.stringify((S.profile && S.profile.schedule) || Profile.scheduleFromWeek(S.weeks[S.weekIdx])));
-  if (v !== 'profile') V._sched = null; cur = v; $('#view').innerHTML = V[v](); document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.v===(v==='profile'?'setup':v)));
+  if (v !== 'profile') V._sched = null; if (v !== 'log') V._sec = null; cur = v; $('#view').innerHTML = V[v](); document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.v===(v==='profile'?'setup':v)));
   $('#title').textContent = 'FightReady' + (S.fighter ? ' — ' + S.fighter : ''); if (v === 'profile') { refreshSched(); refreshCut(); } window.scrollTo(0,0); }
 function upsert(list) { list.forEach(e => { const i = S.entries.findIndex(x=>x.date===e.date); if (i>=0) S.entries[i]=e; else S.entries.push(e); }); S.entries.sort((a,b)=>a.date<b.date?-1:1); save(); }
 function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text],{type})); a.download = name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 1000); }
@@ -427,6 +458,9 @@ function shareText() { const r = res();
 
 document.addEventListener('click', async ev => {
   const t = ev.target.closest('button,a'); if (!t) return;
+  if (t.dataset.sec) return openSection(t.dataset.sec);
+  if (t.id === 'secDone' || t.dataset.back) return closeSection();
+  if (t.dataset.v === 'log' && cur === 'log' && V._sec) return closeSection();
   if (t.dataset.v) return show(t.dataset.v);
   if (t.dataset.goto) { ev.preventDefault(); V._date = null; return show(t.dataset.goto); }
   if (t.closest('.yn') && t.closest('.yn').dataset.k === 'sess') { const i = +t.closest('.yn').dataset.i, on = t.dataset.val==='1'; V._e.sessions[i].done = on;
@@ -437,7 +471,7 @@ document.addEventListener('click', async ev => {
   if (t.closest('.sc')) { const k = t.closest('.sc').dataset.k, n = +t.dataset.val; V._e[k] = V._e[k]===n ? '' : n; t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t && V._e[k]!=='')); autosave(); return; }
   if (t.dataset.chip) { $('#f_'+t.dataset.chip).value = t.dataset.val; t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t)); autosave(); return; }
   if (t.dataset.step) { const i = $('#f_'+t.dataset.step); i.value = Math.max(0, Math.min(24, (+i.value||0) + +t.dataset.d)); autosave(); return; }
-  if (t.dataset.jump) { ev.preventDefault(); return jumpTo(t.dataset.jump); }
+  if (t.dataset.jump) { ev.preventDefault(); const k = t.dataset.jump; if (!fieldFor(k)) { openSection(Insights.sectionOf(k)); setTimeout(() => jumpTo(k), 60); return; } return jumpTo(k); }
   if (t.dataset.edit) { ev.preventDefault(); V._date = t.dataset.edit; return show('log'); }
   if (t.dataset.send || false) return sendWeekly();
   if (t.dataset.sharefile) return shareWeeklyFile();
@@ -535,5 +569,5 @@ setInterval(reminderTick, 60000); document.addEventListener('visibilitychange', 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js');
 if (!S.profile && S.fighter) S.profile = { name:S.fighter, coach:S.coach||'', targetWeight:S.targetWeight||'', startWeight:'' }; // migrate older installs
 { const q = new URLSearchParams(location.search).get('tab'); show(['dash','log','plan','report','setup','help'].includes(q) ? q : 'dash'); }
-if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.tab) { V._date = null; show(e.data.tab); } });
+if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.tab) { V._date = null; V._sec = null; show(e.data.tab); } });
 if (S.push) Push.update(S.reminders, (S.profile&&S.profile.name)||S.fighter).then(sendStatusNow).catch(()=>{});

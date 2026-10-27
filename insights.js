@@ -20,6 +20,11 @@
   function sections(e) { const ms = missing(e);
     return { morning: !ms.includes('sleep') && !ms.some(m => m.startsWith('wellness')), nutrition: !ms.includes('nutrition'),
       training: !ms.includes('training') && !ms.includes('session effort + minutes'), evening: !ms.includes('screen time') && !ms.includes('family/friends') }; }
+  // Log menu: which section each checklist item belongs to, and one tile per section (done <=> sections(e)[key]).
+  const SECTION_META = [['morning','🌅','Morning check-in','Sleep, weight & how you feel'],['nutrition','🍽️','Nutrition','Did you follow your plan?'],['training','🥊','Training','Sessions, effort & minutes'],['evening','🌙','Evening','Screen time, family & notes']];
+  const sectionOf = k => /^(sleep|well-)/.test(k) ? 'morning' : k === 'nutrition' ? 'nutrition' : /^(training|sess)/.test(k) ? 'training' : 'evening';
+  function sectionInfo(e) { const items = checklist(e), st = sections(e);
+    return SECTION_META.map(([key, icon, title, sub]) => ({ key, icon, title, sub, done: !!st[key], items: items.filter(i => sectionOf(i.key) === key) })); }
   // Same rules as missing(), but one entry per field the fighter must fill, with a key the Log screen maps to an input (tap to jump).
   function checklist(e) { const c = [], v2 = !!e && e.v >= 2, ss = e && Array.isArray(e.sessions) ? e.sessions : [];
     if (!e || e.nutrition == null) c.push({ key:'nutrition', label:'Nutrition plan: tap Yes or No' });
@@ -167,6 +172,6 @@
       return [e.date,e.nutrition,S.trainingPct(e)===100,e.sleep,e.screen,e.family,e.weight,e.notes,e.energy,e.soreness,e.mood,e.stress,ws==null?'':ws,Array.isArray(e.sessions)?ss.length:'',ss.filter(s=>s.done===true).length,Math.round(S.trainingPct(e)),...sc(0),...sc(1),x.label,x.rpe,x.mins,sessionLoad(e),isComplete(e)?'Y':'N'].map(csvCell).join(','); });
     return [CSV_COLS.join(',')].concat(rows).join('\r\n') + '\r\n';
   }
-  const api = { checklist, dayStatus, sections, cutPlan, weightVerdict, fightWeek, weekReview, reviewText, WELL, missing, isComplete, isPartial, streak, grid, dayWellness, sessionLoad, wellness, load, cutSafety, toCSV, CSV_COLS };
+  const api = { sectionInfo, sectionOf, SECTION_META, checklist, dayStatus, sections, cutPlan, weightVerdict, fightWeek, weekReview, reviewText, WELL, missing, isComplete, isPartial, streak, grid, dayWellness, sessionLoad, wellness, load, cutSafety, toCSV, CSV_COLS };
   if (typeof module !== 'undefined') module.exports = api; else root.Insights = api;
 })(this);
