@@ -30,11 +30,12 @@
       'END:VCALENDAR'];
     return lines.map(fold).join('\r\n') + '\r\n';
   }
+  const Sc = root.Scoring || (typeof require !== 'undefined' ? require('./scoring.js') : null);
   const num = v => v !== '' && v != null && !isNaN(v);
   const wellOK = e => !(e.v >= 2) || ['energy','soreness','mood','stress'].every(k => num(e[k]) && +e[k] >= 1);
   const trainOK = e => e.v >= 2 ? Array.isArray(e.sessions) && e.sessions.every(x => x.done === false || (x.done === true && num(x.rpe) && num(x.mins))) : (e.training === true || e.training === false);
   // morning = sleep + nutrition + wellness (energy/soreness/mood/stress); evening = sessions (+ effort/minutes) + screen + family
-  const morningDone = e => !!e && num(e.sleep) && (e.nutrition === true || e.nutrition === false) && wellOK(e);
+  const morningDone = e => !!e && num(e.sleep) && (e.nutrition === true || e.nutrition === false) && wellOK(e) && !(Sc.hydrationRequired(e) && !Sc.hydrationOK(e));
   const eveningDone = e => !!e && trainOK(e) && num(e.screen) && (e.family === true || e.family === false);
   const mins = hm => { const [h, m] = hm.split(':').map(Number); return h * 60 + m; };
   // which reminders are due & unfinished right now

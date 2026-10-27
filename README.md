@@ -23,6 +23,9 @@ On first open the app shows a sign-up screen. Only the fighter name is required.
 The sign-up day is Day 1. After sign-up the app goes straight to today's log, and a "Day 1, let's finish today's log" banner lists what's still missing (nutrition, training, sleep, screen time, family/friends) until today's log is complete.
 The app starts empty. The start date is saved the first time Setup is completed. For the first 7 days the Dashboard and Coach Report show "Trends unlock in X days" in place of the score, weight trend and consistency bonus. Today's entry and the number of days logged still show. After that, normal scoring uses the last 3 weeks, counting only days since the start date. Restoring a backup brings its start date with it.
 
+## Hydration check
+Morning check-in has **First pee colour this morning**: 8 tappable colour swatches (pale straw to dark amber/brown), no numbers or labels. Stored as `hydration` (1-8) on the day's entry. 1-3 = Hydrated (green), 4-5 = Drink more (amber), 6-8 = Dehydrated (red), with a short tip after tapping. It is required for new days only (v2 entries dated 2026-10-28 or later, `HYD_FROM` in `scoring.js`); older days without it still count complete. It never changes the score. Shown on the Morning tile, a 7-day strip on Score and Report, the weekly report image, and CSV (`Hydration_Colour`, `Hydration_Status`; the colour column is also read on import). Flags: 2+ dehydrated mornings in 7 days; in fight week a gentle no-water-cut / minors-should-not-dehydrate note when the latest reading is 4+. Tested in `test-hydration.js`.
+
 ## Reminders (no push server needed)
 Setup → Reminders: pick a morning time (default 7:00) and an evening time (default 21:00), then tap **Add reminders to my calendar**. This makes a `.ics` file with 4 repeating events that each sound an alarm at the start time:
 - a daily morning log (sleep hours + nutrition plan + energy/soreness/mood/stress)

@@ -15,14 +15,15 @@
     if (e && e.v >= 2 && Array.isArray(e.sessions) && e.sessions.some(x => x.done === true && !(num(x.rpe) && num(x.mins) && +x.mins > 0))) m.push('session effort + minutes');
     if (!e || !num(e.sleep)) m.push('sleep'); if (!e || !num(e.screen)) m.push('screen time'); if (!e || e.family == null) m.push('family/friends');
     if ((!e || e.v >= 2) && S.wellnessScore(e) == null) m.push('wellness (energy, soreness, mood, stress)');
+    if (e && S.hydrationRequired(e) && !S.hydrationOK(e)) m.push('hydration (first pee colour)');
     return m; }
   // Log-screen sections. All four true <=> isComplete for current (v2) days.
   function sections(e) { const ms = missing(e);
-    return { morning: !ms.includes('sleep') && !ms.some(m => m.startsWith('wellness')), nutrition: !ms.includes('nutrition'),
+    return { morning: !ms.includes('sleep') && !ms.some(m => m.startsWith('wellness') || m.startsWith('hydration')), nutrition: !ms.includes('nutrition'),
       training: !ms.includes('training') && !ms.includes('session effort + minutes'), evening: !ms.includes('screen time') && !ms.includes('family/friends') }; }
   // Log menu: which section each checklist item belongs to, and one tile per section (done <=> sections(e)[key]).
-  const SECTION_META = [['morning','🌅','Morning check-in','Sleep, weight & how you feel'],['nutrition','🍽️','Nutrition','Did you follow your plan?'],['training','🥊','Training','Sessions, effort & minutes'],['evening','🌙','Evening','Screen time, family & notes']];
-  const sectionOf = k => /^(sleep|well-)/.test(k) ? 'morning' : k === 'nutrition' ? 'nutrition' : /^(training|sess)/.test(k) ? 'training' : 'evening';
+  const SECTION_META = [['morning','🌅','Morning check-in','Sleep, hydration, weight & how you feel'],['nutrition','🍽️','Nutrition','Did you follow your plan?'],['training','🥊','Training','Sessions, effort & minutes'],['evening','🌙','Evening','Screen time, family & notes']];
+  const sectionOf = k => /^(sleep|well-|hydration)/.test(k) ? 'morning' : k === 'nutrition' ? 'nutrition' : /^(training|sess)/.test(k) ? 'training' : 'evening';
   function sectionInfo(e) { const items = checklist(e), st = sections(e);
     return SECTION_META.map(([key, icon, title, sub]) => ({ key, icon, title, sub, done: !!st[key], items: items.filter(i => sectionOf(i.key) === key) })); }
   // Same rules as missing(), but one entry per field the fighter must fill, with a key the Log screen maps to an input (tap to jump).
@@ -33,6 +34,7 @@
       else if (x.done === true && !(num(x.rpe) && num(x.mins) && +x.mins > 0)) c.push({ key:'sessfx-' + i, label:`Session ${i+1}: add effort (RPE) and minutes` }); });
     if (!e || !num(e.sleep)) c.push({ key:'sleep', label:'Sleep: enter hours slept last night' });
     if ((!e || e.v >= 2)) WELL.forEach(([k, l]) => { if (!e || !(num(e[k]) && +e[k] >= 1)) c.push({ key:'well-' + k, label:`How you feel: rate ${l.split(' / ')[0].toLowerCase()} (1–5)` }); });
+    if (e && S.hydrationRequired(e) && !S.hydrationOK(e)) c.push({ key:'hydration', label:'Hydration: tap the colour of your first pee this morning' });
     if (!e || !num(e.screen)) c.push({ key:'screen', label:'Screen time: enter hours' });
     if (!e || e.family == null) c.push({ key:'family', label:'Family/friends: tap Yes or No' });
     return c; }
@@ -163,15 +165,38 @@
     return out;
   }
   const reviewText = rv => `What went well: ${rv.well.join('; ')}\nWhat was missed: ${rv.missed.length?rv.missed.join('; '):'nothing major'}\nFocus next week: ${rv.focus.join('; ')}`;
+  // ---- Hydration (first-pee colour chart). 8 swatches, pale straw -> dark amber/brown. Info only, never changes the score. ----
+  const HYD_COLORS = ['#fbf6d3','#f7eca0','#f3de6a','#eec94a','#e3a92d','#cc8420','#a9611a','#7e4214'];
+  const HYD_TIPS = { ok:'Nice work. Keep sipping water through the day, especially around training.',
+    warn:'A bit low. Drink 2 glasses of water now and keep water with you today, more around training.',
+    bad:'Drink water steadily over the next hour (not all at once), add electrolytes if you train hard, and tell your coach if it stays dark.' };
+  function hydrationStatus(v) { if (v === '' || v == null) return null; v = +v; if (!Number.isInteger(v) || v < 1 || v > 8) return null;
+    const level = v <= 3 ? 'ok' : v <= 5 ? 'warn' : 'bad';
+    return { level, value:v, color:HYD_COLORS[v-1], emoji: level === 'ok' ? '🟢' : level === 'warn' ? '🟡' : '🔴', label: level === 'ok' ? 'Hydrated' : level === 'warn' ? 'Drink more' : 'Dehydrated', tip:HYD_TIPS[level] }; }
+  // Last n mornings (oldest first), one cell per day; v = null when not logged.
+  function hydrationWeek(entries, today = new Date(), n = 7) {
+    const by = {}; entries.forEach(e => { by[e.date] = e; }); const days = [];
+    for (let i = n - 1; i >= 0; i--) { const x = new Date(today); x.setDate(x.getDate() - i); const d = ymd(x), e = by[d], v = e && S.hydrationOK(e) ? +e.hydration : null;
+      days.push({ date:d, v, status: v == null ? null : hydrationStatus(v) }); }
+    const got = days.filter(x => x.v != null);
+    return { days, logged:got.length, dehydrated:got.filter(x => x.v >= 6).length, low:got.filter(x => x.v >= 4).length, latest: got.length ? got[got.length-1] : null };
+  }
+  // Flags: 2+ dehydrated mornings in the last 7 days; gentle fight-week note (no water-cut, minors never dehydrate).
+  function hydrationFlags(entries, today = new Date(), profile = {}, fightWeekOn = null) {
+    const h = hydrationWeek(entries, today), out = [];
+    if (h.dehydrated >= 2) out.push(`Dehydrated ${h.dehydrated} of the last 7 mornings (dark first pee). Drink more through the day and tell your coach.`);
+    const fw = fightWeekOn != null ? fightWeekOn : !!fightWeek(profile.fightDate, today);
+    if (fw && h.latest && h.latest.v >= 4) out.push('Fight week: do not water-cut or restrict fluids to make weight. Minors (under 18) should never dehydrate. Follow your coach and dietitian.');
+    return out; }
   const csvCell = v => { const s = v == null ? '' : v === true ? 'Y' : v === false ? 'N' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; };
-  const CSV_COLS = ['Date','Nutrition','Training','Sleep_Hours','Screen_Hours','Family_Friends','Weight','Notes','Energy','Soreness','Mood','Stress','Wellness_Score','Sessions_Scheduled','Sessions_Done','Training_Pct','S1_Label','S1_Done','S1_RPE','S1_Min','S2_Label','S2_Done','S2_RPE','S2_Min','Extra_Label','Extra_RPE','Extra_Min','Session_Load','Complete'];
+  const CSV_COLS = ['Date','Nutrition','Training','Sleep_Hours','Screen_Hours','Family_Friends','Weight','Notes','Energy','Soreness','Mood','Stress','Wellness_Score','Sessions_Scheduled','Sessions_Done','Training_Pct','S1_Label','S1_Done','S1_RPE','S1_Min','S2_Label','S2_Done','S2_RPE','S2_Min','Extra_Label','Extra_RPE','Extra_Min','Session_Load','Complete','Hydration_Colour','Hydration_Status'];
   function toCSV(entries) {
     const sess = e => Array.isArray(e.sessions) ? e.sessions : (e.training != null || num(e.rpe) ? [{ label:'', done:e.training, rpe:e.rpe, mins:e.mins }] : []);
     const rows = entries.slice().sort((a,b)=>a.date<b.date?-1:1).map(e => { const ss = sess(e), x = e.extra || {}, sc = i => ss[i] ? [ss[i].label, ss[i].done, ss[i].rpe, ss[i].mins] : ['','','',''];
       const ws = S.wellnessScore(e);
-      return [e.date,e.nutrition,S.trainingPct(e)===100,e.sleep,e.screen,e.family,e.weight,e.notes,e.energy,e.soreness,e.mood,e.stress,ws==null?'':ws,Array.isArray(e.sessions)?ss.length:'',ss.filter(s=>s.done===true).length,Math.round(S.trainingPct(e)),...sc(0),...sc(1),x.label,x.rpe,x.mins,sessionLoad(e),isComplete(e)?'Y':'N'].map(csvCell).join(','); });
+      return [e.date,e.nutrition,S.trainingPct(e)===100,e.sleep,e.screen,e.family,e.weight,e.notes,e.energy,e.soreness,e.mood,e.stress,ws==null?'':ws,Array.isArray(e.sessions)?ss.length:'',ss.filter(s=>s.done===true).length,Math.round(S.trainingPct(e)),...sc(0),...sc(1),x.label,x.rpe,x.mins,sessionLoad(e),isComplete(e)?'Y':'N',S.hydrationOK(e)?+e.hydration:'',S.hydrationOK(e)?hydrationStatus(e.hydration).label:''].map(csvCell).join(','); });
     return [CSV_COLS.join(',')].concat(rows).join('\r\n') + '\r\n';
   }
-  const api = { sectionInfo, sectionOf, SECTION_META, checklist, dayStatus, sections, cutPlan, weightVerdict, fightWeek, weekReview, reviewText, WELL, missing, isComplete, isPartial, streak, grid, dayWellness, sessionLoad, wellness, load, cutSafety, toCSV, CSV_COLS };
+  const api = { HYD_COLORS, hydrationStatus, hydrationWeek, hydrationFlags, sectionInfo, sectionOf, SECTION_META, checklist, dayStatus, sections, cutPlan, weightVerdict, fightWeek, weekReview, reviewText, WELL, missing, isComplete, isPartial, streak, grid, dayWellness, sessionLoad, wellness, load, cutSafety, toCSV, CSV_COLS };
   if (typeof module !== 'undefined') module.exports = api; else root.Insights = api;
 })(this);

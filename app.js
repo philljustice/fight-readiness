@@ -80,6 +80,7 @@ function weeklySummary() { const r = res(), st = Insights.streak(S.entries), w =
   const cp = Insights.cutPlan(r.latestWeight ? r.latestWeight.weight : p.startWeight, p.targetWeight, p.fightDate), vd = Insights.weightVerdict(S.entries, p);
   if (c.level) flags.push(`Weight loss ${-c.pctPerWeek}%/wk (${c.level})`); if (cp && cp.level !== 'ok') flags.push(`Target needs ${cp.perWeek} lbs/wk (${cp.pct}%), ${cp.short} lbs short at safe pace`);
   if (w.dropping) flags.push('Wellness below normal'); w.flags.forEach(f => flags.push(`Low ${f.item} ${f.value} on ${f.date.slice(5)}`));
+  Insights.hydrationFlags(S.entries, new Date(), p).forEach(f => flags.push(f));
   const notes = S.entries.filter(e => e.notes && Scoring.dayNum(e.date) >= Scoring.dayNum(today())-6).map(e => `${e.date.slice(5)}: ${e.notes}`);
   return `Fighter: ${p.name||S.fighter||'—'}${p.gym?' ('+p.gym+')':''}\nDate: ${today()}\nScore: ${r.locked?lockMsg(r):r.score+'/100 – '+r.verdict}\n` +
    `Streak: ${st.current} days (best ${st.best}) • Days logged (3 wks): ${r.daysLogged}\n` +
@@ -99,6 +100,8 @@ function reportData() { const r = res(), p = S.profile||{}, P = weeklyParts(), w
   const c = Insights.cutSafety(S.entries, new Date(), p), cp = Insights.cutPlan(lw ? lw.weight : p.startWeight, p.targetWeight, p.fightDate), flags = [];
   if (c.level) flags.push(`Weight loss ${-c.pctPerWeek}%/week (${c.level})`); if (cp && cp.level !== 'ok') flags.push(`Target needs ${cp.perWeek} lbs/week (${cp.pct}%), ${cp.short} lbs short at a safe pace`);
   if (w.dropping) flags.push('Wellness below normal'); w.flags.forEach(f => flags.push(`Low ${f.item} (${f.value}/5) on ${f.date.slice(5)}`));
+  Insights.hydrationFlags(S.entries, new Date(), p).forEach(f => flags.push(f));
+  const hw = Insights.hydrationWeek(S.entries, new Date()), hc = k => hw.days.filter(x => x.status && x.status.level === k).length;
   const lp = L.weeks[2] ? Math.round((L.weeks[3]-L.weeks[2])/L.weeks[2]*100) : null; if (lp != null && lp > 15) flags.push(`Training load up ${lp}% vs last week`);
   const rpes = wk.flatMap(e => Scoring.sessionsDone(e)).map(x => +x.rpe).filter(x => x > 0), sl = wk.map(e => +e.sleep).filter(x => x > 0), avg = a => a.length ? (a.reduce((s,x)=>s+x,0)/a.length).toFixed(1) : '—';
   return { subject: P.subj, name: P.name, meta: [p.gym && 'Gym: '+p.gym, p.coach && 'Coach: '+p.coach, p.weightClass].filter(Boolean).join(' • '),
@@ -110,6 +113,7 @@ function reportData() { const r = res(), p = S.profile||{}, P = weeklyParts(), w
     weight: es.filter(e => +e.weight > 0).map(e => ({date:e.date, y:+e.weight})), target: +(p.targetWeight || S.targetWeight) || null,
     sleep: es.map(e => ({date:e.date, y: e.sleep===''||e.sleep==null ? null : +e.sleep})), idealSleep: S.params.idealSleep||8,
     loadWeeks: L.weeks, training: `${tr7().split(' • ')[0]} • load ${L.week} AU${lp!=null?` (${lp>=0?'+':''}${lp}% vs last week)`:''} • avg effort RPE ${avg(rpes)}`,
+    hydration: { days: hw.days.map(x => ({ date:x.date, v:x.v, color:x.status ? x.status.color : null, label:x.status ? x.status.label : null })), summary: hw.logged ? `Latest: ${hw.latest.status.label} • ${hw.logged}/7 mornings logged: ${hc('ok')} hydrated, ${hc('warn')} drink more, ${hc('bad')} dehydrated` : 'No hydration logged in the last 7 days' },
     flags, review: Insights.weekReview(S.entries, new Date(), S.params, p) }; }
 async function sendWeekly() { const P = weeklyParts(), d = reportData(), cv = Report.draw(document.createElement('canvas'), d);
   const blob = await new Promise(r => cv.toBlob(r, 'image/png')), file = new File([blob], Report.fileName(P.name, P.wk), { type:'image/png' });
@@ -158,6 +162,20 @@ function earlyCard(r) { const pr = Early.progress(r, S.params.unlockDays||7);
    <p style="text-align:center"><b>Early score – based on ${r.daysLogged} day${r.daysLogged==1?'':'s'}</b></p>
    <div class="bar" style="margin:6px 0"><i style="width:${pr.pct}%"></i></div>
    <p class="muted" style="text-align:center">Full score unlocks in ${pr.unlockIn} day${pr.unlockIn==1?'':'s'}. Same weights as the full score, it just firms up as you log more days.</p></div>`; }
+// ---- Hydration (first-pee colour): swatches only, no numbers. Stored as e.hydration 1-8; info only, never changes the score. ----
+const hydLevelCls = s => s ? s.level : '';
+function hydStatusHtml(v) { const s = Insights.hydrationStatus(v);
+  return s ? `<b>${s.emoji} ${s.label}</b> <span>${esc(s.tip)}</span>` : '<span class="muted">Tap the swatch closest to your first pee this morning.</span>'; }
+function hydPicker(e) { const v = +e.hydration, need = Scoring.hydrationRequired(e), s = Insights.hydrationStatus(v);
+  return `<label id="hydLabel">💧 First pee colour this morning ${need ? '*' : '<span class="muted">(optional for today)</span>'}</label>
+   <div class="hyd" data-k="hydration" role="group" aria-labelledby="hydLabel">${Insights.HYD_COLORS.map((c, i) => `<button type="button" class="${v === i + 1 ? 'on' : ''}" data-hyd="${i + 1}" style="background:${c}" aria-label="Colour ${i + 1} of 8, pale to dark" aria-pressed="${v === i + 1}"></button>`).join('')}</div>
+   <div class="hydst ${hydLevelCls(s)}" id="hydStatus" aria-live="polite">${hydStatusHtml(v)}</div>`; }
+function hydrationCard() { const h = Insights.hydrationWeek(S.entries, new Date()), flags = Insights.hydrationFlags(S.entries, new Date(), S.profile || {}), L = 'SMTWTFS';
+  const cnt = k => h.days.filter(x => x.status && x.status.level === k).length;
+  return `<div class="card" id="hydCard"><h3>💧 Hydration (last 7 mornings)</h3>
+   <div class="hstrip" aria-label="First pee colour, last 7 mornings">${h.days.map(x => `<div class="hd"><i class="${x.v ? '' : 'none'}" style="${x.v ? 'background:' + x.status.color : ''}" title="${x.date}: ${x.status ? x.status.label : 'not logged'}"></i><span>${L[new Date(x.date + 'T12:00').getDay()]}</span></div>`).join('')}</div>
+   ${h.logged ? `<p style="margin:10px 0 0">Latest: <b>${h.latest.status.emoji} ${h.latest.status.label}</b> <span class="muted">• ${cnt('ok')} hydrated, ${cnt('warn')} drink more, ${cnt('bad')} dehydrated</span></p>` : '<p class="muted" style="margin:10px 0 0">No hydration logged yet. Tap the colour in the Morning check-in.</p>'}
+   ${flags.map(f => `<div class="hint warn">🚩 ${esc(f)}</div>`).join('')}</div>`; }
 function spark(vals, opts = {}) { const v = vals.filter(x => x.y != null); if (v.length < 2) return `<p class="muted">${opts.empty||'Log 2+ days to see this chart.'}</p>`;
   const W=320,H=70,P=4, ys=v.map(x=>x.y).concat(opts.ref!=null?[opts.ref]:[]), y0=opts.min??Math.min(...ys), y1=opts.max??Math.max(...ys);
   const X=i=>P+i/(v.length-1)*(W-2*P), Y=y=>H-P-(y-y0)/((y1-y0)||1)*(H-2*P);
@@ -172,7 +190,7 @@ const V = {
   const r = res(), lw = r.latestWeight;
   const isWeighDay = [1,4].includes(new Date().getDay()) && !S.entries.some(e=>e.date===today() && +e.weight>0);
   const dueNow = Reminders.due(S.entries.find(e=>e.date===today()), new Date(), S.reminders.morning, S.reminders.evening);
-  return `${day1Banner(false)}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning log not done: sleep hours, nutrition plan, how you feel (energy, soreness, mood, stress)'+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: each training session (effort + minutes), screen hours, family/friends, notes'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${weeklyCard()}${fightCard()}${fightWeekCard()}${streakCard()}
+  return `${day1Banner(false)}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning log not done: sleep hours, nutrition plan, first pee colour, how you feel (energy, soreness, mood, stress)'+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: each training session (effort + minutes), screen hours, family/friends, notes'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${weeklyCard()}${fightCard()}${fightWeekCard()}${streakCard()}
   ${isWeighDay?'<div class="card hint">⚖️ It\'s a weigh-in day (Mon/Thu). Weigh in this morning, fasted, and log it.</div>':''}
   ${r.locked?`${earlyCard(r)}${todayCard()}<div class="card"><h3>Categories so far (${r.daysLogged} day${r.daysLogged==1?'':'s'})</h3>${catTable(r)}<p class="muted">Consistency bonus: 🔒 unlocks in ${r.unlockIn} day${r.unlockIn==1?'':'s'}.</p></div>`:`${todayCard()}
   <div class="card"><div class="muted" style="text-align:center">FightReady Score</div><div class="big">${r.daysLogged?r.score:'—'}</div>
@@ -182,7 +200,7 @@ const V = {
   <p>Core consistency (Nutrition + Training both Y): <b>${r.consistency.toFixed(0)}%</b> → ${r.bonus?'+'+r.bonus+' pts for daily discipline!':'Build streaks on both key plans'}</p>
   <p class="muted">Bonus: +5 at ≥90%, +3 at ≥75%, +1 at ≥60%.</p></div>`}
   <div class="card"><h3>🥊 Weight</h3>${verdictLine()}<p>Latest: <b>${lw?lw.weight+' lbs':'—'}</b> ${lw?'<span class="muted">('+lw.date+')</span>':''}${+S.targetWeight?` • Target ${esc(S.targetWeight)} lbs`:''}</p>
-  ${r.locked?`<p>7-day trend: ${lockMsg(r)}</p>`:`<p>7-day trend: <b>${r.delta==null?'—':(r.delta>0?'+':'')+r.delta+' lbs/wk'}</b></p><p>${r.trend.emoji} ${esc(r.trend.label)}</p>`}${cutWarn()}${weightChart()}</div>${miniCharts()}${wellCard(false)}`;
+  ${r.locked?`<p>7-day trend: ${lockMsg(r)}</p>`:`<p>7-day trend: <b>${r.delta==null?'—':(r.delta>0?'+':'')+r.delta+' lbs/wk'}</b></p><p>${r.trend.emoji} ${esc(r.trend.label)}</p>`}${cutWarn()}${weightChart()}</div>${miniCharts()}${hydrationCard()}${wellCard(false)}`;
  },
  log() {
   const d = V._date || today(), ex = S.entries.find(x=>x.date===d), e = blankOr(ex, d);
@@ -211,6 +229,7 @@ const V = {
    ${step('sleep','Sleep last night (hours) *',0.5)}${chips('sleep',[6,7,7.5,8,8.5,9])}
    <label>Weight (lbs) ${wd?'<span style="color:#ff9800">— weigh-in day! ⚖️ Weigh in before eating.</span>':'<span class="muted">(Mon/Thu mornings)</span>'}</label>
    <input id="f_weight" type="number" inputmode="decimal" step="0.1" value="${esc(e.weight)}">
+   ${hydPicker(e)}
    <p style="margin:14px 0 0"><b>How do you feel? *</b></p>
    ${Insights.WELL.map(([k,l,lo,hi])=>`<label>${l} <span class="muted">(${lo} … ${hi})</span></label><div class="sc" data-k="${k}">${[1,2,3,4,5].map(n=>`<button class="${+e[k]===n?'on':''}" data-val="${n}">${n}</button>`).join('')}</div>`).join('')}
    </div>`,
@@ -261,7 +280,7 @@ const V = {
   ${reviewCard()}${fightWeekCard()}
   <div class="card"><h3>Training</h3><p>Last 7 days: <b>${tr7()}</b></p></div>
   <div class="card"><h3>Logging</h3><p>Current streak: <b>${Insights.streak(S.entries).current} days</b> (best ${Insights.streak(S.entries).best}) • Full logs in last 28 days: <b>${Insights.grid(S.entries).filter(x=>x.status==='done').length}/28</b></p></div>
-  ${wellCard(true)}
+  ${wellCard(true)}${hydrationCard()}
   <div class="card"><h3>Category performance</h3><table><tr><th>Category</th><th>Score</th><th>Weight</th><th>Contribution</th></tr>
    ${CATS.map(([k,l,w])=>`<tr><td>${l}</td><td>${r.cats[k].toFixed(0)}</td><td>${S.params[w]}%</td><td>${(r.cats[k]*S.params[w]/100).toFixed(1)}</td></tr>`).join('')}
    ${r.locked?`<tr><td colspan="4">Base score & consistency bonus: ${lockMsg(r)}</td></tr>`:`<tr><th>Base score</th><td></td><td></td><th>${r.base.toFixed(1)}</th></tr><tr><td>Consistency bonus</td><td>${r.consistency.toFixed(0)}%</td><td></td><td>+${r.bonus}</td></tr>`}</table></div>
@@ -325,7 +344,7 @@ const V = {
   <p><b>First week:</b> from your first log you see a daily score, an early FightReady Score (same weights, based on the days logged so far), badges and mini charts. The full 21-day score, weight trend and consistency bonus unlock 7 days after you finish Setup. Only days since then count.</p>
   <p><b>Day 1:</b> your sign-up day is Day 1. Finish that day's log that night to get your first score.</p>
   <p><b>Profile:</b> on first open, sign up with your name (required) and optional team, weight, fight date and safety details. Edit it anytime in Setup → Edit profile. Your starting weight becomes your first weigh-in. The Dashboard shows your fight countdown and lbs to go.</p>
-  <p><b>Daily log (about 30 sec):</b> tap Log. You see a menu of 4 tiles: 🌅 <b>Morning check-in</b> (sleep, weight on Mon/Thu, how you feel), 🍽️ <b>Nutrition</b>, 🥊 <b>Training</b> (each session, plus any extra session) and 🌙 <b>Evening</b> (screen time, family/friends, notes). <b>Light blue</b> tiles aren't logged yet. Tap one to open it, fill it in and tap <b>Done</b> (or swipe back / press Back) to return to the menu. When a section is complete its tile turns <b>grey with a ✓</b>. Everything you enter <b>saves automatically</b> on your phone as you go, so nothing is lost if you close the app. When all 4 tiles are grey your day is complete; the <b>💾 Save today's log</b> button at the bottom confirms it, or lists exactly what's missing (tap an item to jump to it). Nutrition = followed your plan (macros, timing, hydration). <b>Training:</b> for each session on your schedule today, answer "Did you complete session N?" and, if yes, its effort (RPE 1–10) and minutes (both required). Rest days need nothing. Add an unscheduled extra session if you did one. Sleep = hours slept last night. Screen = recreational screen time only (not film study or school). Family/Friends = real quality time without heavy screens. <b>How you feel</b> (required daily, 1–5): Energy (5 = fresh), Soreness (5 = no soreness), Mood (5 = great), Stress (5 = no stress).</p>
+  <p><b>Daily log (about 30 sec):</b> tap Log. You see a menu of 4 tiles: 🌅 <b>Morning check-in</b> (sleep, the colour of your first pee, weight on Mon/Thu, how you feel), 🍽️ <b>Nutrition</b>, 🥊 <b>Training</b> (each session, plus any extra session) and 🌙 <b>Evening</b> (screen time, family/friends, notes). <b>Light blue</b> tiles aren't logged yet. Tap one to open it, fill it in and tap <b>Done</b> (or swipe back / press Back) to return to the menu. When a section is complete its tile turns <b>grey with a ✓</b>. Everything you enter <b>saves automatically</b> on your phone as you go, so nothing is lost if you close the app. When all 4 tiles are grey your day is complete; the <b>💾 Save today's log</b> button at the bottom confirms it, or lists exactly what's missing (tap an item to jump to it). Nutrition = followed your plan (macros, timing, hydration). <b>Training:</b> for each session on your schedule today, answer "Did you complete session N?" and, if yes, its effort (RPE 1–10) and minutes (both required). Rest days need nothing. Add an unscheduled extra session if you did one. Sleep = hours slept last night. Screen = recreational screen time only (not film study or school). Family/Friends = real quality time without heavy screens. <b>How you feel</b> (required daily, 1–5): Energy (5 = fresh), Soreness (5 = no soreness), Mood (5 = great), Stress (5 = no stress).</p>
   <p><b>Training schedule:</b> set at sign-up (once or twice a day, then Rest / 1 / 2 sessions per weekday with optional labels). Edit it in Setup → Edit profile & training schedule. Saving it updates this week's and future Weekly Outlines.</p>
   <p><b>Reminders:</b> Setup → Reminders → pick a morning (5:00–10:00) and evening (18:00–23:00) time in 30-min steps → tap <i>Add reminders to my calendar</i>. <b>On iPhone</b> Safari opens a calendar preview: tap <b>Add All</b>. This works from the home-screen app too. You get a daily morning and evening alarm, a Mon/Thu weigh-in, and a Sunday 6 PM weekly-report reminder, even when the app is closed. (Push notifications, which you turn on in the same Reminders card, also follow up until your log is finished; calendar alarms can't.) Alternatives: <i>Subscribe (webcal)</i> (then turn off "Remove Alerts" in Settings → Calendar → Accounts → Subscribed Calendars) or <i>Share / save the calendar file</i>. The app also shows a banner if today's morning or evening items aren't logged after those times.</p>
   <p><b>Weight:</b> weigh Monday & Thursday mornings: fasted, after the bathroom, same scale, minimal clothing.</p>
@@ -338,6 +357,7 @@ const V = {
   <p><b>Wellness & load:</b> wellness ratings of 1–2 get a 🚩 flag for your coach, and a drop below your normal is highlighted. Session load = RPE × minutes summed over all sessions (two-a-days add up). It's shown on the Dashboard and Coach Report and doesn't change the score.</p>
   <p><b>Safe weight cut:</b> the app warns if you lose more than 1%/week of bodyweight (caution) or 1.5%/week (warning), or if your target and fight date would need a faster pace. Sports-nutrition guidance for combat sports is a gradual ~0.5–1 kg (1–2 lbs) per week. Never cut by skipping meals or dehydrating without coach supervision.</p>
   <p><b>Weekly report (testing phase):</b> every Sunday (and on the first open after, until it's sent) the Score screen shows a <i>Send weekly report to ${Weekly.CONFIG.ADMIN_NAME}</i> card. Tap <i>🖼️ Send report with charts</i>: the app makes a one-page report image (score, category bars, daily score, weight vs target, sleep and training load charts, flags) and opens the share sheet. Pick Mail: the report is attached and the text starts with the subject (your name + report dates, e.g. "Pablo – FightReady weekly report – Oct 19 to Oct 25, 2026") and To (${Weekly.CONFIG.ADMIN_EMAIL}). If Mail leaves the To or Subject blank, copy them from the first lines. To send the full log as a file, use <i>Share full log file (CSV)</i>. You can send anytime from Setup or the Report screen. A calendar reminder fires Sundays at 6 PM.</p>
+  <p><b>💧 Hydration:</b> in the Morning check-in, tap the colour closest to your first pee of the day (pale straw to dark amber). 🟢 pale = hydrated, 🟡 mid-yellow = drink more, 🔴 dark = dehydrated. It's a quick guide, not a medical test, and it doesn't change your score. It's required for each new day. The Score screen shows your last 7 mornings, and 2 or more dark mornings in a week shows a flag. In fight week do not cut water to make weight, and minors (under 18) should never dehydrate.</p>
   <p><b>Notes:</b> injuries, illness, soreness, bad sleep causes, low energy. These show up on the Coach Report.</p></div>
   <div class="card"><h3>Scoring</h3><p>Score 0–100 from the last 3 weeks of logs. Nutrition 25%, Training 25%, Sleep 15%, Wellness 15%, Screen 10%, Family 10% (editable in Setup, must add up to 100).</p>
   <p>• Nutrition / Family = % of logged days marked Yes.<br>• Training = average daily % of scheduled sessions completed (rest day = 100%; older days: Yes = 100).<br>• Wellness = average of Energy, Soreness, Mood, Stress mapped 1→0, 2→25, 3→50, 4→75, 5→100 (days with all 4 rated).<br>• Sleep: 100 at 8h, −25 per hour off (6h or 10h = 50).<br>• Screen: 100 if ≤2h, −40 per extra hour (3h = 60, 4h = 20).<br>
@@ -352,8 +372,8 @@ function blankOr(ex, d) { const e = JSON.parse(JSON.stringify(ex || {date:d, v:2
   return e; }
 // ---- Log menu: one tile per section; tapping opens that section full-screen, Done / back returns to the menu ----
 function tileSummary(x, e) { const has = k => x.items.some(i => k.test(i.key));
-  if (x.key === 'morning') { if (x.done) { const w = Insights.dayWellness(e); return [e.sleep + 'h sleep', +e.weight > 0 ? e.weight + ' lbs' : '', w != null ? 'feel ' + w.toFixed(1) + '/5' : ''].filter(Boolean).join(' · '); }
-    return 'To log: ' + [has(/^sleep$/) ? 'sleep' : '', has(/^well-/) ? 'how you feel' : ''].filter(Boolean).join(' + '); }
+  if (x.key === 'morning') { if (x.done) { const w = Insights.dayWellness(e); const hs = Insights.hydrationStatus(e.hydration); return [e.sleep + 'h sleep', hs ? '💧 ' + hs.label : '', +e.weight > 0 ? e.weight + ' lbs' : '', w != null ? 'feel ' + w.toFixed(1) + '/5' : ''].filter(Boolean).join(' · '); }
+    return 'To log: ' + [has(/^sleep$/) ? 'sleep' : '', has(/^hydration$/) ? 'hydration' : '', has(/^well-/) ? 'how you feel' : ''].filter(Boolean).join(' + '); }
   if (x.key === 'nutrition') return x.done ? (e.nutrition ? 'Followed plan ✅' : 'Plan not followed ❌') : 'Tap Yes or No';
   if (x.key === 'training') { const ss = Array.isArray(e.sessions) ? e.sessions : [], ex = e.extra && e.extra.label ? ' + extra' : '';
     if (x.done) return (ss.length ? ss.filter(s => s.done === true).length + ' of ' + ss.length + ' sessions done' : (e.v >= 2 ? 'Rest day' : e.training ? 'Session done' : 'Session skipped')) + ex;
@@ -373,7 +393,7 @@ function closeSection() { if (history.state && history.state.frSec) return histo
 window.addEventListener('popstate', () => { if (cur === 'log' && V._sec) leaveSection(); });
 try { if (history.state && history.state.frSec) history.replaceState(null, ''); } catch (e) {}
 // ---- Log screen: every field autosaves silently; one Save button validates and reports what's missing ----
-const hasData = b => ['nutrition','training','family'].some(k => b[k] === true || b[k] === false) || ['sleep','screen','weight'].some(k => b[k] !== '' && b[k] != null) || Scoring.WELL_KEYS.some(k => +b[k] > 0)
+const hasData = b => ['nutrition','training','family'].some(k => b[k] === true || b[k] === false) || ['sleep','screen','weight'].some(k => b[k] !== '' && b[k] != null) || Scoring.WELL_KEYS.some(k => +b[k] > 0) || Scoring.hydrationOK(b)
   || !!(b.notes && String(b.notes).trim()) || !!b.extra || (Array.isArray(b.sessions) && b.sessions.some(x => x.done != null));
 // Build the day's entry from what is on screen + the taps held in V._e. Out-of-range numbers keep the last good value (and show up at Save).
 function readDraft() { const u = V._e; if (!u) return null;
@@ -382,6 +402,7 @@ function readDraft() { const u = V._e; if (!u) return null;
   // Only one section is on screen at a time: fields that aren't on screen keep their stored value.
   if (has('#f_sleep')) b.sleep = rng(nv('#f_sleep'), b.sleep, 0, 24); if (has('#f_screen')) b.screen = rng(nv('#f_screen'), b.screen, 0, 24); if (has('#f_weight')) b.weight = rng(nv('#f_weight'), b.weight, 60, 400);
   if (has('#f_notes')) b.notes = $('#f_notes').value; b.nutrition = u.nutrition ?? null; b.family = u.family ?? null; Scoring.WELL_KEYS.forEach(k => { b[k] = u[k] ?? ''; });
+  if (Scoring.hydrationOK(u)) b.hydration = +u.hydration; else delete b.hydration;
   if (V._legacy) b.training = u.training ?? null;
   else if (Array.isArray(b.sessions)) { b.v = 2; b.sessions = b.sessions.map((x, i) => { const us = (u.sessions || [])[i] || {}, done = us.done == null ? null : us.done;
     const r = document.querySelector(`[data-srpe="${i}"]`), m = document.querySelector(`[data-smin="${i}"]`);
@@ -405,10 +426,11 @@ function fieldFor(key) { const q = s => document.querySelector(s);
   if (key.startsWith('sessfx-')) { const i = key.slice(7), r = q(`[data-srpe="${i}"]`); return r && r.value === '' ? r : q(`[data-smin="${i}"]`); }
   if (key.startsWith('sess-')) return q('#' + key.replace('-', '_'));
   if (key.startsWith('well-')) return q(`.sc[data-k="${key.slice(5)}"]`);
+  if (key === 'hydration') return q('.hyd');
   if (key === 'extra') return q('#f_xrpe');
   return q({ nutrition:'.yn[data-k="nutrition"]', training:'.yn[data-k="training"]', family:'.yn[data-k="family"]', sleep:'#f_sleep', screen:'#f_screen', weight:'#f_weight' }[key]); }
 function jumpTo(key) { const el = fieldFor(key); if (!el) return; const det = el.closest('details'); if (det) det.open = true;
-  el.scrollIntoView({ behavior:'smooth', block:'center' }); const box = el.closest('.yn,.sc,.step,.row') || el; box.classList.add('flash'); setTimeout(() => box.classList.remove('flash'), 2200);
+  el.scrollIntoView({ behavior:'smooth', block:'center' }); const box = el.closest('.yn,.sc,.hyd,.step,.row') || el; box.classList.add('flash'); setTimeout(() => box.classList.remove('flash'), 2200);
   if (el.focus && /INPUT|SELECT|TEXTAREA/.test(el.tagName)) setTimeout(() => el.focus({ preventScroll:true }), 400); }
 function saveDay() { const b = autosave(); if (!b) return; const date = b.date;
   const items = Insights.checklist(b).slice(), bad = (id, lo, hi) => { const el = $(id); return el && el.value !== '' && !(+el.value >= lo && +el.value <= hi); };
@@ -441,12 +463,12 @@ function download(name, text, type) { const a = document.createElement('a'); a.h
 function parseCSV(text) {
   const rows = text.trim().split(/\r?\n/).map(l => { const out=[]; let cur='', q=false; for (const ch of l) { if (ch=='"') q=!q; else if (ch==',' && !q) { out.push(cur); cur=''; } else cur+=ch; } out.push(cur); return out.map(s=>s.trim()); });
   const h = rows.shift().map(s=>s.toLowerCase()), col = re => h.findIndex(x=>re.test(x));
-  const c = { d:col(/^date/), n:col(/^nutrition/), t:col(/^training/), sl:col(/^sleep_?hours|^sleep$/), sc:col(/^screen_?hours|^screen$/), f:col(/^family/), w:col(/^weight/), no:col(/^notes/), en:col(/^energy/), so:col(/^soreness/), mo:col(/^mood/), stx:col(/^stress/), rp:col(/^rpe/), mi:col(/^session_?min/), s1l:col(/^s1_label/), s1d:col(/^s1_done/), s1r:col(/^s1_rpe/), s1m:col(/^s1_min/), s2l:col(/^s2_label/), s2d:col(/^s2_done/), s2r:col(/^s2_rpe/), s2m:col(/^s2_min/), ss:col(/^sessions_scheduled/), xl:col(/^extra_label/), xr:col(/^extra_rpe/), xm:col(/^extra_min/) };
+  const c = { d:col(/^date/), n:col(/^nutrition/), t:col(/^training/), sl:col(/^sleep_?hours|^sleep$/), sc:col(/^screen_?hours|^screen$/), f:col(/^family/), w:col(/^weight/), no:col(/^notes/), en:col(/^energy/), so:col(/^soreness/), mo:col(/^mood/), stx:col(/^stress/), rp:col(/^rpe/), mi:col(/^session_?min/), s1l:col(/^s1_label/), s1d:col(/^s1_done/), s1r:col(/^s1_rpe/), s1m:col(/^s1_min/), s2l:col(/^s2_label/), s2d:col(/^s2_done/), s2r:col(/^s2_rpe/), s2m:col(/^s2_min/), ss:col(/^sessions_scheduled/), xl:col(/^extra_label/), xr:col(/^extra_rpe/), xm:col(/^extra_min/), hy:col(/^hydration_?colou?r$/) };
   if (c.d < 0) throw new Error('CSV needs a Date column');
   const YN = v => /^y/i.test(v||'') ? true : /^n/i.test(v||'') ? false : null, numv = v => v===''||v==null||isNaN(v) ? '' : +v;
   return rows.filter(r=>r[c.d]).map(r => { let d = r[c.d]; const m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); if (m) d = `${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
     if (!/^\d{4}-\d{2}-\d{2}/.test(d)) throw new Error('Bad date: '+d);
-    const g = j => c[j]>=0 ? r[c[j]] : '', o = { date:d.slice(0,10), nutrition:YN(r[c.n]), training:YN(r[c.t]), sleep:numv(r[c.sl]), screen:numv(r[c.sc]), family:YN(r[c.f]), weight:numv(r[c.w]), notes:c.no>=0?r[c.no]||'':'', ...Object.fromEntries([['energy','en'],['soreness','so'],['mood','mo'],['stress','stx'],['rpe','rp'],['mins','mi']].filter(([,j])=>c[j]>=0&&numv(r[c[j]])!=='').map(([k,j])=>[k,numv(r[c[j]])])) };
+    const g = j => c[j]>=0 ? r[c[j]] : '', o = { date:d.slice(0,10), nutrition:YN(r[c.n]), training:YN(r[c.t]), sleep:numv(r[c.sl]), screen:numv(r[c.sc]), family:YN(r[c.f]), weight:numv(r[c.w]), notes:c.no>=0?r[c.no]||'':'', ...Object.fromEntries([['energy','en'],['soreness','so'],['mood','mo'],['stress','stx'],['rpe','rp'],['mins','mi'],['hydration','hy']].filter(([,j])=>c[j]>=0&&numv(r[c[j]])!=='').map(([k,j])=>[k,numv(r[c[j]])])) };
     if (c.ss>=0 && g('ss')!=='') { const n = +g('ss'); o.v = 2; o.sessions = [['s1l','s1d','s1r','s1m'],['s2l','s2d','s2r','s2m']].slice(0,n).map(([l,dd,rr,mm]) => ({ label:g(l), done:YN(g(dd)), rpe:numv(g(rr)), mins:numv(g(mm)) }));
       o.training = o.sessions.some(x=>x.done==null) ? null : Scoring.trainingPct(o) === 100; delete o.rpe; delete o.mins; }
     if (g('xl') || g('xr')) o.extra = { label:g('xl')||'Extra session', rpe:numv(g('xr')), mins:numv(g('xm')) };
@@ -470,6 +492,9 @@ document.addEventListener('click', async ev => {
   if (t.dataset.sd != null) { const i = +t.dataset.sd, n = +t.dataset.n, sd = V._sched.days[i]; sd.n = n; refreshSched(); return; }
   if (t.dataset.perday) { V._sched.perDay = +t.dataset.perday; V._sched.days.forEach(d => { if (d.n) d.n = V._sched.perDay; }); refreshSched(); return; }
   if (t.closest('.yn')) { const k = t.closest('.yn').dataset.k; V._e[k] = t.dataset.val==='1'; t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t)); autosave(); return; }
+  if (t.closest('.hyd')) { const n = +t.dataset.hyd; V._e.hydration = +V._e.hydration === n ? '' : n; const on = V._e.hydration !== '';
+    t.parentNode.querySelectorAll('button').forEach(b => { const s = on && +b.dataset.hyd === n; b.classList.toggle('on', s); b.setAttribute('aria-pressed', s); });
+    const st = $('#hydStatus'); if (st) { const s = Insights.hydrationStatus(V._e.hydration); st.className = 'hydst ' + hydLevelCls(s); st.innerHTML = hydStatusHtml(V._e.hydration); } autosave(); return; }
   if (t.closest('.sc')) { const k = t.closest('.sc').dataset.k, n = +t.dataset.val; V._e[k] = V._e[k]===n ? '' : n; t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t && V._e[k]!=='')); autosave(); return; }
   if (t.dataset.chip) { $('#f_'+t.dataset.chip).value = t.dataset.val; t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t)); autosave(); return; }
   if (t.dataset.step) { const i = $('#f_'+t.dataset.step); i.value = Math.max(0, Math.min(24, (+i.value||0) + +t.dataset.d)); autosave(); return; }

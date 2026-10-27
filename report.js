@@ -16,7 +16,7 @@
     ctx.fillStyle = MUTE; ctx.font = '24px Helvetica,Arial';
     ctx.fillText(`${v[0].date.slice(5)} → ${v[v.length-1].date.slice(5)} • latest ${v[v.length-1].y}${o.unit||''}${o.ref!=null?' • target '+o.ref+(o.unit||''):''}`, x0, y + h + 32);
     return y + h + 60; }
-  // d: { subject, name, meta, score, scoreLabel, verdict, cats:[[label,val,weight]], head:[[label,value]], weight:[{date,y}], target, sleep:[], idealSleep, daily:[], loadWeeks:[4], training, flags:[], review:{well,missed,focus} }
+  // d: { subject, name, meta, score, scoreLabel, verdict, cats:[[label,val,weight]], head:[[label,value]], weight:[{date,y}], target, sleep:[], idealSleep, daily:[], loadWeeks:[4], hydration:{days:[{date,v,color}],summary}, training, flags:[], review:{well,missed,focus} }
   function draw(canvas, d, scale = 1) { const H = 3000; canvas.width = W * scale; canvas.height = H * scale; const ctx = canvas.getContext('2d'); ctx.scale(scale, scale);
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = '#111'; ctx.fillRect(0, 0, W, 150); ctx.fillStyle = '#fff'; ctx.font = 'bold 46px -apple-system,Helvetica,Arial'; ctx.fillText('🥊 FightReady weekly report', PAD, 70);
@@ -38,6 +38,11 @@
     y += 20; y = section(ctx, 'Daily FightReady score', y); y = line(ctx, d.daily, y, 200, { min: 0, max: 100 });
     y = section(ctx, 'Weight vs target', y); y = line(ctx, d.weight, y, 220, { ref: d.target, unit: ' lbs' });
     y = section(ctx, 'Sleep hours', y); y = line(ctx, d.sleep, y, 200, { ref: d.idealSleep, unit: 'h' });
+    if (d.hydration) { y = section(ctx, 'Hydration (first pee colour, last 7 mornings)', y); const hd = d.hydration.days, cw = (W - 2*PAD) / hd.length;
+      hd.forEach((x, i) => { const bx = PAD + i * cw + 8, bw = cw - 16; if (x.v) { ctx.fillStyle = x.color; ctx.fillRect(bx, y, bw, 64); ctx.strokeStyle = '#999'; ctx.lineWidth = 2; ctx.strokeRect(bx, y, bw, 64); }
+        else { ctx.strokeStyle = LINE; ctx.lineWidth = 2; ctx.setLineDash([6, 6]); ctx.strokeRect(bx, y, bw, 64); ctx.setLineDash([]); }
+        ctx.fillStyle = MUTE; ctx.font = '22px Helvetica,Arial'; ctx.textAlign = 'center'; ctx.fillText(x.date.slice(5), bx + bw / 2, y + 92); ctx.textAlign = 'left'; });
+      y += 116; ctx.fillStyle = INK; ctx.font = '26px Helvetica,Arial'; y = wrap(ctx, d.hydration.summary, PAD, y, W - 2*PAD, 34) + 20; }
     y = section(ctx, 'Training', y); ctx.fillStyle = INK; ctx.font = '28px Helvetica,Arial'; y = wrap(ctx, d.training || '', PAD, y + 4, W - 2*PAD, 36) + 10;
     const lw = d.loadWeeks || [0,0,0,0], mx = Math.max(...lw, 1), bwid = (W - 2*PAD) / 4;
     lw.forEach((v, i) => { const h = Math.round(v / mx * 160), x = PAD + i * bwid + 30; ctx.fillStyle = i === 3 ? RED : '#9e9e9e'; ctx.fillRect(x, y + 170 - h, bwid - 60, h);

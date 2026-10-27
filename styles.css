@@ -43,3 +43,11 @@ ul.chk{margin:8px 0 0;padding-left:20px}ul.chk li{margin:6px 0}ul.chk a{color:#f
 .tile.done{background:#3a3a40;border-color:#5b5b64;color:#c4c4cc;box-shadow:none}.tile.done .tk{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:#555560;color:#9be29f;font-size:1.2rem}
 .secbar{margin:0 0 12px}.btn.secback{width:auto;display:inline-block;margin:0;padding:12px 18px}
 #secDone{margin:0}
+
+/* hydration: first-pee colour swatches (no numbers) */
+.hyd{display:flex;gap:4px;margin-top:6px}.hyd button{flex:1;height:56px;min-width:0;padding:0;border-radius:10px;border:2px solid #555;position:relative;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.hyd button.on{outline:3px solid #fff;outline-offset:2px;border-color:#222;transform:scale(1.06);z-index:1}
+.hyd button.on::after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:800;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000,0 0 6px #000}
+.hydst{margin-top:10px;padding:8px 10px;border-radius:8px;background:#222;border-left:4px solid #555;font-size:.95rem;line-height:1.35}
+.hydst.ok{background:#12301a;border-left-color:#43a047}.hydst.warn{background:#3b2f10;border-left-color:#ffb300}.hydst.bad{background:#4a1010;border-left-color:#f44336}
+.hstrip{display:flex;gap:6px}.hstrip .hd{flex:1;text-align:center;font-size:.75rem;color:#aaa}.hstrip i{display:block;height:36px;border-radius:8px;border:2px solid #555;margin-bottom:4px}.hstrip i.none{background:transparent;border:2px dashed #444}

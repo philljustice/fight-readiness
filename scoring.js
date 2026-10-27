@@ -5,6 +5,11 @@
     // tiered bonus as in Dashboard!C24: >=90% -> 5, >=75% -> 3, >=60% -> 1
     bonusTiers:[[90,5],[75,3],[60,1]] };
   const WELL_KEYS = ['energy','soreness','mood','stress']; // all stored 1-5 with 5 = best (fresh / no soreness / great / no stress)
+  // Morning hydration: first-pee colour swatch 1 (pale) .. 8 (dark amber/brown). Stored as e.hydration (1-8). Does not affect any score.
+  // Required only for new days (v2 entries dated HYD_FROM or later); older days without it still count complete.
+  const HYD_FROM = '2026-10-28';
+  const hydrationOK = e => !!e && e.hydration !== '' && e.hydration != null && Number.isInteger(+e.hydration) && +e.hydration >= 1 && +e.hydration <= 8;
+  const hydrationRequired = e => !!e && e.v >= 2 && String(e.date || '') >= HYD_FROM;
   const isNum = v => v !== '' && v != null && !isNaN(v);
   // Wellness 0-100 = average of the four ratings mapped 1->0 ... 5->100. null if not all four rated.
   function wellnessScore(e) { if (!e) return null; const v = WELL_KEYS.map(k => e[k]);
@@ -73,6 +78,6 @@
       delta, trend: trendLabel(delta), verdict: verdict(final), dataQuality: dataQuality(N),
       latestWeight: weighed.length ? weighed[weighed.length-1] : null, windowEntries: w };
   }
-  const api = { WELL_KEYS, wellnessScore, trainingPct, sessionsDone, sessionLoad, DEFAULT_PARAMS, sleepScore, screenScore, weightDelta, trendLabel, compute, ymd, dayNum, verdict, dataQuality };
+  const api = { HYD_FROM, hydrationOK, hydrationRequired, WELL_KEYS, wellnessScore, trainingPct, sessionsDone, sessionLoad, DEFAULT_PARAMS, sleepScore, screenScore, weightDelta, trendLabel, compute, ymd, dayNum, verdict, dataQuality };
   if (typeof module !== 'undefined') module.exports = api; else root.Scoring = api;
 })(this);
