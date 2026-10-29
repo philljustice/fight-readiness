@@ -8,7 +8,7 @@
     screen:'keep recreational screen time to 2 hours or less', family:'make time for family or friends tomorrow' };
   // Score for one day with the same weights. null if nothing logged.
   function daily(e, params = {}) { if (!e) return null;
-    const r = Sc.compute([e], new Date(e.date + 'T12:00'), Object.assign({}, params, { startDate:null }));
+    const r = Sc.compute([e], new Date(e.date + 'T12:00'), Object.assign({}, params, { startDate:null, includeToday:true }));
     return { score: Math.round(r.base), base: r.base, cats: r.cats, weights: r.weights }; }
   function feedback(d, e) { if (!d) return null; const ks = Object.keys(d.cats);
     const best = ks.slice().sort((a,b) => d.cats[b]*d.weights[b] - d.cats[a]*d.weights[a] || d.cats[b]-d.cats[a])[0];

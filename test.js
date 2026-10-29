@@ -1,4 +1,5 @@
 const S = require('./scoring.js'), assert = require('assert');
+const _c=S.compute; S.compute=(e,t,p={})=>_c(e,t,Object.assign({includeToday:true},p)); // legacy fixtures include today
 assert.equal(S.sleepScore(8),100); assert.equal(S.sleepScore(6),50); assert.equal(S.sleepScore(10),50); assert.equal(S.sleepScore(3),0);
 assert.equal(S.screenScore(2),100); assert.equal(S.screenScore(3),60); assert.equal(S.screenScore(4),20); assert.equal(S.screenScore(5),0);
 [['🔴',2],['🟠',1],['🟡',0.5],['🟡',0],['🟢',-0.5],['🟢',-1],['🔵',-1.5],['🔵',-3],['📊',null]].forEach(([e,v])=>assert.equal(S.trendLabel(v).emoji,e,String(v)));
@@ -38,3 +39,4 @@ r = S.compute([mk(0,{v:2,sessions:ss(true,false)}), mk(1,{v:2,sessions:[]})], to
 assert.equal(S.sessionLoad({sessions:[{done:true,rpe:7,mins:90},{done:true,rpe:5,mins:60},{done:false,rpe:9,mins:30}], extra:{label:'Run',rpe:3,mins:20}}), 630+300+60);
 assert.equal(S.sessionsDone({sessions:ss(true,true)}).length,2); assert.equal(S.sessionLoad({rpe:7,mins:90}),630); assert.equal(S.sessionLoad({sessions:[]}),null);
 console.log('All scoring tests passed');
+{ const T=new Date('2026-10-29T12:00'); const _r=_c([{date:'2026-10-29',nutrition:true,training:true,family:true,sleep:9,screen:1}],T); assert.equal(_r.daysLogged,0); const _r2=_c([{date:'2026-10-29',nutrition:true},{date:'2026-10-28',nutrition:true}],T); assert.equal(_r2.daysLogged,1); console.log('today excluded from overall ok'); }

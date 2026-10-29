@@ -1,4 +1,5 @@
 const E = require('./early.js'), S = require('./scoring.js'), assert = require('assert');
+const _c=S.compute; S.compute=(e,t,p={})=>_c(e,t,Object.assign({includeToday:true},p)); // legacy fixtures include today
 const mk = (d,o) => Object.assign({date:d, v:2, nutrition:true, sessions:[{label:'',done:true,rpe:6,mins:60}], training:true, family:true, sleep:8, screen:1, weight:170, energy:5, soreness:5, mood:5, stress:5, notes:''}, o);
 assert.equal(E.daily(null), null);
 assert.equal(E.daily(mk('2026-10-19')).score, 100);

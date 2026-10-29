@@ -58,7 +58,7 @@
     const daysSinceStart = st == null ? null : t - st;
     const locked = st == null || daysSinceStart < (p.unlockDays ?? 7);
     const unlockIn = st == null ? (p.unlockDays ?? 7) : Math.max(0, (p.unlockDays ?? 7) - daysSinceStart);
-    const w = entries.filter(e => { const n = dayNum(e.date); return n >= t - p.windowDays && n <= t; });
+    const w = entries.filter(e => { const n = dayNum(e.date); return n >= t - p.windowDays && (p.includeToday ? n <= t : n < t); }); // today counts only once closed out (from tomorrow)
     const N = w.length;
     const pctY = k => N ? w.filter(e => e[k] === true).length / N * 100 : 0; // blank counts as N, like COUNTIFS/N4
     const cats = {
