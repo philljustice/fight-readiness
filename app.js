@@ -1,4 +1,4 @@
-const APP_VERSION='fr-v29';
+const APP_VERSION='fr-v30';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -109,7 +109,7 @@ function reportData() { const r = res(), p = S.profile||{}, P = weeklyParts(), w
     verdict: r.locked ? lockMsg(r).replace('🔒 ','') : r.verdict,
     head: [['Days logged this week', `${wk.length}/7`], ['Streak', `${Insights.streak(S.entries).current} days`], ['Weight vs target', ws ? `${ws.current} lbs • ${ws.text}` : (lw ? lw.weight+' lbs' : '—')], ['Fight', cd ? cd.text : '—'],
       ['Wellness (1–5)', w.avg7==null?'—':w.avg7.toFixed(1)], ['Avg sleep', sl.length ? avg(sl)+' h' : '—']],
-    nutrition: (n => ({ title: 'Nutrition: ' + n.label, text: n.text }))(nutWeek()),
+    nutrition: (n => ({ title: 'Nutrition: ' + n.label, text: n.text + ((c => c.length ? ' • 🍕 Cheat day: ' + c.join(', ') : '')(wk.filter(e => e.cheat).map(e => e.date.slice(5)))) }))(nutWeek()),
     cats: CATS.map(([k,l,wt]) => [l, r.cats[k], S.params[wt]]), daily: Early.series(S.entries, S.params).map(x=>({date:x.date,y:x.score})),
     weight: es.filter(e => +e.weight > 0).map(e => ({date:e.date, y:+e.weight})), target: +(p.targetWeight || S.targetWeight) || null,
     sleep: es.map(e => ({date:e.date, y: e.sleep===''||e.sleep==null ? null : +e.sleep})), idealSleep: S.params.idealSleep||8,
@@ -138,7 +138,7 @@ function nutTargets(m, p = S.params) { if (m === 'kcal') return +p.nutKcal > 0 ?
 // Mode for a day: the one stored on it, else Yes/No if it was answered that way, else the current Setup mode (if its targets are set).
 function entryNutMode(e) { if (e && (e.nmode === 'kcal' || e.nmode === 'macros')) return e.nmode; if (e && (e.nutrition === true || e.nutrition === false)) return 'yn';
   const m = S.params.nutMode || 'yn'; return nutTargets(m) ? m : 'yn'; }
-function nutText(e, short) { if (!e) return '—'; const m = Scoring.nutMode(e), sc = Scoring.nutritionScore(e);
+function nutText(e, short) { if (!e) return '—'; if (e.cheat) return short ? '🍕' : '🍕 Cheat day (100)'; const m = Scoring.nutMode(e), sc = Scoring.nutritionScore(e);
   if (m === 'yn') return e.nutrition == null ? '—' : short ? (e.nutrition ? 'Y' : 'N') : (e.nutrition ? 'Followed plan ✅' : 'Plan not followed ❌');
   if (sc == null) return '—'; const t = e.ntarget || {};
   if (short) return Math.round(sc) + '';
@@ -152,6 +152,16 @@ function nutWeek() { const m = S.params.nutMode || 'yn', t = Scoring.dayNum(toda
   if (!g.length) return { mode:m, label:lbl, text: tg ? 'No goal days logged in the last 7 days' : 'Set your targets in Setup' };
   const txt = m === 'kcal' ? `Avg ${av(g.map(e=>+e.kcal))} kcal vs goal ${tg ? tg.kcal : (g[0].ntarget||{}).kcal}` : MACROS.map(([k,l,pk]) => `${l} ${av(g.map(e=>+e[k]))}/${tg ? tg[k] : (g[0].ntarget||{})[k]}g`).join(' • ');
   return { mode:m, label:lbl, score:sc, hits:g.filter(Scoring.nutritionHit).length, days:g.length, text:`${txt} • avg score ${sc}/100 • on target (80+) ${g.filter(Scoring.nutritionHit).length}/${g.length} days` }; }
+const cheatEval = () => Cheat.evaluate(S.entries, { today:new Date(), startDate:S.startDate, profile:S.profile||{}, params:S.params });
+const dayName = d => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(d+'T12:00').getDay()];
+function cheatCard() { const c = cheatEval();
+  if (c.claimed) return `<div class="card hint ok" id="cheatCard">🍕 <b>Cheat day claimed: ${dayName(c.claimed)} ${c.claimed.slice(5)}.</b> Nutrition counts as 100 that day. Still log everything else.</div>`;
+  if (c.blackout) return `<div class="card" id="cheatCard"><h3>🍕 Cheat day</h3><p class="muted">${c.blackout === 'camp' ? 'Cheat days unlock from the second weekend of camp.' : 'No cheat days in fight week window (14 days before the fight).'}</p></div>`;
+  if (c.unlocked && c.claimable.length) return `<div class="card" id="cheatCard" style="border-color:#43a047"><h3>🍕 Cheat day earned!</h3><p>Great week. Pick one day this weekend: nutrition scores 100 that day. Other sections still need logging. Unused expires Sunday midnight.</p>
+    <div class="sc">${c.claimable.map(d => `<button data-cheat="${d}">Claim ${dayName(d)} ${d.slice(5)}</button>`).join('')}</div></div>`;
+  if (c.earned) return `<div class="card" id="cheatCard"><h3>🍕 Cheat day on track</h3><p>All conditions met so far. Finish Friday's log to unlock your weekend cheat day.</p></div>`;
+  return `<div class="card" id="cheatCard"><h3>🍕 Earn a weekend cheat day</h3>${c.conds.map(x => `<p style="margin:4px 0">${x.ok ? '✅' : '⬜'} ${esc(x.text)}</p>`).join('')}
+    <p class="muted" style="margin-top:8px">${c.left.length ? 'Still to go: ' + esc(c.left.join(', ')) + ' to earn your cheat day.' : ''}</p></div>`; }
 function nutCard() { const w = nutWeek(); if (w.mode === 'yn') return '';
   return `<div class="card" id="nutCard"><h3>🍽️ Nutrition: ${esc(w.label)} (last 7 days)</h3><p>${esc(w.text)}</p><p class="muted">100 within ±${Scoring.NUT_FULL}% of the goal, dropping to 0 at ±${Scoring.NUT_ZERO}% (over or under).</p></div>`; }
 const todayRow = () => { const e = S.entries.find(x=>x.date===today()); return e ? `<p>Today: Nutrition ${Scoring.nutMode(e)==='yn'?ynI(e.nutrition):nutText(e)} • Training ${trainTxt(e)} • Sleep ${e.sleep===''?'—':e.sleep+'h'} • Screen ${e.screen===''?'—':e.screen+'h'} • Family ${ynI(e.family)}${+e.weight?' • '+e.weight+' lbs':''}</p>` : '<p class="muted">Nothing logged today yet.</p>'; };
@@ -215,7 +225,7 @@ const V = {
   const r = res(), lw = r.latestWeight;
   const isWeighDay = [1,4].includes(new Date().getDay()) && !S.entries.some(e=>e.date===today() && +e.weight>0);
   const dueNow = Reminders.due(S.entries.find(e=>e.date===today()), new Date(), S.reminders.morning, S.reminders.evening);
-  return `${day1Banner(false)}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning log not done: sleep hours, nutrition plan, first pee colour, how you feel (energy, soreness, mood, stress)'+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: each training session (effort + minutes), screen hours, family/friends, notes'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${weeklyCard()}${fightCard()}${fightWeekCard()}${streakCard()}${nutCard()}
+  return `${day1Banner(false)}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning log not done: sleep hours, nutrition plan, first pee colour, how you feel (energy, soreness, mood, stress)'+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: each training session (effort + minutes), screen hours, family/friends, notes'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${weeklyCard()}${fightCard()}${fightWeekCard()}${cheatCard()}${streakCard()}${nutCard()}
   ${isWeighDay?'<div class="card hint">⚖️ It\'s a weigh-in day (Mon/Thu). Weigh in this morning, fasted, and log it.</div>':''}
   ${r.locked?`${earlyCard(r)}${todayCard()}<div class="card"><h3>Categories so far (${r.daysLogged} day${r.daysLogged==1?'':'s'})</h3>${catTable(r)}<p class="muted">Consistency bonus: 🔒 unlocks in ${r.unlockIn} day${r.unlockIn==1?'':'s'}.</p></div>`:`${todayCard()}
   <div class="card"><div class="muted" style="text-align:center">FightReady Score</div><div class="big">${r.daysLogged?r.score:'—'}</div>
@@ -398,7 +408,7 @@ const V = {
  }
 };
 let cur = 'dash';
-function nutLogHtml(e) { const m = entryNutMode(e), t = (e.nmode === m && e.ntarget) || nutTargets(m) || {};
+function nutLogHtml(e) { if (e.cheat) return `<p class="hint ok">🍕 <b>Cheat day.</b> Nutrition counts as 100 and on target today. Log the other sections as usual.</p>`; const m = entryNutMode(e), t = (e.nmode === m && e.ntarget) || nutTargets(m) || {};
   const box = (k, l, unit, tg) => `<label for="f_${k}">${l} <span class="muted">(goal ${tg} ${unit})</span></label><input id="f_${k}" type="number" inputmode="numeric" min="0" step="1" value="${esc(e[k] ?? '')}" placeholder="${tg}">`;
   if (m === 'yn') return `<label>Nutrition plan followed today?</label><div class="yn" data-k="nutrition"><button class="y ${e.nutrition===true?'on':''}" data-val="1">✅ Yes</button><button class="n ${e.nutrition===false?'on':''}" data-val="0">❌ No</button></div>`;
   const body = m === 'kcal' ? box('kcal','Calories eaten today *','kcal',t.kcal) : MACROS.map(([k,l]) => box(k, l + ' eaten today (g) *', 'g', t[k])).join('');
@@ -539,6 +549,9 @@ document.addEventListener('click', async ev => {
     if (m === 'kcal') { const v = +$('#n_kcal').value; if (!(v >= 800 && v <= 8000)) return alert('Enter a daily calorie target between 800 and 8000 kcal.'); np.nutKcal = v; }
     if (m === 'macros') { for (const [k,l,pk] of MACROS) { const v = +$('#n_' + k).value; if (!(v >= 1 && v <= 1500)) return alert(`Enter a ${l.toLowerCase()} target in grams (1–1500).`); np[pk] = v; } }
     S.params = np; V._nm = null; save(); alert('Nutrition goal saved ✔ It applies from the next day you log nutrition. Days already logged keep their score.'); return show('setup'); }
+  if (t.dataset.cheat) { const d = t.dataset.cheat; if (!Cheat.claim(S.entries, d, { today:new Date(), startDate:S.startDate, profile:S.profile||{}, params:S.params })) return alert('That day can no longer be claimed.');
+    if (!confirm(`Use your cheat day on ${dayName(d)} ${d.slice(5)}? This can't be changed.`)) return;
+    const e = blankOr(S.entries.find(x => x.date === d), d); e.cheat = true; e.cheatWeek = cheatEval().mon; upsert([e]); save(); return show('dash'); }
   if (t.dataset.sd != null) { const i = +t.dataset.sd, n = +t.dataset.n, sd = V._sched.days[i]; sd.n = n; refreshSched(); return; }
   if (t.dataset.perday) { V._sched.perDay = +t.dataset.perday; V._sched.days.forEach(d => { if (d.n) d.n = V._sched.perDay; }); refreshSched(); return; }
   if (t.closest('.yn')) { const k = t.closest('.yn').dataset.k; V._e[k] = t.dataset.val==='1'; t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t)); autosave(); return; }

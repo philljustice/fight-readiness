@@ -33,16 +33,16 @@
     return dev <= NUT_FULL ? 100 : dev >= NUT_ZERO ? 0 : (NUT_ZERO - dev) / (NUT_ZERO - NUT_FULL) * 100; }
   // Mode stored on each entry (e.nmode + e.ntarget) so changing Setup later never rescores past days. No nmode = Yes/No (legacy).
   const nutMode = e => e && (e.nmode === 'kcal' || e.nmode === 'macros') ? e.nmode : 'yn';
-  const nutritionDone = e => { if (!e) return false; const m = nutMode(e);
+  const nutritionDone = e => { if (!e) return false; if (e.cheat) return true; const m = nutMode(e);
     if (m === 'kcal') return isNum(e.kcal); if (m === 'macros') return ['protein','carbs','fat'].every(k => isNum(e[k]));
     return e.nutrition === true || e.nutrition === false; };
   // 0-100 for the day, null if not entered (counts as 0 in the overall, like a blank Yes/No).
-  function nutritionScore(e) { if (!nutritionDone(e)) return null; const m = nutMode(e), t = e.ntarget || {};
+  function nutritionScore(e) { if (!nutritionDone(e)) return null; if (e.cheat) return 100; /* claimed cheat day */ const m = nutMode(e), t = e.ntarget || {};
     if (m === 'kcal') return closeness(e.kcal, t.kcal) ?? 0;
     if (m === 'macros') return Object.keys(MACRO_W).reduce((s, k) => s + (closeness(e[k], t[k]) ?? 0) * MACRO_W[k], 0);
     return e.nutrition ? 100 : 0; }
   // Consistency bonus "nutrition hit": Yes for Yes/No days, day score >= 80 for goal days.
-  const nutritionHit = e => nutMode(e) === 'yn' ? !!e && e.nutrition === true : (nutritionScore(e) ?? 0) >= NUT_HIT;
+  const nutritionHit = e => e && e.cheat ? true : nutMode(e) === 'yn' ? !!e && e.nutrition === true : (nutritionScore(e) ?? 0) >= NUT_HIT;
   const sleepScore = (h, p = DEFAULT_PARAMS) => Math.max(0, 100 - p.sleepPenalty * Math.abs(h - p.idealSleep));
   const screenScore = (h, p = DEFAULT_PARAMS) => h <= p.screenFree ? 100 : Math.max(0, 100 - p.screenPenalty * (h - p.screenFree));
   const ymd = d => { const x = new Date(d); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); };
