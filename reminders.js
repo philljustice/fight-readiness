@@ -34,9 +34,10 @@
   const num = v => v !== '' && v != null && !isNaN(v);
   const wellOK = e => !(e.v >= 2) || ['energy','soreness','mood','stress'].every(k => num(e[k]) && +e[k] >= 1);
   const trainOK = e => e.v >= 2 ? Array.isArray(e.sessions) && e.sessions.every(x => x.done === false || (x.done === true && num(x.rpe) && num(x.mins))) : (e.training === true || e.training === false);
+  // goal-mode nutrition (calories/macros eaten) belongs to the evening reminder.
   // morning = sleep + nutrition + wellness (energy/soreness/mood/stress); evening = sessions (+ effort/minutes) + screen + family
-  const morningDone = e => !!e && num(e.sleep) && (e.nutrition === true || e.nutrition === false) && wellOK(e) && !(Sc.hydrationRequired(e) && !Sc.hydrationOK(e));
-  const eveningDone = e => !!e && trainOK(e) && num(e.screen) && (e.family === true || e.family === false);
+  const morningDone = e => !!e && num(e.sleep) && (Sc.nutMode(e) !== 'yn' || Sc.nutritionDone(e)) && wellOK(e) && !(Sc.hydrationRequired(e) && !Sc.hydrationOK(e));
+  const eveningDone = e => !!e && (Sc.nutMode(e) === 'yn' || Sc.nutritionDone(e)) && trainOK(e) && num(e.screen) && (e.family === true || e.family === false);
   const mins = hm => { const [h, m] = hm.split(':').map(Number); return h * 60 + m; };
   // which reminders are due & unfinished right now
   function due(entry, now, morning = '07:00', evening = '21:00') {

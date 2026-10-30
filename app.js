@@ -1,4 +1,4 @@
-const APP_VERSION='fr-v26';
+const APP_VERSION='fr-v29';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -109,6 +109,7 @@ function reportData() { const r = res(), p = S.profile||{}, P = weeklyParts(), w
     verdict: r.locked ? lockMsg(r).replace('🔒 ','') : r.verdict,
     head: [['Days logged this week', `${wk.length}/7`], ['Streak', `${Insights.streak(S.entries).current} days`], ['Weight vs target', ws ? `${ws.current} lbs • ${ws.text}` : (lw ? lw.weight+' lbs' : '—')], ['Fight', cd ? cd.text : '—'],
       ['Wellness (1–5)', w.avg7==null?'—':w.avg7.toFixed(1)], ['Avg sleep', sl.length ? avg(sl)+' h' : '—']],
+    nutrition: (n => ({ title: 'Nutrition: ' + n.label, text: n.text }))(nutWeek()),
     cats: CATS.map(([k,l,wt]) => [l, r.cats[k], S.params[wt]]), daily: Early.series(S.entries, S.params).map(x=>({date:x.date,y:x.score})),
     weight: es.filter(e => +e.weight > 0).map(e => ({date:e.date, y:+e.weight})), target: +(p.targetWeight || S.targetWeight) || null,
     sleep: es.map(e => ({date:e.date, y: e.sleep===''||e.sleep==null ? null : +e.sleep})), idealSleep: S.params.idealSleep||8,
@@ -129,7 +130,31 @@ async function shareWeeklyFile() { const p = weeklyParts();
   const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; a.click(); }
 const lockMsg = r => `🔒 Weekly trends unlock in ${r.unlockIn} day${r.unlockIn==1?'':'s'}. Keep logging!`;
 const ynI = v => v===true?'✅':v===false?'❌':'—';
-const todayRow = () => { const e = S.entries.find(x=>x.date===today()); return e ? `<p>Today: Nutrition ${ynI(e.nutrition)} • Training ${trainTxt(e)} • Sleep ${e.sleep===''?'—':e.sleep+'h'} • Screen ${e.screen===''?'—':e.screen+'h'} • Family ${ynI(e.family)}${+e.weight?' • '+e.weight+' lbs':''}</p>` : '<p class="muted">Nothing logged today yet.</p>'; };
+// ---- Nutrition mode helpers (Setup → Nutrition goal). Each entry keeps the mode + targets it was logged with. ----
+const NUT_MODES = [['yn','Yes / No','Did you follow your nutrition plan?'],['kcal','Calorie goal','Log calories eaten vs a daily target'],['macros','Macros goal','Log protein, carbs and fat (g) vs targets']];
+const MACROS = [['protein','Protein','nutP'],['carbs','Carbs','nutC'],['fat','Fat','nutF']];
+function nutTargets(m, p = S.params) { if (m === 'kcal') return +p.nutKcal > 0 ? { kcal:+p.nutKcal } : null;
+  if (m === 'macros') return MACROS.every(([,,k]) => +p[k] > 0) ? { protein:+p.nutP, carbs:+p.nutC, fat:+p.nutF } : null; return null; }
+// Mode for a day: the one stored on it, else Yes/No if it was answered that way, else the current Setup mode (if its targets are set).
+function entryNutMode(e) { if (e && (e.nmode === 'kcal' || e.nmode === 'macros')) return e.nmode; if (e && (e.nutrition === true || e.nutrition === false)) return 'yn';
+  const m = S.params.nutMode || 'yn'; return nutTargets(m) ? m : 'yn'; }
+function nutText(e, short) { if (!e) return '—'; const m = Scoring.nutMode(e), sc = Scoring.nutritionScore(e);
+  if (m === 'yn') return e.nutrition == null ? '—' : short ? (e.nutrition ? 'Y' : 'N') : (e.nutrition ? 'Followed plan ✅' : 'Plan not followed ❌');
+  if (sc == null) return '—'; const t = e.ntarget || {};
+  if (short) return Math.round(sc) + '';
+  if (m === 'kcal') return `${e.kcal} / ${t.kcal} kcal (${Math.round(sc)}/100)`;
+  return `P ${e.protein}/${t.protein} • C ${e.carbs}/${t.carbs} • F ${e.fat}/${t.fat} g (${Math.round(sc)}/100)`; }
+// Last-7-days summary for goal modes: avg intake vs goal + avg score
+function nutWeek() { const m = S.params.nutMode || 'yn', t = Scoring.dayNum(today()), wk = S.entries.filter(e => { const n = Scoring.dayNum(e.date); return n > t-7 && n <= t && Scoring.nutritionDone(e); });
+  const lbl = (NUT_MODES.find(x => x[0] === m) || NUT_MODES[0])[1], av = a => a.length ? Math.round(a.reduce((x,y)=>x+y,0)/a.length) : null;
+  if (m === 'yn') { const y = wk.filter(e => Scoring.nutMode(e) === 'yn'); return { mode:m, label:lbl, text: y.length ? `Plan followed ${y.filter(e=>e.nutrition).length}/${y.length} days` : 'No nutrition logged in the last 7 days' }; }
+  const g = wk.filter(e => Scoring.nutMode(e) === m), tg = nutTargets(m), sc = av(g.map(Scoring.nutritionScore));
+  if (!g.length) return { mode:m, label:lbl, text: tg ? 'No goal days logged in the last 7 days' : 'Set your targets in Setup' };
+  const txt = m === 'kcal' ? `Avg ${av(g.map(e=>+e.kcal))} kcal vs goal ${tg ? tg.kcal : (g[0].ntarget||{}).kcal}` : MACROS.map(([k,l,pk]) => `${l} ${av(g.map(e=>+e[k]))}/${tg ? tg[k] : (g[0].ntarget||{})[k]}g`).join(' • ');
+  return { mode:m, label:lbl, score:sc, hits:g.filter(Scoring.nutritionHit).length, days:g.length, text:`${txt} • avg score ${sc}/100 • on target (80+) ${g.filter(Scoring.nutritionHit).length}/${g.length} days` }; }
+function nutCard() { const w = nutWeek(); if (w.mode === 'yn') return '';
+  return `<div class="card" id="nutCard"><h3>🍽️ Nutrition: ${esc(w.label)} (last 7 days)</h3><p>${esc(w.text)}</p><p class="muted">100 within ±${Scoring.NUT_FULL}% of the goal, dropping to 0 at ±${Scoring.NUT_ZERO}% (over or under).</p></div>`; }
+const todayRow = () => { const e = S.entries.find(x=>x.date===today()); return e ? `<p>Today: Nutrition ${Scoring.nutMode(e)==='yn'?ynI(e.nutrition):nutText(e)} • Training ${trainTxt(e)} • Sleep ${e.sleep===''?'—':e.sleep+'h'} • Screen ${e.screen===''?'—':e.screen+'h'} • Family ${ynI(e.family)}${+e.weight?' • '+e.weight+' lbs':''}</p>` : '<p class="muted">Nothing logged today yet.</p>'; };
 const trainTxt = e => Array.isArray(e.sessions) ? (e.sessions.length ? e.sessions.filter(x=>x.done===true).length+'/'+e.sessions.length+(e.sessions.some(x=>x.done==null)?'…':'') : 'Rest')+(e.extra&&e.extra.label?' +extra':'') : e.training==null?'—':e.training?'Y':'N';
 const CATS = [['nutrition','Nutrition','wNutrition'],['training','Training','wTraining'],['sleep','Sleep','wSleep'],['wellness','Wellness','wWellness'],['screen','Screen Time','wScreen'],['family','Family/Friends','wFamily']];
 
@@ -190,14 +215,14 @@ const V = {
   const r = res(), lw = r.latestWeight;
   const isWeighDay = [1,4].includes(new Date().getDay()) && !S.entries.some(e=>e.date===today() && +e.weight>0);
   const dueNow = Reminders.due(S.entries.find(e=>e.date===today()), new Date(), S.reminders.morning, S.reminders.evening);
-  return `${day1Banner(false)}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning log not done: sleep hours, nutrition plan, first pee colour, how you feel (energy, soreness, mood, stress)'+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: each training session (effort + minutes), screen hours, family/friends, notes'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${weeklyCard()}${fightCard()}${fightWeekCard()}${streakCard()}
+  return `${day1Banner(false)}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning log not done: sleep hours, nutrition plan, first pee colour, how you feel (energy, soreness, mood, stress)'+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: each training session (effort + minutes), screen hours, family/friends, notes'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${weeklyCard()}${fightCard()}${fightWeekCard()}${streakCard()}${nutCard()}
   ${isWeighDay?'<div class="card hint">⚖️ It\'s a weigh-in day (Mon/Thu). Weigh in this morning, fasted, and log it.</div>':''}
   ${r.locked?`${earlyCard(r)}${todayCard()}<div class="card"><h3>Categories so far (${r.daysLogged} day${r.daysLogged==1?'':'s'})</h3>${catTable(r)}<p class="muted">Consistency bonus: 🔒 unlocks in ${r.unlockIn} day${r.unlockIn==1?'':'s'}.</p></div>`:`${todayCard()}
   <div class="card"><div class="muted" style="text-align:center">FightReady Score</div><div class="big">${r.daysLogged?r.score:'—'}</div>
   <p style="text-align:center">${r.daysLogged?esc(r.verdict):'No entries in the last 3 weeks yet.'}</p>
   <p class="muted" style="text-align:center">Base ${r.base.toFixed(1)} + bonus ${r.bonus} • Data Quality: ${esc(r.dataQuality)} (${r.daysLogged} days logged)</p></div>
   <div class="card"><h3>Categories (last 3 weeks)</h3>${catTable(r)}
-  <p>Core consistency (Nutrition + Training both Y): <b>${r.consistency.toFixed(0)}%</b> → ${r.bonus?'+'+r.bonus+' pts for daily discipline!':'Build streaks on both key plans'}</p>
+  <p>Core consistency (Nutrition hit + all Training done${(S.params.nutMode||'yn')==='yn'?'':'; goal days count at 80+'}): <b>${r.consistency.toFixed(0)}%</b> → ${r.bonus?'+'+r.bonus+' pts for daily discipline!':'Build streaks on both key plans'}</p>
   <p class="muted">Bonus: +5 at ≥90%, +3 at ≥75%, +1 at ≥60%.</p></div>`}
   <div class="card"><h3>🥊 Weight</h3>${verdictLine()}<p>Latest: <b>${lw?lw.weight+' lbs':'—'}</b> ${lw?'<span class="muted">('+lw.date+')</span>':''}${+S.targetWeight?` • Target ${esc(S.targetWeight)} lbs`:''}</p>
   ${r.locked?`<p>7-day trend: ${lockMsg(r)}</p>`:`<p>7-day trend: <b>${r.delta==null?'—':(r.delta>0?'+':'')+r.delta+' lbs/wk'}</b></p><p>${r.trend.emoji} ${esc(r.trend.label)}</p>`}${cutWarn()}${weightChart()}</div>${miniCharts()}${hydrationCard()}${wellCard(false)}`;
@@ -233,7 +258,7 @@ const V = {
    <p style="margin:14px 0 0"><b>How do you feel? *</b></p>
    ${Insights.WELL.map(([k,l,lo,hi])=>`<label>${l} <span class="muted">(${lo} … ${hi})</span></label><div class="sc" data-k="${k}">${[1,2,3,4,5].map(n=>`<button class="${+e[k]===n?'on':''}" data-val="${n}">${n}</button>`).join('')}</div>`).join('')}
    </div>`,
-   nutrition: `<div class="card" id="sec_nutrition">${head('nutrition','🍽️ Nutrition')}${yn('nutrition','Nutrition plan followed today?')}</div>`,
+   nutrition: `<div class="card" id="sec_nutrition">${head('nutrition','🍽️ Nutrition')}${nutLogHtml(e)}</div>`,
    training: `<div class="card" id="sec_training">${head('training','🥊 Training')}${sessCard()}</div>`,
    evening: `<div class="card" id="sec_evening">${head('evening','🌙 Evening')}
    ${step('screen','Recreational screen time (hours) *',0.5)}${chips('screen',[0,1,2,3,4])}
@@ -251,7 +276,7 @@ const V = {
   <div class="card" id="saveCard"><button class="btn big-save" id="saveDay">${all?'✅':'💾'} Save ${d===today()?"today's":"this day's"} log</button><div id="saveResult" aria-live="polite">${all?allDoneHtml(d):''}</div>${ex?'<button class="btn alt" id="delLog">Delete this day</button>':''}</div>
   <div id="todayWrap">${todayCard(d===today()?"Today's score":'Score for '+d)}</div>
   <div class="card"><h3>Recent entries</h3><table><tr><th>Date</th><th>N</th><th>T</th><th>Sl</th><th>Sc</th><th>F</th><th>Wt</th><th>✓</th></tr>
-  ${S.entries.slice().sort((a,b)=>a.date<b.date?1:-1).slice(0,V._all?1e9:21).map(x=>`<tr data-date="${x.date}"><td><a href="#" data-edit="${x.date}">${x.date.slice(5)}</a></td><td>${x.nutrition==null?'—':x.nutrition?'Y':'N'}</td><td>${trainTxt(x)}</td><td>${x.sleep??''}</td><td>${x.screen??''}</td><td>${x.family==null?'—':x.family?'Y':'N'}</td><td>${x.weight||''}</td><td>${Insights.isComplete(x)?'✅':'…'}</td></tr>`).join('')}</table>
+  ${S.entries.slice().sort((a,b)=>a.date<b.date?1:-1).slice(0,V._all?1e9:21).map(x=>`<tr data-date="${x.date}"><td><a href="#" data-edit="${x.date}">${x.date.slice(5)}</a></td><td>${nutText(x,true)}</td><td>${trainTxt(x)}</td><td>${x.sleep??''}</td><td>${x.screen??''}</td><td>${x.family==null?'—':x.family?'Y':'N'}</td><td>${x.weight||''}</td><td>${Insights.isComplete(x)?'✅':'…'}</td></tr>`).join('')}</table>
   <p class="muted">Tap a date to view or edit that day.</p>${S.entries.length>21&&!V._all?`<button class="btn alt" id="showAll">Show all ${S.entries.length} days</button>`:''}</div>`;
 
  },
@@ -319,6 +344,12 @@ const V = {
    ${n('wNutrition','Nutrition weight %')}${n('wTraining','Training weight %')}${n('wSleep','Sleep weight %')}${n('wWellness','Wellness weight %')}${n('wScreen','Screen weight %')}${n('wFamily','Family/Friends weight %')}
    ${n('idealSleep','Ideal sleep hours')}${n('sleepPenalty','Sleep penalty per hour off')}${n('screenFree','Max screen hours for full score')}${n('screenPenalty','Screen penalty per extra hour')}
    <p id="wsum" class="muted"></p><button class="btn" id="saveSetup">💾 Save setup</button><button class="btn alt" id="resetParams">Reset parameters to defaults</button></div>
+  <div class="card" id="nutSetup"><h3>🍽️ Nutrition goal</h3><p class="muted">How the Nutrition section is logged and scored. Goal modes score each day 0–100: 100 within ±${Scoring.NUT_FULL}% of the goal, falling evenly to 0 at ±${Scoring.NUT_ZERO}% over <b>or</b> under. Macros: protein 50%, carbs 25%, fat 25%. Days already logged keep the mode and goal they were logged with.</p>
+   <div class="sc" id="nutMode" role="radiogroup">${NUT_MODES.map(([k,l]) => `<button data-nmode="${k}" class="${(V._nm||p.nutMode||'yn')===k?'on':''}" role="radio" aria-checked="${(V._nm||p.nutMode||'yn')===k}">${l}</button>`).join('')}</div>
+   <p class="muted" id="nutModeSub">${esc((NUT_MODES.find(x=>x[0]===(V._nm||p.nutMode||'yn'))||NUT_MODES[0])[2])}</p>
+   <div id="nutKcalBox" style="display:${(V._nm||p.nutMode)==='kcal'?'':'none'}"><label for="n_kcal">Daily calorie target (kcal) *</label><input id="n_kcal" type="number" inputmode="numeric" min="800" max="8000" step="10" value="${esc(p.nutKcal)}"></div>
+   <div id="nutMacroBox" style="display:${(V._nm||p.nutMode)==='macros'?'':'none'}">${MACROS.map(([k,l,pk]) => `<label for="n_${k}">${l} target (g/day) *</label><input id="n_${k}" type="number" inputmode="numeric" min="1" max="1500" step="1" value="${esc(p[pk])}">`).join('')}</div>
+   <button class="btn" id="saveNut">💾 Save nutrition goal</button></div>
   <div class="card" id="remCard"><h3>⏰ Reminders</h3>
    <label for="r_morning">Morning reminder</label><select id="r_morning">${Reminders.MORNING_TIMES.map(t=>`<option ${t===Reminders.nearest(S.reminders.morning,Reminders.MORNING_TIMES)?'selected':''}>${t}</option>`).join('')}</select>
    <label for="r_evening">Evening reminder</label><select id="r_evening">${Reminders.EVENING_TIMES.map(t=>`<option ${t===Reminders.nearest(S.reminders.evening,Reminders.EVENING_TIMES)?'selected':''}>${t}</option>`).join('')}</select>
@@ -367,6 +398,12 @@ const V = {
  }
 };
 let cur = 'dash';
+function nutLogHtml(e) { const m = entryNutMode(e), t = (e.nmode === m && e.ntarget) || nutTargets(m) || {};
+  const box = (k, l, unit, tg) => `<label for="f_${k}">${l} <span class="muted">(goal ${tg} ${unit})</span></label><input id="f_${k}" type="number" inputmode="numeric" min="0" step="1" value="${esc(e[k] ?? '')}" placeholder="${tg}">`;
+  if (m === 'yn') return `<label>Nutrition plan followed today?</label><div class="yn" data-k="nutrition"><button class="y ${e.nutrition===true?'on':''}" data-val="1">✅ Yes</button><button class="n ${e.nutrition===false?'on':''}" data-val="0">❌ No</button></div>`;
+  const body = m === 'kcal' ? box('kcal','Calories eaten today *','kcal',t.kcal) : MACROS.map(([k,l]) => box(k, l + ' eaten today (g) *', 'g', t[k])).join('');
+  return `<p class="muted" style="margin:0 0 6px">${m === 'kcal' ? 'Calorie goal' : 'Macros goal (score: protein 50%, carbs 25%, fat 25%)'}: 100 within ±${Scoring.NUT_FULL}% of goal, 0 at ±${Scoring.NUT_ZERO}% over or under.</p>${body}<p id="nutScore" class="hydst">${nutScoreHtml(e)}</p>`; }
+function nutScoreHtml(e) { const sc = Scoring.nutritionScore(e); return sc == null ? 'Enter what you ate to see today\'s nutrition score.' : `Nutrition score today: <b>${Math.round(sc)}/100</b>${sc >= Scoring.NUT_HIT ? ' ✅ on target' : ''}`; }
 function blankOr(ex, d) { const e = JSON.parse(JSON.stringify(ex || {date:d, v:2, nutrition:null, training:null, family:null, sleep:'', screen:'', weight:'', notes:''}));
   if (!(ex && !Array.isArray(ex.sessions) && ex.v !== 2) && !Array.isArray(e.sessions)) { e.sessions = Profile.sessionsFor(S.profile && S.profile.schedule, d) || []; e.v = 2; }
   return e; }
@@ -374,7 +411,7 @@ function blankOr(ex, d) { const e = JSON.parse(JSON.stringify(ex || {date:d, v:2
 function tileSummary(x, e) { const has = k => x.items.some(i => k.test(i.key));
   if (x.key === 'morning') { if (x.done) { const w = Insights.dayWellness(e); const hs = Insights.hydrationStatus(e.hydration); return [e.sleep + 'h sleep', hs ? '💧 ' + hs.label : '', +e.weight > 0 ? e.weight + ' lbs' : '', w != null ? 'feel ' + w.toFixed(1) + '/5' : ''].filter(Boolean).join(' · '); }
     return 'To log: ' + [has(/^sleep$/) ? 'sleep' : '', has(/^hydration$/) ? 'hydration' : '', has(/^well-/) ? 'how you feel' : ''].filter(Boolean).join(' + '); }
-  if (x.key === 'nutrition') return x.done ? (e.nutrition ? 'Followed plan ✅' : 'Plan not followed ❌') : 'Tap Yes or No';
+  if (x.key === 'nutrition') { const m = entryNutMode(e); return x.done ? nutText(e) : m === 'kcal' ? 'Enter calories eaten' : m === 'macros' ? 'Enter protein, carbs & fat' : 'Tap Yes or No'; }
   if (x.key === 'training') { const ss = Array.isArray(e.sessions) ? e.sessions : [], ex = e.extra && e.extra.label ? ' + extra' : '';
     if (x.done) return (ss.length ? ss.filter(s => s.done === true).length + ' of ' + ss.length + ' sessions done' : (e.v >= 2 ? 'Rest day' : e.training ? 'Session done' : 'Session skipped')) + ex;
     const ok = ss.filter(s => s.done === false || (s.done === true && +s.rpe > 0 && +s.mins > 0)).length; return ss.length ? ok + ' of ' + ss.length + ' sessions logged' : 'Tap Yes or No'; }
@@ -393,7 +430,7 @@ function closeSection() { if (history.state && history.state.frSec) return histo
 window.addEventListener('popstate', () => { if (cur === 'log' && V._sec) leaveSection(); });
 try { if (history.state && history.state.frSec) history.replaceState(null, ''); } catch (e) {}
 // ---- Log screen: every field autosaves silently; one Save button validates and reports what's missing ----
-const hasData = b => ['nutrition','training','family'].some(k => b[k] === true || b[k] === false) || ['sleep','screen','weight'].some(k => b[k] !== '' && b[k] != null) || Scoring.WELL_KEYS.some(k => +b[k] > 0) || Scoring.hydrationOK(b)
+const hasData = b => ['nutrition','training','family'].some(k => b[k] === true || b[k] === false) || ['sleep','screen','weight'].some(k => b[k] !== '' && b[k] != null) || Scoring.WELL_KEYS.some(k => +b[k] > 0) || Scoring.hydrationOK(b) || ['kcal','protein','carbs','fat'].some(k => b[k] !== '' && b[k] != null)
   || !!(b.notes && String(b.notes).trim()) || !!b.extra || (Array.isArray(b.sessions) && b.sessions.some(x => x.done != null));
 // Build the day's entry from what is on screen + the taps held in V._e. Out-of-range numbers keep the last good value (and show up at Save).
 function readDraft() { const u = V._e; if (!u) return null;
@@ -402,6 +439,12 @@ function readDraft() { const u = V._e; if (!u) return null;
   // Only one section is on screen at a time: fields that aren't on screen keep their stored value.
   if (has('#f_sleep')) b.sleep = rng(nv('#f_sleep'), b.sleep, 0, 24); if (has('#f_screen')) b.screen = rng(nv('#f_screen'), b.screen, 0, 24); if (has('#f_weight')) b.weight = rng(nv('#f_weight'), b.weight, 60, 400);
   if (has('#f_notes')) b.notes = $('#f_notes').value; b.nutrition = u.nutrition ?? null; b.family = u.family ?? null; Scoring.WELL_KEYS.forEach(k => { b[k] = u[k] ?? ''; });
+  { const m = entryNutMode(b.nutrition != null || b.nmode ? b : Object.assign({}, b, { nutrition: u.nutrition ?? null }));
+    if (m === 'yn') { delete b.nmode; delete b.ntarget; ['kcal','protein','carbs','fat'].forEach(k => delete b[k]); }
+    else { const ks = m === 'kcal' ? ['kcal'] : ['protein','carbs','fat'];
+      ks.forEach(k => { if (has('#f_' + k)) { const v = nv('#f_' + k); b[k] = v === '' ? '' : (v >= 0 && v <= 20000 ? v : (b[k] ?? '')); } });
+      if (ks.some(k => b[k] !== '' && b[k] != null)) { if (b.nmode !== m || !b.ntarget) b.ntarget = nutTargets(m); b.nmode = m; b.nutrition = Scoring.nutritionDone(b) ? Scoring.nutritionHit(b) : null; }
+      else { delete b.nmode; delete b.ntarget; ks.forEach(k => delete b[k]); b.nutrition = null; } } }
   if (Scoring.hydrationOK(u)) b.hydration = +u.hydration; else delete b.hydration;
   if (V._legacy) b.training = u.training ?? null;
   else if (Array.isArray(b.sessions)) { b.v = 2; b.sessions = b.sessions.map((x, i) => { const us = (u.sessions || [])[i] || {}, done = us.done == null ? null : us.done;
@@ -415,7 +458,7 @@ function readDraft() { const u = V._e; if (!u) return null;
 function autosave() { const b = readDraft(); if (!b) return null;
   if (!S.entries.some(x => x.date === b.date) && !hasData(b)) return b;
   upsert([b]); refreshProgress(b); if (b.date === today()) scheduleStatus(); return b; }
-function refreshProgress(b) { const st = Insights.sections(b), n = Object.values(st).filter(Boolean).length, left = Insights.missing(b);
+function refreshProgress(b) { const ns = $('#nutScore'); if (ns) ns.innerHTML = nutScoreHtml(b); const st = Insights.sections(b), n = Object.values(st).filter(Boolean).length, left = Insights.missing(b);
   Object.keys(st).forEach(k => { const el = $('#ok_' + k); if (el) { el.classList.toggle('on', !!st[k]); el.textContent = st[k] ? '✓ Done' : '…'; } });
   const pr = $('#progress'); if (pr) pr.textContent = (n === 4 ? '✅ ' : '') + n + ' of 4 sections done';
   const sl = $('#stillToLog'); if (sl) sl.textContent = left.length ? 'Still to log: ' + left.join(', ') : 'All done for this day 🎉';
@@ -428,6 +471,7 @@ function fieldFor(key) { const q = s => document.querySelector(s);
   if (key.startsWith('well-')) return q(`.sc[data-k="${key.slice(5)}"]`);
   if (key === 'hydration') return q('.hyd');
   if (key === 'extra') return q('#f_xrpe');
+  if (key === 'nutrition') return q('.yn[data-k="nutrition"]') || ['f_kcal','f_protein','f_carbs','f_fat'].map(i => q('#' + i)).find(x => x && x.value === '') || q('#f_kcal,#f_protein');
   return q({ nutrition:'.yn[data-k="nutrition"]', training:'.yn[data-k="training"]', family:'.yn[data-k="family"]', sleep:'#f_sleep', screen:'#f_screen', weight:'#f_weight' }[key]); }
 function jumpTo(key) { const el = fieldFor(key); if (!el) return; const det = el.closest('details'); if (det) det.open = true;
   el.scrollIntoView({ behavior:'smooth', block:'center' }); const box = el.closest('.yn,.sc,.hyd,.step,.row') || el; box.classList.add('flash'); setTimeout(() => box.classList.remove('flash'), 2200);
@@ -489,6 +533,12 @@ document.addEventListener('click', async ev => {
   if (t.dataset.goto) { ev.preventDefault(); V._date = null; return show(t.dataset.goto); }
   if (t.closest('.yn') && t.closest('.yn').dataset.k === 'sess') { const i = +t.closest('.yn').dataset.i, on = t.dataset.val==='1'; V._e.sessions[i].done = on;
     t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t)); $('#sx_'+i).style.display = on ? '' : 'none'; autosave(); return; }
+  if (t.dataset.nmode) { V._nm = t.dataset.nmode; document.querySelectorAll('#nutMode button').forEach(b => { const on = b === t; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+    $('#nutModeSub').textContent = NUT_MODES.find(x => x[0] === V._nm)[2]; $('#nutKcalBox').style.display = V._nm === 'kcal' ? '' : 'none'; $('#nutMacroBox').style.display = V._nm === 'macros' ? '' : 'none'; return; }
+  if (t.id === 'saveNut') { const m = V._nm || S.params.nutMode || 'yn', np = Object.assign({}, S.params, { nutMode:m });
+    if (m === 'kcal') { const v = +$('#n_kcal').value; if (!(v >= 800 && v <= 8000)) return alert('Enter a daily calorie target between 800 and 8000 kcal.'); np.nutKcal = v; }
+    if (m === 'macros') { for (const [k,l,pk] of MACROS) { const v = +$('#n_' + k).value; if (!(v >= 1 && v <= 1500)) return alert(`Enter a ${l.toLowerCase()} target in grams (1–1500).`); np[pk] = v; } }
+    S.params = np; V._nm = null; save(); alert('Nutrition goal saved ✔ It applies from the next day you log nutrition. Days already logged keep their score.'); return show('setup'); }
   if (t.dataset.sd != null) { const i = +t.dataset.sd, n = +t.dataset.n, sd = V._sched.days[i]; sd.n = n; refreshSched(); return; }
   if (t.dataset.perday) { V._sched.perDay = +t.dataset.perday; V._sched.days.forEach(d => { if (d.n) d.n = V._sched.perDay; }); refreshSched(); return; }
   if (t.closest('.yn')) { const k = t.closest('.yn').dataset.k; V._e[k] = t.dataset.val==='1'; t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t)); autosave(); return; }
@@ -547,7 +597,7 @@ document.addEventListener('click', async ev => {
     case 'wipeBtn': if (confirm('Erase ALL data on this phone? Export a backup first!') && confirm('Really erase?')) { localStorage.removeItem(KEY); S = load(); show('setup'); } return;
   }
 });
-const LOGF = ['f_sleep','f_screen','f_weight','f_notes','f_xlabel','f_xrpe','f_xmin'];
+const LOGF = ['f_kcal','f_protein','f_carbs','f_fat','f_sleep','f_screen','f_weight','f_notes','f_xlabel','f_xrpe','f_xmin'];
 document.addEventListener('input', ev => { const t = ev.target, w = S.weeks[S.weekIdx];
   if (cur === 'log' && (LOGF.includes(t.id) || t.dataset.srpe != null || t.dataset.smin != null)) return void autosave();
   if (['p_startWeight','p_targetWeight','p_fightDate'].includes(t.id)) refreshCut();

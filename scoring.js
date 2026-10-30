@@ -3,7 +3,9 @@
   const DEFAULT_PARAMS = { wNutrition:25, wTraining:25, wSleep:15, wWellness:15, wScreen:10, wFamily:10,
     idealSleep:8, sleepPenalty:25, screenFree:2, screenPenalty:40, windowDays:21, unlockDays:7, startDate:null,
     // tiered bonus as in Dashboard!C24: >=90% -> 5, >=75% -> 3, >=60% -> 1
-    bonusTiers:[[90,5],[75,3],[60,1]] };
+    bonusTiers:[[90,5],[75,3],[60,1]],
+    // Nutrition mode: 'yn' (plan followed Yes/No, default), 'kcal' (daily calorie goal) or 'macros' (protein/carbs/fat grams)
+    nutMode:'yn', nutKcal:'', nutP:'', nutC:'', nutF:'' };
   const WELL_KEYS = ['energy','soreness','mood','stress']; // all stored 1-5 with 5 = best (fresh / no soreness / great / no stress)
   // Morning hydration: first-pee colour swatch 1 (pale) .. 8 (dark amber/brown). Stored as e.hydration (1-8). Does not affect any score.
   // Required only for new days (v2 entries dated HYD_FROM or later); older days without it still count complete.
@@ -24,6 +26,23 @@
     if (e.extra && (isNum(e.extra.rpe) || isNum(e.extra.mins) || e.extra.label)) out.push({ label:(e.extra.label||'Extra')+' (extra)', rpe:e.extra.rpe, mins:e.extra.mins, extra:true });
     return out; }
   const sessionLoad = e => { const L = sessionsDone(e).filter(x => isNum(x.rpe) && isNum(x.mins) && +x.rpe > 0 && +x.mins > 0).map(x => Math.round(+x.rpe * +x.mins)); return L.length ? L.reduce((a,b)=>a+b,0) : null; };
+  // ---- Nutrition goal scoring ----
+  // closeness(actual, target): within ±5% of goal = 100, then linear down to 0 at ±30% (over and under penalised the same).
+  const NUT_FULL = 5, NUT_ZERO = 30, NUT_HIT = 80, MACRO_W = { protein:0.5, carbs:0.25, fat:0.25 };
+  function closeness(a, t) { if (!(+t > 0) || !isNum(a)) return null; const dev = Math.abs(+a - +t) / +t * 100;
+    return dev <= NUT_FULL ? 100 : dev >= NUT_ZERO ? 0 : (NUT_ZERO - dev) / (NUT_ZERO - NUT_FULL) * 100; }
+  // Mode stored on each entry (e.nmode + e.ntarget) so changing Setup later never rescores past days. No nmode = Yes/No (legacy).
+  const nutMode = e => e && (e.nmode === 'kcal' || e.nmode === 'macros') ? e.nmode : 'yn';
+  const nutritionDone = e => { if (!e) return false; const m = nutMode(e);
+    if (m === 'kcal') return isNum(e.kcal); if (m === 'macros') return ['protein','carbs','fat'].every(k => isNum(e[k]));
+    return e.nutrition === true || e.nutrition === false; };
+  // 0-100 for the day, null if not entered (counts as 0 in the overall, like a blank Yes/No).
+  function nutritionScore(e) { if (!nutritionDone(e)) return null; const m = nutMode(e), t = e.ntarget || {};
+    if (m === 'kcal') return closeness(e.kcal, t.kcal) ?? 0;
+    if (m === 'macros') return Object.keys(MACRO_W).reduce((s, k) => s + (closeness(e[k], t[k]) ?? 0) * MACRO_W[k], 0);
+    return e.nutrition ? 100 : 0; }
+  // Consistency bonus "nutrition hit": Yes for Yes/No days, day score >= 80 for goal days.
+  const nutritionHit = e => nutMode(e) === 'yn' ? !!e && e.nutrition === true : (nutritionScore(e) ?? 0) >= NUT_HIT;
   const sleepScore = (h, p = DEFAULT_PARAMS) => Math.max(0, 100 - p.sleepPenalty * Math.abs(h - p.idealSleep));
   const screenScore = (h, p = DEFAULT_PARAMS) => h <= p.screenFree ? 100 : Math.max(0, 100 - p.screenPenalty * (h - p.screenFree));
   const ymd = d => { const x = new Date(d); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); };
@@ -62,14 +81,14 @@
     const N = w.length;
     const pctY = k => N ? w.filter(e => e[k] === true).length / N * 100 : 0; // blank counts as N, like COUNTIFS/N4
     const cats = {
-      nutrition: pctY('nutrition'), training: N ? avg(w.map(trainingPct)) : 0, family: pctY('family'),
+      nutrition: N ? avg(w.map(e => nutritionScore(e) ?? 0)) : 0, training: N ? avg(w.map(trainingPct)) : 0, family: pctY('family'),
       wellness: N ? (avg(w.map(wellnessScore).filter(v => v != null)) || 0) : 0,
       sleep: N ? (avg(w.filter(e => num(e.sleep)).map(e => sleepScore(+e.sleep, p))) || 0) : 0,
       screen: N ? (avg(w.filter(e => num(e.screen)).map(e => screenScore(+e.screen, p))) || 0) : 0,
     };
     const wt = { nutrition:p.wNutrition, training:p.wTraining, sleep:p.wSleep, wellness:p.wWellness||0, screen:p.wScreen, family:p.wFamily };
     let base = 0; for (const k in cats) base += cats[k] * wt[k] / 100;
-    const consistency = N ? w.filter(e => e.nutrition === true && trainingPct(e) === 100).length / N * 100 : 0;
+    const consistency = N ? w.filter(e => nutritionHit(e) && trainingPct(e) === 100).length / N * 100 : 0;
     const bonus = bonusFor(consistency, p);
     const final = Math.min(100, base + bonus);
     const delta = weightDelta(entries, t);
@@ -78,6 +97,6 @@
       delta, trend: trendLabel(delta), verdict: verdict(final), dataQuality: dataQuality(N),
       latestWeight: weighed.length ? weighed[weighed.length-1] : null, windowEntries: w };
   }
-  const api = { HYD_FROM, hydrationOK, hydrationRequired, WELL_KEYS, wellnessScore, trainingPct, sessionsDone, sessionLoad, DEFAULT_PARAMS, sleepScore, screenScore, weightDelta, trendLabel, compute, ymd, dayNum, verdict, dataQuality };
+  const api = { NUT_FULL, NUT_ZERO, NUT_HIT, MACRO_W, closeness, nutMode, nutritionDone, nutritionScore, nutritionHit, HYD_FROM, hydrationOK, hydrationRequired, WELL_KEYS, wellnessScore, trainingPct, sessionsDone, sessionLoad, DEFAULT_PARAMS, sleepScore, screenScore, weightDelta, trendLabel, compute, ymd, dayNum, verdict, dataQuality };
   if (typeof module !== 'undefined') module.exports = api; else root.Scoring = api;
 })(this);

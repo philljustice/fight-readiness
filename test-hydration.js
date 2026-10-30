@@ -38,12 +38,12 @@ assert.deepEqual(I.hydrationFlags([v2(d(0),{hydration:2})], today, fw), [], 'wel
 assert.deepEqual(I.hydrationFlags([v2(d(0),{hydration:5})], today, {fightDate: S.ymd(new Date(2026,11,20))}), [], 'not fight week');
 assert.equal(I.hydrationFlags(es, today, fw).length, 2);
 // CSV: appended columns, old columns unchanged
-assert.deepEqual(I.CSV_COLS.slice(-3), ['Complete','Hydration_Colour','Hydration_Status']);
-const rows = I.toCSV([v2(d(0),{hydration:6}), v2('2026-10-27',{})]).trim().split('\r\n');
+assert.deepEqual(I.CSV_COLS.slice(-9,-6), ['Complete','Hydration_Colour','Hydration_Status']);
+const rows = I.toCSV([v2(d(0),{hydration:6}), v2('2026-10-27',{})]).trim().split('\r\n').map(r => r.split(',').slice(0,-6).join(','));
 assert.ok(rows[2].endsWith(',N,6,Dehydrated') || rows[2].endsWith(',Y,6,Dehydrated'), rows[2]); assert.ok(rows[1].endsWith(',Y,,'), rows[1]);
 // wiring
 const app = fs.readFileSync(__dirname+'/app.js','utf8'), rep = fs.readFileSync(__dirname+'/report.js','utf8'), sw = fs.readFileSync(__dirname+'/sw.js','utf8');
 assert.ok(app.includes('hydPicker(e)') && app.includes('hydrationCard()') && app.includes('hydration: { days:') && app.includes('hydrationFlags'));
-assert.ok(rep.includes('d.hydration')); assert.ok(sw.includes("'fr-v28'"));
+assert.ok(rep.includes('d.hydration')); assert.ok(sw.includes("'fr-v29'"));
 assert.ok(!/<button[^>]*class="[^"]*"[^>]*data-hyd[^>]*>[^<]+</.test(app.match(/function hydPicker[\s\S]*?\n function|function hydPicker[\s\S]{0,900}/)[0]), 'swatches carry no visible text');
 console.log('All hydration tests passed');

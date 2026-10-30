@@ -3,7 +3,7 @@
   const Sc = typeof module !== 'undefined' ? require('./scoring.js') : root.Scoring;
   const In = typeof module !== 'undefined' ? require('./insights.js') : root.Insights;
   const NAMES = { nutrition:'Nutrition', training:'Training', sleep:'Sleep', wellness:'Wellness', screen:'Screen time', family:'Family/Friends' };
-  const TIPS = { nutrition:'stick to the nutrition plan tomorrow, prep meals tonight', training:'complete every scheduled session tomorrow (rest days count 100%)',
+  const TIPS = { nutrition:'stick to the nutrition plan tomorrow (or land within 5% of your calorie/macro goal), prep meals tonight', training:'complete every scheduled session tomorrow (rest days count 100%)',
     sleep:'aim for 8 hours tonight, screens off 30 min before bed', wellness:'recover well: hydrate, eat, stretch, sleep (it lifts energy and soreness)',
     screen:'keep recreational screen time to 2 hours or less', family:'make time for family or friends tomorrow' };
   // Score for one day with the same weights. null if nothing logged.

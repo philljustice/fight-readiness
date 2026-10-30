@@ -43,6 +43,7 @@
         else { ctx.strokeStyle = LINE; ctx.lineWidth = 2; ctx.setLineDash([6, 6]); ctx.strokeRect(bx, y, bw, 64); ctx.setLineDash([]); }
         ctx.fillStyle = MUTE; ctx.font = '22px Helvetica,Arial'; ctx.textAlign = 'center'; ctx.fillText(x.date.slice(5), bx + bw / 2, y + 92); ctx.textAlign = 'left'; });
       y += 116; ctx.fillStyle = INK; ctx.font = '26px Helvetica,Arial'; y = wrap(ctx, d.hydration.summary, PAD, y, W - 2*PAD, 34) + 20; }
+    if (d.nutrition) { y = section(ctx, d.nutrition.title, y); ctx.fillStyle = INK; ctx.font = '28px Helvetica,Arial'; y = wrap(ctx, d.nutrition.text, PAD, y + 4, W - 2*PAD, 36) + 20; }
     y = section(ctx, 'Training', y); ctx.fillStyle = INK; ctx.font = '28px Helvetica,Arial'; y = wrap(ctx, d.training || '', PAD, y + 4, W - 2*PAD, 36) + 10;
     const lw = d.loadWeeks || [0,0,0,0], mx = Math.max(...lw, 1), bwid = (W - 2*PAD) / 4;
     lw.forEach((v, i) => { const h = Math.round(v / mx * 160), x = PAD + i * bwid + 30; ctx.fillStyle = i === 3 ? RED : '#9e9e9e'; ctx.fillRect(x, y + 170 - h, bwid - 60, h);

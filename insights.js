@@ -10,7 +10,7 @@
   const WELL = [['energy','Fatigue / energy','1 = always tired','5 = very fresh'],['soreness','Muscle soreness','1 = very sore','5 = no soreness'],['stress','Stress','1 = very stressed','5 = very relaxed'],['mood','Mood','1 = irritable / down','5 = very positive']];
   // What's still missing for a complete day. v2 (current) entries need wellness + every scheduled session answered (with RPE + minutes if done).
   function missing(e) { const m = [];
-    if (!e || e.nutrition == null) m.push('nutrition');
+    if (!S.nutritionDone(e)) m.push('nutrition');
     if (!e || (e.v >= 2 ? !Array.isArray(e.sessions) || e.sessions.some(x => x.done == null) : e.training == null)) m.push('training');
     if (e && e.v >= 2 && Array.isArray(e.sessions) && e.sessions.some(x => x.done === true && !(num(x.rpe) && num(x.mins) && +x.mins > 0))) m.push('session effort + minutes');
     if (!e || !num(e.sleep)) m.push('sleep'); if (!e || !num(e.screen)) m.push('screen time'); if (!e || e.family == null) m.push('family/friends');
@@ -22,13 +22,13 @@
     return { morning: !ms.includes('sleep') && !ms.some(m => m.startsWith('wellness') || m.startsWith('hydration')), nutrition: !ms.includes('nutrition'),
       training: !ms.includes('training') && !ms.includes('session effort + minutes'), evening: !ms.includes('screen time') && !ms.includes('family/friends') }; }
   // Log menu: which section each checklist item belongs to, and one tile per section (done <=> sections(e)[key]).
-  const SECTION_META = [['morning','🌅','Morning check-in','Sleep, hydration, weight & how you feel'],['nutrition','🍽️','Nutrition','Did you follow your plan?'],['training','🥊','Training','Sessions, effort & minutes'],['evening','🌙','Evening','Screen time, family & notes']];
+  const SECTION_META = [['morning','🌅','Morning check-in','Sleep, hydration, weight & how you feel'],['nutrition','🍽️','Nutrition','Your plan or goal for the day'],['training','🥊','Training','Sessions, effort & minutes'],['evening','🌙','Evening','Screen time, family & notes']];
   const sectionOf = k => /^(sleep|well-|hydration)/.test(k) ? 'morning' : k === 'nutrition' ? 'nutrition' : /^(training|sess)/.test(k) ? 'training' : 'evening';
   function sectionInfo(e) { const items = checklist(e), st = sections(e);
     return SECTION_META.map(([key, icon, title, sub]) => ({ key, icon, title, sub, done: !!st[key], items: items.filter(i => sectionOf(i.key) === key) })); }
   // Same rules as missing(), but one entry per field the fighter must fill, with a key the Log screen maps to an input (tap to jump).
   function checklist(e) { const c = [], v2 = !!e && e.v >= 2, ss = e && Array.isArray(e.sessions) ? e.sessions : [];
-    if (!e || e.nutrition == null) c.push({ key:'nutrition', label:'Nutrition plan: tap Yes or No' });
+    if (!S.nutritionDone(e)) { const m = S.nutMode(e); c.push({ key:'nutrition', label: m === 'kcal' ? 'Nutrition: enter calories eaten today' : m === 'macros' ? 'Nutrition: enter protein, carbs and fat (g)' : 'Nutrition plan: tap Yes or No' }); }
     if (!e || (v2 ? !Array.isArray(e.sessions) : e.training == null)) c.push({ key:'training', label:'Training: tap Yes or No' });
     else if (v2) ss.forEach((x, i) => { if (x.done == null) c.push({ key:'sess-' + i, label:`Session ${i+1}: tap Yes or No` });
       else if (x.done === true && !(num(x.rpe) && num(x.mins) && +x.mins > 0)) c.push({ key:'sessfx-' + i, label:`Session ${i+1}: add effort (RPE) and minutes` }); });
@@ -155,7 +155,7 @@
     worst.forEach(([k,v]) => out.missed.push(`${NAMES[k]} only ${v}/100`));
     const w = wellness(entries, today); if (w.flags.length) out.missed.push(`🚩 Low ratings: ${w.flags.slice(0,3).map(f=>f.item+' '+f.value).join(', ')}`);
     const v = weightVerdict(entries, profile, today); if (v.word === 'On track') out.well.push('Weight on track'); else if (v.word === 'Too fast' || v.word === 'Too slow') out.missed.push(`Weight ${v.word.toLowerCase()}`);
-    const tips = { nutrition:'Hit your nutrition plan every day: prep meals ahead', training:'Make every scheduled session, or tell your coach early', sleep:`Aim for ${params.idealSleep||8}h of sleep: same bedtime nightly`, wellness:'Recovery: sleep, food and easier sessions; tell your coach how you feel', screen:'Cut recreational screens to 2h or less, especially before bed', family:'Plan real time with family or friends' };
+    const tips = { nutrition:'Hit your nutrition plan or goal every day: prep meals ahead', training:'Make every scheduled session, or tell your coach early', sleep:`Aim for ${params.idealSleep||8}h of sleep: same bedtime nightly`, wellness:'Recovery: sleep, food and easier sessions; tell your coach how you feel', screen:'Cut recreational screens to 2h or less, especially before bed', family:'Plan real time with family or friends' };
     worst.forEach(([k]) => out.focus.push(tips[k]));
     if (v.word === 'Too fast') out.focus.push('Slow the cut to about 1%/week: eat enough carbs and protein');
     if (v.word === 'Too slow') out.focus.push('Tighten nutrition to get to about 0.5–1%/week loss');
@@ -189,12 +189,12 @@
     if (fw && h.latest && h.latest.v >= 4) out.push('Fight week: do not water-cut or restrict fluids to make weight. Minors (under 18) should never dehydrate. Follow your coach and dietitian.');
     return out; }
   const csvCell = v => { const s = v == null ? '' : v === true ? 'Y' : v === false ? 'N' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; };
-  const CSV_COLS = ['Date','Nutrition','Training','Sleep_Hours','Screen_Hours','Family_Friends','Weight','Notes','Energy','Soreness','Mood','Stress','Wellness_Score','Sessions_Scheduled','Sessions_Done','Training_Pct','S1_Label','S1_Done','S1_RPE','S1_Min','S2_Label','S2_Done','S2_RPE','S2_Min','Extra_Label','Extra_RPE','Extra_Min','Session_Load','Complete','Hydration_Colour','Hydration_Status'];
+  const CSV_COLS = ['Date','Nutrition','Training','Sleep_Hours','Screen_Hours','Family_Friends','Weight','Notes','Energy','Soreness','Mood','Stress','Wellness_Score','Sessions_Scheduled','Sessions_Done','Training_Pct','S1_Label','S1_Done','S1_RPE','S1_Min','S2_Label','S2_Done','S2_RPE','S2_Min','Extra_Label','Extra_RPE','Extra_Min','Session_Load','Complete','Hydration_Colour','Hydration_Status','Nutrition_Mode','Calories','Protein_g','Carbs_g','Fat_g','Nutrition_Score'];
   function toCSV(entries) {
     const sess = e => Array.isArray(e.sessions) ? e.sessions : (e.training != null || num(e.rpe) ? [{ label:'', done:e.training, rpe:e.rpe, mins:e.mins }] : []);
     const rows = entries.slice().sort((a,b)=>a.date<b.date?-1:1).map(e => { const ss = sess(e), x = e.extra || {}, sc = i => ss[i] ? [ss[i].label, ss[i].done, ss[i].rpe, ss[i].mins] : ['','','',''];
       const ws = S.wellnessScore(e);
-      return [e.date,e.nutrition,S.trainingPct(e)===100,e.sleep,e.screen,e.family,e.weight,e.notes,e.energy,e.soreness,e.mood,e.stress,ws==null?'':ws,Array.isArray(e.sessions)?ss.length:'',ss.filter(s=>s.done===true).length,Math.round(S.trainingPct(e)),...sc(0),...sc(1),x.label,x.rpe,x.mins,sessionLoad(e),isComplete(e)?'Y':'N',S.hydrationOK(e)?+e.hydration:'',S.hydrationOK(e)?hydrationStatus(e.hydration).label:''].map(csvCell).join(','); });
+      return [e.date,e.nutrition,S.trainingPct(e)===100,e.sleep,e.screen,e.family,e.weight,e.notes,e.energy,e.soreness,e.mood,e.stress,ws==null?'':ws,Array.isArray(e.sessions)?ss.length:'',ss.filter(s=>s.done===true).length,Math.round(S.trainingPct(e)),...sc(0),...sc(1),x.label,x.rpe,x.mins,sessionLoad(e),isComplete(e)?'Y':'N',S.hydrationOK(e)?+e.hydration:'',S.hydrationOK(e)?hydrationStatus(e.hydration).label:'',S.nutMode(e),e.kcal??'',e.protein??'',e.carbs??'',e.fat??'',S.nutritionScore(e)==null?'':Math.round(S.nutritionScore(e))].map(csvCell).join(','); });
     return [CSV_COLS.join(',')].concat(rows).join('\r\n') + '\r\n';
   }
   const api = { HYD_COLORS, hydrationStatus, hydrationWeek, hydrationFlags, sectionInfo, sectionOf, SECTION_META, checklist, dayStatus, sections, cutPlan, weightVerdict, fightWeek, weekReview, reviewText, WELL, missing, isComplete, isPartial, streak, grid, dayWellness, sessionLoad, wellness, load, cutSafety, toCSV, CSV_COLS };
