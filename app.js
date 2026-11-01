@@ -1,4 +1,4 @@
-const APP_VERSION='fr-v40';
+const APP_VERSION='fr-v41';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -262,7 +262,7 @@ const V = {
   const isWeighDay = [1,4].includes(new Date().getDay()) && !S.entries.some(e=>e.date===today() && +e.weight>0);
   const dueNow = Reminders.due(S.entries.find(e=>e.date===today()), new Date(), S.reminders.morning, S.reminders.evening);
   const top = scoreHero(r);
-  return `${top}${day1Banner(false)}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning log not done: sleep hours, nutrition plan, first pee colour, how you feel (energy, soreness, mood, stress)'+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: each training session (effort + minutes), screen hours, family/friends, notes'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${weeklyCard()}${fightCard()}${fightWeekCard()}${cheatCard()}${streakCard()}${nutCard()}
+  return `${top}${day1Banner(false)}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning check-in not done: '+esc(Insights.morningMissing(S.entries.find(e=>e.date===today())).map(x=>x.replace(/^[^:]*: /,'')).join('; ')||'sleep, hydration, how you feel')+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: nutrition, each training session (effort + minutes), screen hours, family/friends'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${weeklyCard()}${fightCard()}${fightWeekCard()}${cheatCard()}${streakCard()}${nutCard()}
   ${isWeighDay?'<div class="card hint">⚖️ It\'s a weigh-in day (Mon/Thu). Weigh in this morning, fasted, and log it.</div>':''}
   ${r.locked?`${todayCard()}<div class="card"><h3>Categories so far (${r.daysLogged} day${r.daysLogged==1?'':'s'})</h3>${catTable(r)}<p class="muted">Consistency bonus: 🔒 unlocks in ${r.unlockIn} day${r.unlockIn==1?'':'s'}.</p></div>`:`${todayCard()}
   <div class="card"><h3>Categories (last 3 weeks)</h3>${catTable(r)}
@@ -736,8 +736,8 @@ let lastNotified = {};
 function reminderTick() {
   const d = Reminders.due(S.entries.find(e=>e.date===today()), new Date(), S.reminders.morning, S.reminders.evening);
   if (cur === 'dash' && d.length !== document.querySelectorAll('#view .hint a[data-goto]').length) show('dash');
-  if (S.notify && 'Notification' in window && Notification.permission === 'granted') d.forEach(k => { const key = today()+k; if (!lastNotified[key]) { lastNotified[key] = 1;
-    try { new Notification('FightReady', { body: k==='morning' ? 'Morning log: sleep + nutrition' : 'Evening log: training, screen, family, notes', icon:'icons/icon-192.png' }); } catch (e) {} } });
+  if (S.notify && 'Notification' in window && Notification.permission === 'granted') d.forEach(k => { const key = today()+k; let ln = {}; try { ln = JSON.parse(localStorage.getItem('fr_notified')||'{}'); } catch (e) {} if (!lastNotified[key] && !ln[key]) { lastNotified[key] = 1; ln = { [key]: 1, ...Object.fromEntries(Object.entries(ln).filter(([x]) => x.slice(0,10) === today())) }; try { localStorage.setItem('fr_notified', JSON.stringify(ln)); } catch (e) {}
+    try { new Notification('FightReady', { body: k==='morning' ? 'Morning check-in: sleep, hydration and how you feel' : 'Evening log: training, screen, family, notes', icon:'icons/icon-192.png' }); } catch (e) {} } });
 }
 setInterval(reminderTick, 60000); document.addEventListener('visibilitychange', () => { if (document.hidden) { if (_stTimer) sendStatusNow(); } else reminderTick(); });
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {

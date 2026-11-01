@@ -78,8 +78,8 @@ assert.deepEqual(I.checklist(full(0,{training:null})).map(x=>x.key), ['training'
 for (const e of [undefined, full(0), full(0,{sleep:''}), v2({}), v2({mood:''}), v2({nutrition:null,family:null}), v2({sessions:[]}), v2({sessions:[{done:true,rpe:5,mins:0}]}), {date:d(0),v:2,sessions:[],nutrition:null}])
   assert.equal(I.checklist(e).length === 0, I.isComplete(e), JSON.stringify(e));
 // dayStatus = the only per-day info sent to the push server (flag + count, no log data)
-assert.deepEqual(I.dayStatus(v2({})), {complete:true, missing:0}); assert.deepEqual(I.dayStatus(undefined), {complete:false, missing:6});
-assert.deepEqual(Object.keys(I.dayStatus(v2({notes:'secret', weight:180}))).sort(), ['complete','missing']);
+assert.deepEqual(I.dayStatus(v2({})), {complete:true, missing:0, morning:true}); assert.deepEqual(I.dayStatus(undefined), {complete:false, missing:6, morning:false});
+assert.deepEqual(Object.keys(I.dayStatus(v2({notes:'secret', weight:180}))).sort(), ['complete','missing','morning']);
 console.log('All insights tests passed');
 // log menu: sectionInfo agrees with sections()/checklist() and maps every item to a tile
 { const W = {energy:4,soreness:2,mood:4,stress:2}, base = { date:d(0), v:2, nutrition:null, training:null, family:null, sleep:'', screen:'', sessions:[{label:'A',done:null,rpe:'',mins:''},{label:'B',done:null,rpe:'',mins:''}] };

@@ -45,7 +45,11 @@
     if (!e || e.family == null) c.push({ key:'family', label:'Family/friends: tap Yes or No' });
     return c; }
   // The only thing the push server ever learns about a day: is it complete, and how many items are still open.
-  const dayStatus = e => ({ complete: isComplete(e), missing: missing(e).length });
+  // ONE completeness rule for reminders: morning = the Morning check-in tile; evening = Nutrition + Training + Evening tiles.
+  const morningDone = e => !!e && sections(e).morning;
+  const eveningDone = e => { if (!e) return false; const s = sections(e); return s.nutrition && s.training && s.evening; };
+  const morningMissing = e => checklist(e).filter(i => sectionOf(i.key) === 'morning').map(i => i.label);
+  const dayStatus = e => ({ complete: isComplete(e), missing: missing(e).length, morning: morningDone(e) });
   // Legacy (pre-v2) days with the old 5 items stay complete.
   const isComplete = e => !!e && !missing(e).length;
   const isPartial = e => !!e && !isComplete(e) && (CORE.some(k => num(e[k]) || e[k] === true || e[k] === false) || num(e.weight));
@@ -208,6 +212,6 @@
       return [e.date,e.nutrition,S.trainingPct(e)===100,e.sleep,e.screen,e.family,e.weight,e.notes,e.energy,e.soreness,e.mood,e.stress,ws==null?'':ws,Array.isArray(e.sessions)?ss.length:'',ss.filter(s=>s.done===true).length,Math.round(S.trainingPct(e)),...sc(0),...sc(1),x.label,x.rpe,x.mins,sessionLoad(e),isComplete(e)?'Y':'N',S.hydrationOK(e)?+e.hydration:'',S.hydrationOK(e)?hydrationStatus(e.hydration).label:'',S.nutMode(e),e.kcal??'',e.protein??'',e.carbs??'',e.fat??'',S.nutritionScore(e)==null?'':Math.round(S.nutritionScore(e)),S.WELL_SCALE,e.sleepq??'',e.sleepDevice??'',e.sleepDev??'',e.motivation??'',e.appetite??'',e.injury??'',e.injuryArea??'',e.ill==null?'':e.ill,e.rhr??''].map(csvCell).join(','); });
     return [CSV_COLS.join(',')].concat(rows).join('\r\n') + '\r\n';
   }
-  const api = { WELL3, well3Missing, HYD_COLORS, hydrationStatus, hydrationWeek, hydrationFlags, sectionInfo, sectionOf, SECTION_META, checklist, dayStatus, sections, cutPlan, weightVerdict, fightWeek, weekReview, reviewText, WELL, missing, isComplete, isPartial, streak, grid, dayWellness, sessionLoad, wellness, load, cutSafety, toCSV, CSV_COLS };
+  const api = { morningDone, eveningDone, morningMissing, WELL3, well3Missing, HYD_COLORS, hydrationStatus, hydrationWeek, hydrationFlags, sectionInfo, sectionOf, SECTION_META, checklist, dayStatus, sections, cutPlan, weightVerdict, fightWeek, weekReview, reviewText, WELL, missing, isComplete, isPartial, streak, grid, dayWellness, sessionLoad, wellness, load, cutSafety, toCSV, CSV_COLS };
   if (typeof module !== 'undefined') module.exports = api; else root.Insights = api;
 })(this);

@@ -20,7 +20,7 @@ assert.equal(I.isComplete(v2(d(0), {hydration:''})), false); assert.equal(I.isCo
 assert.equal(I.isComplete(Object.assign({}, nw, {v:undefined, training:true})), true, 'legacy (non-v2) day never needs it');
 // morning reminder check follows the same rule
 assert.equal(R.morningDone(old), true); assert.equal(R.morningDone(nw), false); assert.equal(R.morningDone(ok), true);
-assert.equal(I.dayStatus(nw).complete, false); assert.deepEqual(Object.keys(I.dayStatus(ok)).sort(), ['complete','missing']);
+assert.equal(I.dayStatus(nw).complete, false); assert.deepEqual(Object.keys(I.dayStatus(ok)).sort(), ['complete','missing','morning']);
 // score weights untouched: hydration never changes the score
 const a = S.compute([v2(d(0),{hydration:1})], today, {}), b = S.compute([v2(d(0),{hydration:8})], today, {}), c = S.compute([v2(d(0),{})], today, {});
 assert.equal(a.base, b.base); assert.equal(a.base, c.base);
@@ -44,6 +44,6 @@ assert.ok(rows[2].endsWith(',N,6,Dehydrated') || rows[2].endsWith(',Y,6,Dehydrat
 // wiring
 const app = fs.readFileSync(__dirname+'/app.js','utf8'), rep = fs.readFileSync(__dirname+'/report.js','utf8'), sw = fs.readFileSync(__dirname+'/sw.js','utf8');
 assert.ok(app.includes('hydPicker(e)') && app.includes('hydrationCard()') && app.includes('hydration: { days:') && app.includes('hydrationFlags'));
-assert.ok(rep.includes('d.hydration')); assert.ok(sw.includes("'fr-v40'"));
+assert.ok(rep.includes('d.hydration')); assert.ok(sw.includes("'fr-v41'"));
 assert.ok(!/<button[^>]*class="[^"]*"[^>]*data-hyd[^>]*>[^<]+</.test(app.match(/function hydPicker[\s\S]*?\n function|function hydPicker[\s\S]{0,900}/)[0]), 'swatches carry no visible text');
 console.log('All hydration tests passed');

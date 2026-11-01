@@ -25,7 +25,7 @@ const Push = (() => {
     try { await call('/update', payload(sub, reminders, name)); } catch (e) { await call('/subscribe', payload(sub, reminders, name)); } return true; }
   // Per-day completion flag only: { date: 'YYYY-MM-DD', complete: bool, missing: number }. No log data.
   async function setDayStatus(st) { const sub = await current(); if (!sub) return false;
-    await call('/status', { endpoint: sub.endpoint, date: st.date, complete: !!st.complete, missing: st.missing | 0 }); return true; }
+    await call('/status', { endpoint: sub.endpoint, date: st.date, complete: !!st.complete, missing: st.missing | 0, morning: !!st.morning }); return true; }
   async function disable() { const sub = await current(); if (!sub) return; try { await call('/unsubscribe', { endpoint: sub.endpoint }); } catch (e) {} await sub.unsubscribe(); }
   return { CONFIG, status, setDayStatus, enable, update, disable, current, isIOS, standalone };
 })();
