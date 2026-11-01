@@ -44,6 +44,19 @@
       if (!s.n) { if (!REST.test(d.focus||'')) d.focus = 'Rest'; d.s1 = ''; d.s2 = ''; }
       else { d.s1 = s.labels[0] || 'Session 1'; d.s2 = s.n > 1 ? (s.labels[1] || 'Session 2') : ''; if (REST.test(d.focus||'')) d.focus = 'Training'; } }); return week; }
   const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-  const api = { DAYS, scheduleFromWeek, sessionsFor, applyToWeek, dow, DISCIPLINES, WEIGHT_CLASSES, validate, age, daysTo, weightStatus, countdown };
+  // Restore a JSON backup into a fresh/base state. Throws a friendly Error for anything that isn't a FightReady backup.
+  // Sc = Scoring (passed in so this stays pure). Push is per-phone, so it is switched off and must be turned on again.
+  function fromBackup(text, base, Sc) { let d;
+    try { d = JSON.parse(String(text).replace(/^\uFEFF/, '')); } catch (e) { throw new Error('This file isn\'t a FightReady backup (not valid JSON). Pick the FightReady-backup-….json file you exported from Setup.'); }
+    if (!d || typeof d !== 'object' || Array.isArray(d) || !Array.isArray(d.entries) || (d.app && d.app !== 'fight-readiness')) throw new Error('This file isn\'t a FightReady backup. Pick the FightReady-backup-….json file you exported from Setup.');
+    if (d.entries.some(e => !e || typeof e !== 'object' || !/^\d{4}-\d{2}-\d{2}$/.test(String(e.date || '')))) throw new Error('This backup looks damaged (a day has no valid date). Nothing was changed.');
+    d = Object.assign({}, d); ['app','version','exported','push','notify'].forEach(k => delete d[k]);
+    const S = Object.assign({}, base, d); S.wellScale = d.wellScale; Sc.migrateWellScale(S);
+    S.params = Object.assign({}, Sc.DEFAULT_PARAMS, d.params);
+    if (!S.profile && S.fighter) S.profile = { name: S.fighter, coach: S.coach || '', targetWeight: S.targetWeight || '', startWeight: '' };
+    if (!S.profile || !String(S.profile.name || '').trim()) throw new Error('This backup has no fighter profile. Nothing was changed.');
+    if (!S.fighter) S.fighter = S.profile.name;
+    S.push = false; S.notify = false; return S; }
+  const api = { fromBackup, DAYS, scheduleFromWeek, sessionsFor, applyToWeek, dow, DISCIPLINES, WEIGHT_CLASSES, validate, age, daysTo, weightStatus, countdown };
   if (typeof module !== 'undefined') module.exports = api; else root.Profile = api;
 })(this);
