@@ -24,7 +24,7 @@ const goal = (k) => ({ nutrition:null, nmode:'kcal', ntarget:{ kcal:2400 }, kcal
 const g = full.map(e => e.date >= '2026-10-26' && e.date <= '2026-10-27' ? Object.assign({}, e, goal(e.date === '2026-10-26' ? 2500 : 3000)) : e);
 r = ev(g, '2026-10-31'); assert.ok(r.conds[0].text.includes('on target 4/5'));
 // pace: low score fails unless up 3+ points on last week
-const low = full.map(e => Object.assign({}, e, { sleep:5, screen:4, family:false })); assert.ok(!ev(low, '2026-10-31').conds[1].ok);
+const low = full.map(e => Object.assign({}, e, { sleep:5, screen:4, family:false, nutrition:false })); // nutrition off too, so camp momentum (added later) can't lift it assert.ok(!ev(low, '2026-10-31').conds[1].ok);
 const rising = full.map(e => e.date < '2026-10-24' ? Object.assign({}, e, { sleep:4, screen:5, family:false, nutrition:false, energy:1 }) : Object.assign({}, e, { sleep:5, screen:4, family:false }));
 r = ev(rising, '2026-10-31'); assert.ok(r.conds[1].ok, r.conds[1].text);
 // blackout: first weekend of camp

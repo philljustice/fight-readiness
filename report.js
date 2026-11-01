@@ -17,13 +17,21 @@
     ctx.fillText(`${v[0].date.slice(5)} → ${v[v.length-1].date.slice(5)} • latest ${v[v.length-1].y}${o.unit||''}${o.ref!=null?' • target '+o.ref+(o.unit||''):''}`, x0, y + h + 32);
     return y + h + 60; }
   // d: { subject, name, meta, score, scoreLabel, verdict, cats:[[label,val,weight]], head:[[label,value]], weight:[{date,y}], target, sleep:[], idealSleep, daily:[], loadWeeks:[4], hydration:{days:[{date,v,color}],summary}, training, flags:[], review:{well,missed,focus} }
+  function laurels(ctx, cx, cy, R, filled) { const col = filled ? '#E8A828' : 'rgba(216,245,220,.9)';
+    for (const s of [1, -1]) { ctx.save(); ctx.translate(cx, 0); ctx.scale(s, 1); ctx.translate(-cx, 0); ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = filled ? 3 : 2; ctx.lineCap = 'round';
+      const pt = i => { const a = (128 + i * 13.5) * Math.PI / 180; return [cx + R * Math.cos(a), cy + R * Math.sin(a), a]; };
+      ctx.beginPath(); for (let i = 0; i <= 8; i++) { const [x, y] = pt(i); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+      for (let i = 0; i <= 8; i++) { const [x, y, a] = pt(i), k = 1.3 - i * 0.06, L = 24 * k, Wd = 8 * k;
+        for (const side of [-1, 1]) { ctx.save(); ctx.translate(x, y); ctx.rotate(a + Math.PI / 2 + side * 0.7);
+          ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(L / 2, -Wd, L, 0); ctx.quadraticCurveTo(L / 2, Wd, 0, 0); filled ? ctx.fill() : ctx.stroke(); ctx.restore(); } }
+      ctx.restore(); } }
   function draw(canvas, d, scale = 1) { const H = 3000; canvas.width = W * scale; canvas.height = H * scale; const ctx = canvas.getContext('2d'); ctx.scale(scale, scale);
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = '#111'; ctx.fillRect(0, 0, W, 150); ctx.fillStyle = '#fff'; ctx.font = 'bold 46px -apple-system,Helvetica,Arial'; ctx.fillText('🥊 FightReady weekly report', PAD, 70);
     ctx.font = '28px Helvetica,Arial'; ctx.fillStyle = '#ddd'; ctx.fillText(d.subject.split(' – ').filter((_, i) => i !== 1).join(' • '), PAD, 118);
     let y = 200; ctx.fillStyle = INK; ctx.font = '26px Helvetica,Arial'; if (d.meta) y = wrap(ctx, d.meta, PAD, y, W - 2*PAD, 34) + 10;
     // hero score card: tier gradient, ring, bold title, verdict badge
-    { const v = d.score, tier = v == null ? 'solid' : v >= 85 ? 'elite' : v >= 70 ? 'solid' : 'build', G = { elite:['#0b1f17','#11502f','#2e9d55','#7ee29a'], solid:['#0b1730','#12345e','#1e6fb8','#8fd0fb'], build:['#22140a','#5c3110','#d9771e','#ffb74d'] }[tier];
+    { const v = d.score, tier = v == null ? 'solid' : v >= 90 ? 'elite' : v >= 75 ? 'ready' : v >= 60 ? 'solid' : 'low', G = { elite:['#000000','#1a1408','#3a2a08','#E8A828'], ready:['#0b1f17','#11502f','#2e9d55','#7ee29a'], solid:['#0b1730','#12345e','#1e6fb8','#8fd0fb'], low:['#1a0204','#4a0509','#8a0d16','#ff6b6b'] }[tier];
       const x0 = PAD, w = W - 2*PAD, h = 300, g = ctx.createLinearGradient(x0, y, x0 + w, y + h); g.addColorStop(0, G[0]); g.addColorStop(0.55, G[1]); g.addColorStop(1, G[2]);
       ctx.save(); ctx.shadowColor = G[2]; ctx.shadowBlur = 24; ctx.fillStyle = g; ctx.beginPath(); (ctx.roundRect ? ctx.roundRect(x0, y, w, h, 24) : ctx.rect(x0, y, w, h)); ctx.fill(); ctx.restore();
       const cx = x0 + 160, cy = y + h/2, R = 110; ctx.lineWidth = 18; ctx.lineCap = 'round';
@@ -35,6 +43,8 @@
       const badge = String(d.verdict || '').split(' — ')[0].split('.')[0].toUpperCase().slice(0, 28); ctx.font = '900 26px Helvetica,Arial'; const bw = Math.min(tw, ctx.measureText(badge).width + 40);
       ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.beginPath(); (ctx.roundRect ? ctx.roundRect(tx, y + 128, bw, 46, 23) : ctx.rect(tx, y + 128, bw, 46)); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillText(badge, tx + 20, y + 160);
       ctx.font = '24px Helvetica,Arial'; ctx.fillStyle = 'rgba(255,255,255,.9)'; wrap(ctx, String(d.verdict || '').split(' — ').slice(1).join(' — ') || '', tx, y + 210, tw, 30);
+      if (d.breakdown) { ctx.font = 'bold 22px Helvetica,Arial'; ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillText(d.breakdown, tx, y + h - 24); }
+      if (v != null && (tier === 'elite' || tier === 'ready')) laurels(ctx, cx, cy, R + 26, tier === 'elite');
       y += h + 40; }
     // headline grid
     (d.head || []).forEach(([l, v], i) => { const cx = PAD + (i % 2) * ((W - 2*PAD) / 2), cy = y + Math.floor(i / 2) * 84;

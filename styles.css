@@ -70,3 +70,61 @@ ul.chk{margin:8px 0 0;padding-left:20px}ul.chk li{margin:6px 0}ul.chk a{color:#f
 .card.hero.elite{border-color:#2e9d55!important}.card.hero.build{border-color:#d9771e!important}
 .card.hero *{color:#111!important;text-shadow:none!important}.hero-ring .trk{stroke:#e3e3e3!important}.hero .hero-ring .val{stroke:#1e6fb8!important;transition:none}.hero.elite .hero-ring .val{stroke:#2e9d55!important}.hero.build .hero-ring .val{stroke:#d9771e!important}
 .hero-badge{background:#f2f2f2!important;border-color:#bbb!important}.hero-ring svg{max-height:none!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+/* ===== BRAND PREVIEW ===== */
+@font-face{font-family:'Exo2';src:url(fonts/exo2i.ttf);font-style:italic;font-weight:100 900}
+body{background:#0b0b0b;color:#fff}
+header{background:#000;border-bottom:2px solid #E8A828;display:flex;align-items:center;gap:10px;padding:8px 16px}
+header h1{font-family:'Exo2';font-style:italic;font-weight:900;letter-spacing:.06em;color:#E8A828;text-transform:uppercase;font-size:1.25rem}
+header::before{content:'';width:44px;height:44px;background:url(brand/mark-white-gold.png) center/contain no-repeat}
+.card{background:#161616;border-color:#2a2a2a}
+.card>h3:first-child,.card>.row:first-child h3{border-left-color:#E8A828}
+h2,h3{font-family:'Exo2';font-style:italic;font-weight:800;letter-spacing:.03em;text-transform:uppercase}
+.btn{background:#E8A828;color:#000;font-weight:800;font-family:'Exo2';font-style:italic;text-transform:uppercase;letter-spacing:.05em}.btn.alt{background:#262626;color:#E8A828;border:1px solid #E8A828}
+nav{background:#000;border-top:1px solid #E8A82855}
+nav button{background:#161616;border-color:#2a2a2a;color:#888}
+nav button.on{background:#E8A828;border-color:#ffd36b;color:#000}
+.bar i{background:#E8A828}
+.hint{background:#2a0a0c;border-left-color:#B0101A}
+.yn button.y.on{background:#E8A828;border-color:#E8A828;color:#000}.yn button.n.on{background:#B0101A;border-color:#B0101A}
+.tile{background:#161616!important;border-color:#E8A82866!important;color:#fff!important}
+.tile b,.tile strong{font-family:'Exo2';font-style:italic}
+
+.hero::before{content:'';display:block;width:96px;height:72px;margin:0 auto 6px;background:url(brand/mark-white-gold.png) center/contain no-repeat;filter:drop-shadow(0 0 1px #000) drop-shadow(0 3px 8px rgba(0,0,0,.65))}
+.hero-title,.hero-num,.hero-badge{font-family:'Exo2';font-style:italic}
+
+.hero.ready{background:linear-gradient(150deg,#0b1f17 0%,#11502f 55%,#2e9d55 100%);box-shadow:0 8px 28px rgba(46,157,85,.38),inset 0 1px 0 rgba(255,255,255,.12)}
+.hero.ready .hero-ring .val{stroke:#7ee29a}
+.hero.elite{background:radial-gradient(circle at 50% 0%,#3d2c08 0%,#141008 50%,#000 100%);border:1.5px solid #E8A828;box-shadow:0 8px 32px rgba(232,168,40,.4),inset 0 1px 0 rgba(255,220,140,.3)}
+.hero.elite .hero-ring .val{stroke:url(#goldGrad);stroke:#F2C14E}
+.hero.elite .hero-ring .trk{stroke:rgba(232,168,40,.18)}
+.hero.elite .hero-title{color:#F2C14E}
+.hero.elite .hero-num{background:linear-gradient(180deg,#fff3c4,#E8A828 60%,#a86f0c);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero.elite .hero-badge{background:linear-gradient(180deg,#F7D46A,#C88A12);color:#000;border-color:#ffe08a}
+.hero.low{background:linear-gradient(150deg,#1a0204 0%,#4a0509 55%,#8a0d16 100%);box-shadow:0 8px 28px rgba(176,16,26,.4),inset 0 1px 0 rgba(255,255,255,.12)}
+.hero.low .hero-ring .val{stroke:#ff6b6b}
+@media print{.hero.ready{border-color:#2e9d55!important}.hero.ready .hero-ring .val{stroke:#2e9d55!important}.hero.elite{border-color:#C88A12!important}.hero.elite .hero-ring .val{stroke:#C88A12!important}.hero.elite .hero-num{background:none!important;color:#111!important}.hero.low{border-color:#B0101A!important}.hero.low .hero-ring .val{stroke:#B0101A!important}}
+.card.hero.elite{background:radial-gradient(circle at 50% 0%,#4a3509 0%,#17110a 50%,#000 100%);border:1.5px solid #E8A828;box-shadow:0 8px 32px rgba(232,168,40,.4),inset 0 1px 0 rgba(255,220,140,.3)}
+.card.hero.ready{background:linear-gradient(150deg,#0b1f17 0%,#11502f 55%,#2e9d55 100%)}
+.card.hero.low{background:linear-gradient(150deg,#1a0204 0%,#4a0509 55%,#8a0d16 100%)}
+.hero.elite .hero-num{background:linear-gradient(180deg,#fff6d0,#F2C14E 55%,#c8870f);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none}
+@media print{.card.hero.elite,.card.hero.ready,.card.hero.low{background:#fff!important}}
+nav button.on{background:#444!important;border-color:#5a5a5a!important;color:#fff!important;box-shadow:inset 0 -3px 0 #E8A828!important}
+
+.hero-ring .laurel{position:absolute;left:-58px;top:-16px;width:316px;height:228px;transform:none;pointer-events:none;overflow:visible}
+.hero-ring svg:not(.laurel){position:relative}
+.laurel .lw{fill:url(#lg);stroke:url(#lg)}.laurel .lw path:not(.lstem){stroke:none}
+.laurel{filter:drop-shadow(0 2px 4px rgba(0,0,0,.6))}
+@media print{.hero-ring .laurel .lw{fill:#9C6A0E!important;stroke:#9C6A0E!important}.laurel{filter:none}}
+@media print{.card.hero.elite{border-color:#C88A12!important}.card.hero.ready{border-color:#2e9d55!important}.card.hero.low{border-color:#B0101A!important}.card.hero.elite .hero-badge{background:#F7E3A8!important;border-color:#C88A12!important}}
+.hero.ready .laurel{filter:none}
+.hero.ready .laurel .lw{fill:none!important;stroke:#d8f5dc!important;stroke-width:1.3;opacity:.85}
+.hero.ready .laurel .lw path.lstem{stroke-width:1.6}
+.hero.ready .laurel .lw path:not(.lstem){stroke:#d8f5dc!important}
+@media print{.hero.ready .laurel .lw,.hero.ready .laurel .lw path:not(.lstem){fill:none!important;stroke:#2e9d55!important}}
+
+.mom-row{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin:10px 0 0}
+.mom-chip{padding:4px 10px;border-radius:999px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.25);font-weight:700;font-size:.85rem}
+.card.camp{border:1.5px solid #E8A828}.camp-count{font-size:1.3rem;margin:12px 0 0;color:#E8A828;font-family:'Exo2';font-style:italic}
+@media print{.mom-chip{background:#f2f2f2!important;border-color:#bbb!important}}
+
+@media print{.hero::before{background-image:url(brand/mark-red-gold.png)!important;filter:none!important}}

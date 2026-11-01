@@ -66,7 +66,30 @@
     return { emoji:'🔵', key:'aggr', label:'AGGRESSIVE CUT — Strong progress! Prioritize sleep & watch for fatigue/overtraining' };
   }
   const bonusFor = (pct, p) => { for (const [th, pts] of p.bonusTiers) if (pct >= th) return pts; return 0; };
-  const verdict = s => s >= 85 ? 'ELITE — Fight night ready! Keep the edge.' : s >= 70 ? 'SOLID — Strong base, tighten 1-2 areas for next level.' : 'BUILDING — Focus daily on Nutrition + Training consistency first.';
+  // ---- Momentum (camp-long): up to +5 on top of base + 21-day consistency bonus ----
+  // Days: every closed-out day from camp start to yesterday. Consistent = nutrition hit + training 100% (cheat day = hit).
+  // Unlogged camp days count as NOT consistent. Weight rises linearly from 1 at camp start to 2 on fight day.
+  // Weighted part: 0 at <=50% weighted consistency, linear to 4 pts at >=95%. Streak part: +1 per 14 consecutive consistent days, max 1.
+  // No fight date: camp assumed 70 days (10 weeks). Needs >=7 closed camp days. Total rounded to nearest 0.5, max 5.
+  const MOM = { MAX:5, WMAX:4, SMAX:1, LO:50, HI:95, STREAK_FULL:14, MIN_DAYS:7, DEFAULT_CAMP:70 };
+  const isConsistent = e => !!e && nutritionHit(e) && trainingPct(e) === 100;
+  function momentum(entries, today, campStart, fightDate) {
+    const t = dayNum(ymd(today)), out = { points:0, weighted:0, streak:0, campDays:0, consistentDays:0, wPts:0, sPts:0, daysToFight:null, campLength:null };
+    if (!campStart) return out; const st = dayNum(campStart);
+    const fd = fightDate ? dayNum(fightDate) : st + MOM.DEFAULT_CAMP, L = Math.max(1, fd - st);
+    out.campLength = fd - st; out.daysToFight = fightDate ? fd - t : null;
+    const by = {}; entries.forEach(e => by[e.date] = e);
+    let sw = 0, sc = 0;
+    for (let d = st; d < t && d <= fd; d++) { const w = 1 + Math.min(1, (d - st) / L), key = new Date(d * 864e5).toISOString().slice(0,10), c = isConsistent(by[key]);
+      sw += w; if (c) { sc += w; out.consistentDays++; } out.campDays++; }
+    for (let d = t - 1; d >= st; d--) { const key = new Date(d * 864e5).toISOString().slice(0,10); if (isConsistent(by[key])) out.streak++; else break; }
+    if (out.campDays < MOM.MIN_DAYS) return out;
+    out.weighted = sw ? sc / sw * 100 : 0;
+    out.wPts = MOM.WMAX * Math.max(0, Math.min(1, (out.weighted - MOM.LO) / (MOM.HI - MOM.LO)));
+    out.sPts = MOM.SMAX * Math.min(1, out.streak / MOM.STREAK_FULL);
+    out.points = Math.min(MOM.MAX, Math.round((out.wPts + out.sPts) * 2) / 2);
+    return out; }
+  const verdict = s => s >= 90 ? 'ELITE — Fight night ready! Keep the edge.' : s >= 75 ? 'FIGHT READY — Strong base, tighten 1-2 areas for next level.' : s >= 60 ? 'SOLID — Decent base, lift your weakest 2 categories.' : 'OFF PACE — Focus daily on Nutrition + Training consistency first.';
   const dataQuality = n => n >= 18 ? 'Excellent — full 3-week picture. Trust the score.' : n >= 10 ? 'Good — reliable trend. Log more days for precision.' : 'Limited — add daily entries for accurate readiness score.';
   function compute(entries, today = new Date(), params = {}) {
     const p = Object.assign({}, DEFAULT_PARAMS, params);
@@ -90,13 +113,14 @@
     let base = 0; for (const k in cats) base += cats[k] * wt[k] / 100;
     const consistency = N ? w.filter(e => nutritionHit(e) && trainingPct(e) === 100).length / N * 100 : 0;
     const bonus = bonusFor(consistency, p);
-    const final = Math.min(100, base + bonus);
+    const mom = momentum(entries, today, p.startDate, p.fightDate);
+    const final = Math.min(100, base + bonus + mom.points);
     const delta = weightDelta(entries, t);
     const weighed = entries.filter(e => num(e.weight) && +e.weight > 0).sort((a,b)=>a.date<b.date?-1:1);
-    return { locked, unlockIn, daysSinceStart, score: Math.round(final), base, bonus, consistency, cats, weights: wt, daysLogged: N, windowDays: p.windowDays,
+    return { locked, unlockIn, daysSinceStart, score: Math.round(final), base, bonus, consistency, momentum: mom, cats, weights: wt, daysLogged: N, windowDays: p.windowDays,
       delta, trend: trendLabel(delta), verdict: verdict(final), dataQuality: dataQuality(N),
       latestWeight: weighed.length ? weighed[weighed.length-1] : null, windowEntries: w };
   }
-  const api = { NUT_FULL, NUT_ZERO, NUT_HIT, MACRO_W, closeness, nutMode, nutritionDone, nutritionScore, nutritionHit, HYD_FROM, hydrationOK, hydrationRequired, WELL_KEYS, wellnessScore, trainingPct, sessionsDone, sessionLoad, DEFAULT_PARAMS, sleepScore, screenScore, weightDelta, trendLabel, compute, ymd, dayNum, verdict, dataQuality };
+  const api = { NUT_FULL, NUT_ZERO, NUT_HIT, MACRO_W, closeness, nutMode, nutritionDone, nutritionScore, nutritionHit, HYD_FROM, hydrationOK, hydrationRequired, WELL_KEYS, wellnessScore, trainingPct, sessionsDone, sessionLoad, DEFAULT_PARAMS, sleepScore, screenScore, weightDelta, trendLabel, compute, momentum, isConsistent, MOM, ymd, dayNum, verdict, dataQuality };
   if (typeof module !== 'undefined') module.exports = api; else root.Scoring = api;
 })(this);

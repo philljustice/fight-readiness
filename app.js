@@ -1,4 +1,4 @@
-const APP_VERSION='fr-v33';
+const APP_VERSION='fr-v34';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -25,7 +25,7 @@ let S = migrate(load()); S.reminders = Object.assign({morning:'07:00', evening:'
 const save = () => localStorage.setItem(KEY, JSON.stringify(S));
 const $ = s => document.querySelector(s), esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const today = () => Scoring.ymd(new Date());
-const res = () => Scoring.compute(S.entries, new Date(), Object.assign({}, S.params, {startDate:S.startDate||null}));
+const res = () => Scoring.compute(S.entries, new Date(), Object.assign({}, S.params, {startDate:S.startDate||null, fightDate:(S.profile||{}).fightDate||null}));
 function reportHeader(r) { const p = S.profile || {}, cd = Profile.countdown(p.fightDate), lw = r.latestWeight, ws = Profile.weightStatus(lw && lw.weight, p.targetWeight);
   const cell = (l, v) => `<td><span class="muted">${l}</span><br><b>${esc(v||'—')}</b></td>`;
   return `<table class="hdr"><tr>${cell('Fighter', p.name + (p.nickname?' “'+p.nickname+'”':''))}${cell('Gym', p.gym)}${cell('Head coach', p.coach)}</tr>
@@ -82,7 +82,7 @@ function weeklySummary() { const r = res(), st = Insights.streak(S.entries), w =
   if (w.dropping) flags.push('Wellness below normal'); w.flags.forEach(f => flags.push(`Low ${f.item} ${f.value} on ${f.date.slice(5)}`));
   Insights.hydrationFlags(S.entries, new Date(), p).forEach(f => flags.push(f));
   const notes = S.entries.filter(e => e.notes && Scoring.dayNum(e.date) >= Scoring.dayNum(today())-6).map(e => `${e.date.slice(5)}: ${e.notes}`);
-  return `Fighter: ${p.name||S.fighter||'—'}${p.gym?' ('+p.gym+')':''}\nDate: ${today()}\nScore: ${r.locked?lockMsg(r):r.score+'/100 – '+r.verdict}\n` +
+  return `Fighter: ${p.name||S.fighter||'—'}${p.gym?' ('+p.gym+')':''}\nDate: ${today()}\nScore: ${r.locked?lockMsg(r):r.score+'/100 – '+r.verdict+'\n'+breakdown(r)}\n` +
    `Streak: ${st.current} days (best ${st.best}) • Days logged (3 wks): ${r.daysLogged}\n` +
    `Training (7 days): ${tr7()} • Wellness (7 days, 1–5): ${w.avg7==null?'—':w.avg7.toFixed(1)}\n` +
    `Weight: ${r.latestWeight?r.latestWeight.weight+' lbs':'—'} • Trend: ${r.locked?'locked':(r.delta==null?'—':r.delta+' lbs/wk '+r.trend.emoji)} • Verdict: ${vd.word}\n` +
@@ -105,7 +105,7 @@ function reportData() { const r = res(), p = S.profile||{}, P = weeklyParts(), w
   const lp = L.weeks[2] ? Math.round((L.weeks[3]-L.weeks[2])/L.weeks[2]*100) : null; if (lp != null && lp > 15) flags.push(`Training load up ${lp}% vs last week`);
   const rpes = wk.flatMap(e => Scoring.sessionsDone(e)).map(x => +x.rpe).filter(x => x > 0), sl = wk.map(e => +e.sleep).filter(x => x > 0), avg = a => a.length ? (a.reduce((s,x)=>s+x,0)/a.length).toFixed(1) : '—';
   return { subject: P.subj, name: P.name, meta: [p.gym && 'Gym: '+p.gym, p.coach && 'Coach: '+p.coach, p.weightClass].filter(Boolean).join(' • '),
-    score: r.daysLogged ? (r.locked ? Math.round(r.base) : r.score) : null, scoreLabel: r.locked ? `Early FightReady Score (${r.daysLogged} day${r.daysLogged==1?'':'s'})` : 'FightReady Score (3 weeks)',
+    score: r.daysLogged ? (r.locked ? Math.round(r.base) : r.score) : null, breakdown: breakdown(r), scoreLabel: r.locked ? `Early FightReady Score (${r.daysLogged} day${r.daysLogged==1?'':'s'})` : 'FightReady Score (3 weeks)',
     verdict: r.locked ? lockMsg(r).replace('🔒 ','') : r.verdict,
     head: [['Days logged this week', `${wk.length}/7`], ['Streak', `${Insights.streak(S.entries).current} days`], ['Weight vs target', ws ? `${ws.current} lbs • ${ws.text}` : (lw ? lw.weight+' lbs' : '—')], ['Fight', cd ? cd.text : '—'],
       ['Wellness (1–5)', w.avg7==null?'—':w.avg7.toFixed(1)], ['Avg sleep', sl.length ? avg(sl)+' h' : '—']],
@@ -192,19 +192,29 @@ function todayCard(title) { const e = S.entries.find(x=>x.date===(V._date||today
    ${CATS.map(([k,l,w]) => `<div class="row"><span style="width:110px">${l}</span><div class="bar"><i style="width:${d.cats[k]}%"></i></div><b style="width:44px;text-align:right">${(d.cats[k]*S.params[w]/100).toFixed(0)}/${S.params[w]}</b></div>`).join('')}
    <p style="margin:6px 0 0">${esc(f.text)}</p></div>`; }
 function badgeRow() { return `<div class="badges">${Early.badges(S.entries, S.params).map(b=>`<span class="badge ${b.got?'on':''}" title="${esc(b.label)}">${b.icon} ${esc(b.label)}</span>`).join('')}</div>`; }
-// Hero score card: tier colour (elite green / solid blue / building orange), progress ring, verdict badge, count-up.
-const tierOf = v => v == null ? 'none' : v >= 85 ? 'elite' : v >= 70 ? 'solid' : 'build';
+// Hero score card: tier colour (elite gold / fight ready green / solid blue / off pace red), progress ring, verdict badge, count-up.
+const tierOf = v => v == null ? 'none' : v >= 90 ? 'elite' : v >= 75 ? 'ready' : v >= 60 ? 'solid' : 'low';
+const LAUREL = `<svg class="laurel" viewBox="0 0 300 216" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE7A3"/><stop offset=".5" stop-color="#E8A828"/><stop offset="1" stop-color="#9C6A0E"/></linearGradient></defs><g class="lw"><path d="M81.0 196.3 L62.3 177.7 L48.5 155.3 L40.2 130.3 L38.1 104.1 L42.1 78.1 L52.0 53.7 L67.4 32.3 L87.4 15.1" fill="none" stroke-width="2.4" stroke-linecap="round" class="lstem"/><path d="M0 0 Q11.5 -8.0 23.0 0 Q11.5 8.0 0 0Z" transform="translate(81.0 196.3) rotate(178.0)"/><path d="M0 0 Q11.5 -8.0 23.0 0 Q11.5 8.0 0 0Z" transform="translate(81.0 196.3) rotate(258.0)"/><path d="M0 0 Q10.9 -7.6 21.8 0 Q10.9 7.6 0 0Z" transform="translate(62.3 177.7) rotate(191.5)"/><path d="M0 0 Q10.9 -7.6 21.8 0 Q10.9 7.6 0 0Z" transform="translate(62.3 177.7) rotate(271.5)"/><path d="M0 0 Q10.3 -7.2 20.6 0 Q10.3 7.2 0 0Z" transform="translate(48.5 155.3) rotate(205.0)"/><path d="M0 0 Q10.3 -7.2 20.6 0 Q10.3 7.2 0 0Z" transform="translate(48.5 155.3) rotate(285.0)"/><path d="M0 0 Q9.7 -6.8 19.4 0 Q9.7 6.8 0 0Z" transform="translate(40.2 130.3) rotate(218.5)"/><path d="M0 0 Q9.7 -6.8 19.4 0 Q9.7 6.8 0 0Z" transform="translate(40.2 130.3) rotate(298.5)"/><path d="M0 0 Q9.1 -6.4 18.2 0 Q9.1 6.4 0 0Z" transform="translate(38.1 104.1) rotate(232.0)"/><path d="M0 0 Q9.1 -6.4 18.2 0 Q9.1 6.4 0 0Z" transform="translate(38.1 104.1) rotate(312.0)"/><path d="M0 0 Q8.5 -5.9 17.0 0 Q8.5 5.9 0 0Z" transform="translate(42.1 78.1) rotate(245.5)"/><path d="M0 0 Q8.5 -5.9 17.0 0 Q8.5 5.9 0 0Z" transform="translate(42.1 78.1) rotate(325.5)"/><path d="M0 0 Q7.9 -5.5 15.8 0 Q7.9 5.5 0 0Z" transform="translate(52.0 53.7) rotate(259.0)"/><path d="M0 0 Q7.9 -5.5 15.8 0 Q7.9 5.5 0 0Z" transform="translate(52.0 53.7) rotate(339.0)"/><path d="M0 0 Q7.3 -5.1 14.6 0 Q7.3 5.1 0 0Z" transform="translate(67.4 32.3) rotate(272.5)"/><path d="M0 0 Q7.3 -5.1 14.6 0 Q7.3 5.1 0 0Z" transform="translate(67.4 32.3) rotate(352.5)"/><path d="M0 0 Q6.7 -4.7 13.4 0 Q6.7 4.7 0 0Z" transform="translate(87.4 15.1) rotate(286.0)"/><path d="M0 0 Q6.7 -4.7 13.4 0 Q6.7 4.7 0 0Z" transform="translate(87.4 15.1) rotate(366.0)"/><path d="M0 0 Q8 -5 16 0 Q8 5 0 0Z" transform="translate(87.4 15.1) rotate(331.5)"/></g><g class="lw" transform="translate(300 0) scale(-1 1)"><path d="M81.0 196.3 L62.3 177.7 L48.5 155.3 L40.2 130.3 L38.1 104.1 L42.1 78.1 L52.0 53.7 L67.4 32.3 L87.4 15.1" fill="none" stroke-width="2.4" stroke-linecap="round" class="lstem"/><path d="M0 0 Q11.5 -8.0 23.0 0 Q11.5 8.0 0 0Z" transform="translate(81.0 196.3) rotate(178.0)"/><path d="M0 0 Q11.5 -8.0 23.0 0 Q11.5 8.0 0 0Z" transform="translate(81.0 196.3) rotate(258.0)"/><path d="M0 0 Q10.9 -7.6 21.8 0 Q10.9 7.6 0 0Z" transform="translate(62.3 177.7) rotate(191.5)"/><path d="M0 0 Q10.9 -7.6 21.8 0 Q10.9 7.6 0 0Z" transform="translate(62.3 177.7) rotate(271.5)"/><path d="M0 0 Q10.3 -7.2 20.6 0 Q10.3 7.2 0 0Z" transform="translate(48.5 155.3) rotate(205.0)"/><path d="M0 0 Q10.3 -7.2 20.6 0 Q10.3 7.2 0 0Z" transform="translate(48.5 155.3) rotate(285.0)"/><path d="M0 0 Q9.7 -6.8 19.4 0 Q9.7 6.8 0 0Z" transform="translate(40.2 130.3) rotate(218.5)"/><path d="M0 0 Q9.7 -6.8 19.4 0 Q9.7 6.8 0 0Z" transform="translate(40.2 130.3) rotate(298.5)"/><path d="M0 0 Q9.1 -6.4 18.2 0 Q9.1 6.4 0 0Z" transform="translate(38.1 104.1) rotate(232.0)"/><path d="M0 0 Q9.1 -6.4 18.2 0 Q9.1 6.4 0 0Z" transform="translate(38.1 104.1) rotate(312.0)"/><path d="M0 0 Q8.5 -5.9 17.0 0 Q8.5 5.9 0 0Z" transform="translate(42.1 78.1) rotate(245.5)"/><path d="M0 0 Q8.5 -5.9 17.0 0 Q8.5 5.9 0 0Z" transform="translate(42.1 78.1) rotate(325.5)"/><path d="M0 0 Q7.9 -5.5 15.8 0 Q7.9 5.5 0 0Z" transform="translate(52.0 53.7) rotate(259.0)"/><path d="M0 0 Q7.9 -5.5 15.8 0 Q7.9 5.5 0 0Z" transform="translate(52.0 53.7) rotate(339.0)"/><path d="M0 0 Q7.3 -5.1 14.6 0 Q7.3 5.1 0 0Z" transform="translate(67.4 32.3) rotate(272.5)"/><path d="M0 0 Q7.3 -5.1 14.6 0 Q7.3 5.1 0 0Z" transform="translate(67.4 32.3) rotate(352.5)"/><path d="M0 0 Q6.7 -4.7 13.4 0 Q6.7 4.7 0 0Z" transform="translate(87.4 15.1) rotate(286.0)"/><path d="M0 0 Q6.7 -4.7 13.4 0 Q6.7 4.7 0 0Z" transform="translate(87.4 15.1) rotate(366.0)"/><path d="M0 0 Q8 -5 16 0 Q8 5 0 0Z" transform="translate(87.4 15.1) rotate(331.5)"/></g></svg>`;
 function heroCard(o) { const v = o.score, t = tierOf(v), C = 2 * Math.PI * 70, off = v == null ? C : C * (1 - Math.max(0, Math.min(100, v)) / 100);
   return `<div class="card hero ${t}" id="heroScore"><div class="hero-title">FIGHTREADY SCORE</div>
-   <div class="hero-ring"><svg viewBox="0 0 160 160" aria-hidden="true"><circle cx="80" cy="80" r="70" class="trk"/><circle cx="80" cy="80" r="70" class="val" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/></svg>
+   <div class="hero-ring">${t === 'elite' || t === 'ready' ? LAUREL : ''}<svg viewBox="0 0 160 160" aria-hidden="true"><circle cx="80" cy="80" r="70" class="trk"/><circle cx="80" cy="80" r="70" class="val" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/></svg>
     <div class="hero-num" data-count="${v ?? ''}">${v ?? '—'}</div><div class="hero-of">/ 100</div></div>
    <div class="hero-badge">${esc(o.badge)}</div>${o.verdict ? `<p class="hero-verdict">${esc(o.verdict)}</p>` : ''}${o.extra || ''}<p class="hero-foot">${o.foot}</p></div>`; }
 function countUp() { const n = document.querySelector('.hero-num[data-count]'); if (!n || n.dataset.count === '' || n.dataset.done) return; n.dataset.done = 1;
   const to = +n.dataset.count, t0 = performance.now(); if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const step = t => { const k = Math.min(1, (t - t0) / 700); n.textContent = Math.round(to * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); }
 // Main score hero (full or early), shared by the Score and Coach Report tabs
+const breakdown = r => r.locked || !r.daysLogged ? '' : `Base ${r.base.toFixed(1)} + consistency ${r.bonus} + momentum ${r.momentum.points}${r.momentum.streak ? ' • 🔥 ' + r.momentum.streak + '-day streak' : ''}`;
+function momLine(r) { const m = r.momentum || {}, cd = Profile.countdown((S.profile||{}).fightDate);
+  return `<div class="mom-row">${m.streak ? `<span class="mom-chip">🔥 ${m.streak}-day streak</span>` : ''}<span class="mom-chip">⚡ Momentum +${m.points}</span>${cd ? `<span class="mom-chip">🥊 ${cd.days} days to fight</span>` : ''}</div>`; }
+function momCard(r) { const m = r.momentum || {}; return `<div class="card"><h3>⚡ Camp momentum</h3>
+  <div class="row"><span>Momentum bonus</span><b>+${m.points} / 5</b></div>
+  <div class="row"><span>Weighted camp consistency</span><b>${m.weighted.toFixed(0)}% → +${m.wPts.toFixed(1)}</b></div>
+  <div class="row"><span>🔥 Current streak</span><b>${m.streak} days → +${m.sPts.toFixed(1)}</b></div>
+  <div class="row"><span>Consistent camp days</span><b>${m.consistentDays} of ${m.campDays}</b></div>
+  <p class="muted" style="margin:6px 0 0">Every day since camp start (${esc(S.startDate||'—')}) counts, unlogged days count as missed. Days closer to fight night count up to double.</p></div>`; }
 function scoreHero(r) { return r.locked ? earlyCard(r) : heroCard({ score: r.daysLogged ? r.score : null, badge: r.daysLogged ? r.verdict.split(' — ')[0] : 'NO DATA YET', verdict: r.daysLogged ? r.verdict.split(' — ').slice(1).join(' — ') : 'No entries in the last 3 weeks yet.',
-    foot: `Base ${r.base.toFixed(1)} + bonus ${r.bonus} • ${r.daysLogged} days logged • ${esc(r.dataQuality.split(' — ')[0])} data` }); }
+    extra: momLine(r), foot: `Base ${r.base.toFixed(1)} + consistency ${r.bonus} + momentum ${r.momentum.points} • ${r.daysLogged} days logged • ${esc(r.dataQuality.split(' — ')[0])} data` }); }
 function earlyCard(r) { const pr = Early.progress(r, S.params.unlockDays||7), v = r.daysLogged ? Math.round(r.base) : null;
   return heroCard({ score: v, badge: 'EARLY SCORE • ' + r.daysLogged + ' DAY' + (r.daysLogged == 1 ? '' : 'S'), verdict: '',
     extra: `<div class="bar hero-bar"><i style="width:${pr.pct}%"></i></div>`,
@@ -318,7 +328,7 @@ const V = {
  report() {
   const r = res(), notes = S.entries.filter(e=>e.notes && Scoring.dayNum(e.date) >= Scoring.dayNum(today())-14).sort((a,b)=>a.date<b.date?1:-1);
   return `<div class="card"><h2 style="margin:0">🥊 Coach Report: FightReady Summary</h2>
-  ${reportHeader(r)}<p class="muted">Report date: ${today()} • Data period: last 3 weeks (${r.daysLogged} days logged)</p></div>
+  ${reportHeader(r)}<p class="muted">Report date: ${today()} • Data period: last 3 weeks (${r.daysLogged} days logged)</p></div>${r.locked?'':momCard(r)}
   ${scoreHero(r)}${r.locked?`<div class="card"><p style="text-align:center"><b>${lockMsg(r)}</b></p>${todayRow()}</div>`:''}
   <div class="card"><h3>Weight & trend</h3>${verdictLine()}<p>Latest: ${r.latestWeight?r.latestWeight.weight+' lbs ('+r.latestWeight.date+')':'—'}${+S.targetWeight?' • Target: '+esc(S.targetWeight)+' lbs':''}<br>
    7-day trend: ${r.locked?lockMsg(r):(r.delta==null?'—':r.delta+' lbs/wk')+' '+r.trend.emoji+' '+esc(r.trend.label)}</p>${cutWarn()}${weightChart()}</div>
@@ -345,7 +355,7 @@ const V = {
   <div class="card"><h3>Team</h3>${fld('gym','Gym name','maxlength="60"')}${fld('coach','Head coach','maxlength="60"')}${Weekly.CONFIG.SHOW_COACH_CONTACT?fld('coachContact','Coach email or phone','type="text" inputmode="email" maxlength="80"'):''}</div>
   <div class="card"><h3>Weight & fight</h3>${sel('weightClass','Weight class',Profile.WEIGHT_CLASSES)}
    ${fld('startWeight','Starting weight (lbs)',num+(first?'':' disabled'))}${first?'<p class="muted">Saved as your first weigh-in.</p>':''}
-   ${fld('targetWeight','Target weight (lbs)',num)}${fld('fightDate','Fight date (optional)','type="date" min="'+today()+'"')}<div id="cutBox"></div></div>
+   ${fld('targetWeight','Target weight (lbs)',num)}<p class="muted">🥊 Fight date: <b>${esc((S.profile||{}).fightDate||'not set')}</b>. Set it with camp start in Setup → Fight camp.</p><div id="cutBox"></div></div>
   <div class="card" id="schedCard"><h3>🗓️ Training schedule</h3><p class="muted">Your usual week. The daily log asks about each session. Training score = % of scheduled sessions done (rest days count 100%).</p>
    <label>Do you train once or twice a day?</label><div class="sc" id="perDay"><button data-perday="1">Once</button><button data-perday="2">Twice</button></div>
    ${Profile.DAYS.map((dn,i)=>`<div class="sday"><label>${dn}</label><div class="sc">${['Rest','1 session','2 sessions'].map((l,n)=>`<button data-sd="${i}" data-n="${n}">${l}</button>`).join('')}</div>
@@ -357,7 +367,13 @@ const V = {
  setup() {
   const p = S.params, n = (k,l) => `<label>${l}</label><input data-p="${k}" type="number" step="any" value="${p[k]}">`;
   const pr = S.profile || {};
-  return `<div class="card"><h3>Fighter profile</h3><p><b>${esc(pr.name||'—')}</b>${pr.nickname?' “'+esc(pr.nickname)+'”':''}<br><span class="muted">${[pr.gym,pr.coach&&'Coach '+pr.coach,pr.weightClass,pr.discipline].filter(Boolean).map(esc).join(' • ')||'No details yet'}</span></p>
+  const cd = Profile.countdown(pr.fightDate);
+  return `<div class="card camp"><h3>🥊 Fight camp</h3><p class="muted">Set these at the start of camp. Momentum and the countdown are weighted by days to fight.</p>
+   <label for="c_start">Camp start date</label><input id="c_start" type="date" value="${esc(S.startDate||'')}">
+   <label for="c_fight">Fight date</label><input id="c_fight" type="date" value="${esc(pr.fightDate||'')}">
+   ${cd?`<p class="camp-count">🥊 <b>${cd.days}</b> days to fight</p>`:'<p class="muted">No fight date yet: momentum assumes a 10-week camp.</p>'}
+   <button class="btn" id="saveCamp">💾 Save camp dates</button></div>
+  <div class="card"><h3>Fighter profile</h3><p><b>${esc(pr.name||'—')}</b>${pr.nickname?' “'+esc(pr.nickname)+'”':''}<br><span class="muted">${[pr.gym,pr.coach&&'Coach '+pr.coach,pr.weightClass,pr.discipline].filter(Boolean).map(esc).join(' • ')||'No details yet'}</span></p>
    <p class="muted">Schedule: ${pr.schedule?Profile.DAYS.map((dn,i)=>dn.slice(0,3)+' '+(pr.schedule.days[i].n?pr.schedule.days[i].n+'×':'rest')).join(' • '):'—'}</p>
    <button class="btn" data-v="profile">✏️ Edit profile & training schedule</button></div>
   <div class="card"><h3>Scoring parameters</h3><p class="muted">Category weights must add up to 100 (default: Nutrition 25, Training 25, Sleep 15, Wellness 15, Screen 10, Family 10).${S.startDate?' App start date: '+S.startDate+'.':''}</p>
@@ -412,7 +428,7 @@ const V = {
   <p><b>Notes:</b> injuries, illness, soreness, bad sleep causes, low energy. These show up on the Coach Report.</p></div>
   <div class="card"><h3>Scoring</h3><p>Score 0–100 from the last 3 weeks of logs. Nutrition 25%, Training 25%, Sleep 15%, Wellness 15%, Screen 10%, Family 10% (editable in Setup, must add up to 100).</p>
   <p>• Nutrition / Family = % of logged days marked Yes.<br>• Training = average daily % of scheduled sessions completed (rest day = 100%; older days: Yes = 100).<br>• Wellness = average of Energy, Soreness, Mood, Stress mapped 1→0, 2→25, 3→50, 4→75, 5→100 (days with all 4 rated).<br>• Sleep: 100 at 8h, −25 per hour off (6h or 10h = 50).<br>• Screen: 100 if ≤2h, −40 per extra hour (3h = 60, 4h = 20).<br>
-  • Consistency bonus: +5 if ≥90% of days had Nutrition = Yes AND all scheduled sessions done, +3 if ≥75%, +1 if ≥60%. Capped at 100.<br>• 85+ Elite • 70+ Solid • below 70 Building.</p>
+  • Consistency bonus: +5 if ≥90% of days had Nutrition = Yes AND all scheduled sessions done, +3 if ≥75%, +1 if ≥60%. Capped at 100.<br>• <b>Momentum</b> (up to +5, on top): covers your whole camp from camp start. Each day is consistent if Nutrition was hit and all sessions were done; unlogged days count as missed. Days closer to fight night count more (up to double). 50% weighted consistency starts earning, 95% earns +4; a 🔥 streak of 14+ consistent days in a row adds +1. Total score still caps at 100.<br>• 90+ Elite (gold) • 75+ Fight Ready (green) • 60+ Solid (blue) • below 60 Off Pace (red).</p>
   <p><b>Weight trend</b> = average weight of the last 7 days minus the previous 7 days:<br>🔴 > +1.5 rapid gain • 🟠 +0.5 to +1.5 gaining • 🟡 −0.5 to +0.5 stable • 🟢 −0.5 to −1.5 good cut • 🔵 below −1.5 aggressive cut. A steady 0.75–1.5 lbs/week loss is ideal in the final 8–12 weeks.</p></div>
   <div class="card"><h3>Your data</h3><p>Everything stays on this phone only. Nothing is uploaded. Use Setup → Export backup regularly (e.g. weekly), and before you switch phones or clear browser data. Share the Coach Report as a PDF or text.</p></div>`;
  }
@@ -513,7 +529,7 @@ function statusNow() { return Object.assign({ date: today() }, Insights.dayStatu
 function sendStatusNow() { clearTimeout(_stTimer); if (!S.push) return; const st = statusNow(), key = JSON.stringify(st); if (key === _stSent) return; _stSent = key; Push.setDayStatus(st).catch(() => { _stSent = ''; }); }
 function scheduleStatus() { if (!S.push) return; clearTimeout(_stTimer); _stTimer = setTimeout(sendStatusNow, 3000); }
 function refreshCut() { const b = $('#cutBox'); if (!b) return; const lw = res().latestWeight, sw = $('#p_startWeight');
-  b.innerHTML = planBox(lw ? lw.weight : sw && sw.value, $('#p_targetWeight').value, $('#p_fightDate').value); }
+  b.innerHTML = planBox(lw ? lw.weight : sw && sw.value, $('#p_targetWeight').value, (S.profile||{}).fightDate||''); }
 function refreshSched() { const sc = V._sched; if (!sc || !$('#schedCard')) return;
   document.querySelectorAll('#perDay button').forEach(b => b.classList.toggle('on', +b.dataset.perday === sc.perDay));
   sc.days.forEach((d,i) => { document.querySelectorAll(`[data-sd="${i}"]`).forEach(b => b.classList.toggle('on', +b.dataset.n === d.n));
@@ -540,7 +556,7 @@ function parseCSV(text) {
 }
 function shareText() { const r = res();
   if (r.locked) return `🥊 FightReady: ${S.fighter||'Fighter'} (${today()})\n${lockMsg(r)}\nDays logged so far: ${r.daysLogged}`;
-  return `🥊 FightReady: ${S.fighter||'Fighter'} (${today()})${S.profile&&S.profile.gym?' • '+S.profile.gym:''}${S.profile&&Profile.countdown(S.profile.fightDate)?'\n'+Profile.countdown(S.profile.fightDate).text:''}\nScore: ${r.score}/100, ${r.verdict}\n` +
+  return `🥊 FightReady: ${S.fighter||'Fighter'} (${today()})${S.profile&&S.profile.gym?' • '+S.profile.gym:''}${S.profile&&Profile.countdown(S.profile.fightDate)?'\n'+Profile.countdown(S.profile.fightDate).text:''}\nScore: ${r.score}/100, ${r.verdict}${r.locked?'':'\n'+breakdown(r)}\n` +
    CATS.map(([k,l])=>`${l}: ${r.cats[k].toFixed(0)}`).join(' | ') + `\nConsistency: ${r.consistency.toFixed(0)}% (+${r.bonus})\n` +
    `Weight: ${r.latestWeight?r.latestWeight.weight+' lbs':'—'}, trend ${r.delta==null?'—':r.delta+' lbs/wk'} ${r.trend.emoji}\nWeight verdict: ${Insights.weightVerdict(S.entries, S.profile||{}).word}\nTraining (7 days): ${tr7()}\n${Insights.reviewText(Insights.weekReview(S.entries, new Date(), S.params, S.profile||{}))}\nDays logged: ${r.daysLogged} (last 3 weeks) • Streak: ${Insights.streak(S.entries).current} days`; }
 
@@ -603,6 +619,7 @@ document.addEventListener('click', async ev => {
       else if (navigator.clipboard) { await navigator.clipboard.writeText(txt); alert('Summary copied to clipboard.'); } else alert(txt); return; }
     case 'saveProfile': { const keys = ['name','nickname','dob','discipline','gym','coach','coachContact','weightClass','startWeight','targetWeight','fightDate','emName','emPhone','medical'];
       const first = !S.profile, d = {}; keys.forEach(k => { const el = $('#p_'+k); d[k] = el ? el.value.trim() : ''; });
+      d.fightDate = (S.profile && S.profile.fightDate) || '';
       if (!first) d.startWeight = S.profile.startWeight || '';
       if (!Weekly.CONFIG.SHOW_COACH_CONTACT) d.coachContact = (S.profile && S.profile.coachContact) || ''; // hidden in testing: keep existing value
       const errs = Profile.validate(d); if (Object.keys(errs).length) { V._perr = errs; V._pdraft = d; show('profile'); const f = document.querySelector('.err'); if (f) f.previousElementSibling.focus(); return; }
@@ -611,6 +628,8 @@ document.addEventListener('click', async ev => {
       if (first) { if (!S.startDate) S.startDate = today();
         if (+d.startWeight > 0 && !S.entries.some(e=>+e.weight>0)) upsert([{ date:today(), v:2, sessions:Profile.sessionsFor(d.schedule, today()), nutrition:null, training:null, family:null, sleep:'', screen:'', weight:+d.startWeight, notes:'' }]); }
       save(); V._date = null; return show(first ? 'log' : 'setup'); }
+    case 'saveCamp': { const s = $('#c_start').value, fd = $('#c_fight').value; if (!s) return alert('Enter a camp start date.'); if (fd && fd <= s) return alert('Fight date must be after camp start.');
+      S.startDate = s; S.profile = Object.assign({}, S.profile||{}, { fightDate: fd }); save(); alert('Saved ✔'); return show('setup'); }
     case 'saveSetup': { if (!S.startDate) S.startDate = today();
       const np = Object.assign({}, S.params); document.querySelectorAll('[data-p]').forEach(i => { if (i.value!=='') np[i.dataset.p] = +i.value; });
       const sum = CATS.reduce((s,c)=>s+(+np[c[2]]||0),0); if (Math.abs(sum-100) > 1e-9) return alert(`Category weights must add up to 100 (now ${sum}). Not saved.`);

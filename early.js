@@ -14,7 +14,7 @@
     const best = ks.slice().sort((a,b) => d.cats[b]*d.weights[b] - d.cats[a]*d.weights[a] || d.cats[b]-d.cats[a])[0];
     const fix = ks.slice().sort((a,b) => (100-d.cats[b])*d.weights[b] - (100-d.cats[a])*d.weights[a])[0];
     const lost = (100 - d.cats[fix]) * d.weights[fix] / 100, done = In.isComplete(e);
-    const lead = d.score >= 85 ? 'Strong day.' : d.score >= 70 ? 'Solid day.' : 'Good start, every log builds the picture.';
+    const lead = d.score >= 90 ? 'Elite day.' : d.score >= 75 ? 'Strong day.' : d.score >= 60 ? 'Solid day.' : 'Good start, every log builds the picture.';
     return { best, fix: lost >= 1 ? fix : null,
       text: `${lead} Best: ${NAMES[best]} (${Math.round(d.cats[best])}).` + (lost >= 1 ? ` One thing for tomorrow: ${TIPS[fix]} (+${lost.toFixed(0)} pts available).` : ' Nothing to fix, repeat it tomorrow.') + (done ? '' : ' Finish the rest of today\'s log to complete the day.') }; }
   // Score per logged day, oldest first
