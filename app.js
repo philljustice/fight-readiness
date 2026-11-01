@@ -1,4 +1,4 @@
-const APP_VERSION='fr-v31';
+const APP_VERSION='fr-v32';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -192,11 +192,20 @@ function todayCard(title) { const e = S.entries.find(x=>x.date===(V._date||today
    ${CATS.map(([k,l,w]) => `<div class="row"><span style="width:110px">${l}</span><div class="bar"><i style="width:${d.cats[k]}%"></i></div><b style="width:44px;text-align:right">${(d.cats[k]*S.params[w]/100).toFixed(0)}/${S.params[w]}</b></div>`).join('')}
    <p style="margin:6px 0 0">${esc(f.text)}</p></div>`; }
 function badgeRow() { return `<div class="badges">${Early.badges(S.entries, S.params).map(b=>`<span class="badge ${b.got?'on':''}" title="${esc(b.label)}">${b.icon} ${esc(b.label)}</span>`).join('')}</div>`; }
-function earlyCard(r) { const pr = Early.progress(r, S.params.unlockDays||7);
-  return `<div class="card"><div class="muted" style="text-align:center">FightReady Score</div><div class="big">${r.daysLogged?Math.round(r.base):'—'}</div>
-   <p style="text-align:center"><b>Early score – based on ${r.daysLogged} day${r.daysLogged==1?'':'s'}</b></p>
-   <div class="bar" style="margin:6px 0"><i style="width:${pr.pct}%"></i></div>
-   <p class="muted" style="text-align:center">Full score unlocks in ${pr.unlockIn} day${pr.unlockIn==1?'':'s'}. Same weights as the full score, it just firms up as you log more days.</p></div>`; }
+// Hero score card: tier colour (elite green / solid blue / building orange), progress ring, verdict badge, count-up.
+const tierOf = v => v == null ? 'none' : v >= 85 ? 'elite' : v >= 70 ? 'solid' : 'build';
+function heroCard(o) { const v = o.score, t = tierOf(v), C = 2 * Math.PI * 70, off = v == null ? C : C * (1 - Math.max(0, Math.min(100, v)) / 100);
+  return `<div class="card hero ${t}" id="heroScore"><div class="hero-title">FIGHTREADY SCORE</div>
+   <div class="hero-ring"><svg viewBox="0 0 160 160" aria-hidden="true"><circle cx="80" cy="80" r="70" class="trk"/><circle cx="80" cy="80" r="70" class="val" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/></svg>
+    <div class="hero-num" data-count="${v ?? ''}">${v ?? '—'}</div><div class="hero-of">/ 100</div></div>
+   <div class="hero-badge">${esc(o.badge)}</div>${o.verdict ? `<p class="hero-verdict">${esc(o.verdict)}</p>` : ''}${o.extra || ''}<p class="hero-foot">${o.foot}</p></div>`; }
+function countUp() { const n = document.querySelector('.hero-num[data-count]'); if (!n || n.dataset.count === '' || n.dataset.done) return; n.dataset.done = 1;
+  const to = +n.dataset.count, t0 = performance.now(); if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const step = t => { const k = Math.min(1, (t - t0) / 700); n.textContent = Math.round(to * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); }
+function earlyCard(r) { const pr = Early.progress(r, S.params.unlockDays||7), v = r.daysLogged ? Math.round(r.base) : null;
+  return heroCard({ score: v, badge: 'EARLY SCORE • ' + r.daysLogged + ' DAY' + (r.daysLogged == 1 ? '' : 'S'), verdict: '',
+    extra: `<div class="bar hero-bar"><i style="width:${pr.pct}%"></i></div>`,
+    foot: `Full score unlocks in ${pr.unlockIn} day${pr.unlockIn==1?'':'s'}. Same weights as the full score, it just firms up as you log more days.` }); }
 // ---- Hydration (first-pee colour): swatches only, no numbers. Stored as e.hydration 1-8; info only, never changes the score. ----
 const hydLevelCls = s => s ? s.level : '';
 function hydStatusHtml(v) { const s = Insights.hydrationStatus(v);
@@ -225,9 +234,8 @@ const V = {
   const r = res(), lw = r.latestWeight;
   const isWeighDay = [1,4].includes(new Date().getDay()) && !S.entries.some(e=>e.date===today() && +e.weight>0);
   const dueNow = Reminders.due(S.entries.find(e=>e.date===today()), new Date(), S.reminders.morning, S.reminders.evening);
-  const top = r.locked ? earlyCard(r) : `<div class="card"><div class="muted" style="text-align:center">FightReady Score</div><div class="big">${r.daysLogged?r.score:'—'}</div>
-  <p style="text-align:center">${r.daysLogged?esc(r.verdict):'No entries in the last 3 weeks yet.'}</p>
-  <p class="muted" style="text-align:center">Base ${r.base.toFixed(1)} + bonus ${r.bonus} • Data Quality: ${esc(r.dataQuality)} (${r.daysLogged} days logged)</p></div>`;
+  const top = r.locked ? earlyCard(r) : heroCard({ score: r.daysLogged ? r.score : null, badge: r.daysLogged ? r.verdict.split(' — ')[0] : 'NO DATA YET', verdict: r.daysLogged ? r.verdict.split(' — ').slice(1).join(' — ') : 'No entries in the last 3 weeks yet.',
+    foot: `Base ${r.base.toFixed(1)} + bonus ${r.bonus} • ${r.daysLogged} days logged • ${esc(r.dataQuality.split(' — ')[0])} data` });
   return `${top}${day1Banner(false)}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning log not done: sleep hours, nutrition plan, first pee colour, how you feel (energy, soreness, mood, stress)'+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: each training session (effort + minutes), screen hours, family/friends, notes'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${weeklyCard()}${fightCard()}${fightWeekCard()}${cheatCard()}${streakCard()}${nutCard()}
   ${isWeighDay?'<div class="card hint">⚖️ It\'s a weigh-in day (Mon/Thu). Weigh in this morning, fasted, and log it.</div>':''}
   ${r.locked?`${todayCard()}<div class="card"><h3>Categories so far (${r.daysLogged} day${r.daysLogged==1?'':'s'})</h3>${catTable(r)}<p class="muted">Consistency bonus: 🔒 unlocks in ${r.unlockIn} day${r.unlockIn==1?'':'s'}.</p></div>`:`${todayCard()}
@@ -511,7 +519,7 @@ function refreshSched() { const sc = V._sched; if (!sc || !$('#schedCard')) retu
 function show(v) { if (!S.profile && v !== 'help') v = 'profile';
   if (v === 'profile' && !V._sched) V._sched = JSON.parse(JSON.stringify((S.profile && S.profile.schedule) || Profile.scheduleFromWeek(S.weeks[S.weekIdx])));
   if (v !== 'profile') V._sched = null; if (v !== 'log') V._sec = null; cur = v; $('#view').innerHTML = V[v](); document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.v===(v==='profile'?'setup':v)));
-  $('#title').textContent = 'FightReady' + (S.fighter ? ' — ' + S.fighter : ''); if (v === 'profile') { refreshSched(); refreshCut(); } window.scrollTo(0,0); }
+  $('#title').textContent = 'FightReady' + (S.fighter ? ' — ' + S.fighter : ''); if (v === 'profile') { refreshSched(); refreshCut(); } window.scrollTo(0,0); if (v === 'dash') countUp(); }
 function upsert(list) { list.forEach(e => { const i = S.entries.findIndex(x=>x.date===e.date); if (i>=0) S.entries[i]=e; else S.entries.push(e); }); S.entries.sort((a,b)=>a.date<b.date?-1:1); save(); }
 function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text],{type})); a.download = name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 1000); }
 function parseCSV(text) {

@@ -22,11 +22,20 @@
     ctx.fillStyle = '#111'; ctx.fillRect(0, 0, W, 150); ctx.fillStyle = '#fff'; ctx.font = 'bold 46px -apple-system,Helvetica,Arial'; ctx.fillText('🥊 FightReady weekly report', PAD, 70);
     ctx.font = '28px Helvetica,Arial'; ctx.fillStyle = '#ddd'; ctx.fillText(d.subject.split(' – ').filter((_, i) => i !== 1).join(' • '), PAD, 118);
     let y = 200; ctx.fillStyle = INK; ctx.font = '26px Helvetica,Arial'; if (d.meta) y = wrap(ctx, d.meta, PAD, y, W - 2*PAD, 34) + 10;
-    // score card
-    ctx.fillStyle = '#fafafa'; ctx.strokeStyle = LINE; ctx.fillRect(PAD, y, W - 2*PAD, 210); ctx.strokeRect(PAD, y, W - 2*PAD, 210);
-    ctx.fillStyle = RED; ctx.font = 'bold 130px Helvetica,Arial'; ctx.fillText(d.score == null ? '—' : d.score, PAD + 30, y + 150);
-    ctx.fillStyle = INK; ctx.font = 'bold 32px Helvetica,Arial'; ctx.fillText(d.scoreLabel || 'FightReady Score', PAD + 300, y + 70);
-    ctx.font = '28px Helvetica,Arial'; ctx.fillStyle = MUTE; wrap(ctx, d.verdict || '', PAD + 300, y + 115, W - 2*PAD - 330, 34); y += 250;
+    // hero score card: tier gradient, ring, bold title, verdict badge
+    { const v = d.score, tier = v == null ? 'solid' : v >= 85 ? 'elite' : v >= 70 ? 'solid' : 'build', G = { elite:['#0b1f17','#11502f','#2e9d55','#7ee29a'], solid:['#0b1730','#12345e','#1e6fb8','#8fd0fb'], build:['#22140a','#5c3110','#d9771e','#ffb74d'] }[tier];
+      const x0 = PAD, w = W - 2*PAD, h = 300, g = ctx.createLinearGradient(x0, y, x0 + w, y + h); g.addColorStop(0, G[0]); g.addColorStop(0.55, G[1]); g.addColorStop(1, G[2]);
+      ctx.save(); ctx.shadowColor = G[2]; ctx.shadowBlur = 24; ctx.fillStyle = g; ctx.beginPath(); (ctx.roundRect ? ctx.roundRect(x0, y, w, h, 24) : ctx.rect(x0, y, w, h)); ctx.fill(); ctx.restore();
+      const cx = x0 + 160, cy = y + h/2, R = 110; ctx.lineWidth = 18; ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2); ctx.stroke();
+      if (v != null) { ctx.save(); ctx.shadowColor = G[3]; ctx.shadowBlur = 14; ctx.strokeStyle = G[3]; ctx.beginPath(); ctx.arc(cx, cy, R, -Math.PI/2, -Math.PI/2 + Math.PI*2*Math.max(0, Math.min(100, v))/100); ctx.stroke(); ctx.restore(); }
+      ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.font = '900 104px Helvetica,Arial'; ctx.fillText(v == null ? '—' : v, cx, cy + 36); ctx.textAlign = 'left';
+      const tx = x0 + 320, tw = w - 340; ctx.font = '900 40px Helvetica,Arial'; ctx.fillText('FIGHTREADY SCORE', tx, y + 70);
+      ctx.font = 'bold 24px Helvetica,Arial'; ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.fillText(String(d.scoreLabel || '').replace(/fightready score/i, '').replace(/[()]/g, '').replace(/\s+/g, ' ').trim().toUpperCase(), tx, y + 108);
+      const badge = String(d.verdict || '').split(' — ')[0].split('.')[0].toUpperCase().slice(0, 28); ctx.font = '900 26px Helvetica,Arial'; const bw = Math.min(tw, ctx.measureText(badge).width + 40);
+      ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.beginPath(); (ctx.roundRect ? ctx.roundRect(tx, y + 128, bw, 46, 23) : ctx.rect(tx, y + 128, bw, 46)); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillText(badge, tx + 20, y + 160);
+      ctx.font = '24px Helvetica,Arial'; ctx.fillStyle = 'rgba(255,255,255,.9)'; wrap(ctx, String(d.verdict || '').split(' — ').slice(1).join(' — ') || '', tx, y + 210, tw, 30);
+      y += h + 40; }
     // headline grid
     (d.head || []).forEach(([l, v], i) => { const cx = PAD + (i % 2) * ((W - 2*PAD) / 2), cy = y + Math.floor(i / 2) * 84;
       ctx.fillStyle = MUTE; ctx.font = '24px Helvetica,Arial'; ctx.fillText(l, cx, cy); ctx.fillStyle = INK; ctx.font = 'bold 32px Helvetica,Arial'; ctx.fillText(v, cx, cy + 40); });
