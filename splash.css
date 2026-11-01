@@ -36,17 +36,29 @@
 #splash .sp-crown{animation:settle .55s cubic-bezier(.3,1.5,.5,1) .95s both}
 @keyframes settle{0%{opacity:0;transform:translateY(-70px) rotate(18deg)}100%{opacity:1;transform:none}}
 #splash .sp-plate,#splash .sp-burst{position:absolute;left:50%;top:50%;border-radius:50%;pointer-events:none;opacity:0}
-#splash .sp-plate{width:318px;height:318px;margin:-159px;border:3px solid #E8A828;box-shadow:0 0 30px rgba(232,168,40,.5),inset 0 0 30px rgba(232,168,40,.25);animation:plate .5s cubic-bezier(.2,1.4,.4,1) 1.30s forwards}
-@keyframes plate{0%{opacity:1;transform:scale(.3)}100%{opacity:1;transform:none}}
-#splash .sp-burst{width:900px;height:900px;margin:-450px;background:repeating-conic-gradient(from 0deg,rgba(232,168,40,.17) 0 6deg,transparent 6deg 15deg);-webkit-mask:radial-gradient(circle,#000 0,#000 22%,transparent 58%);mask:radial-gradient(circle,#000 0,#000 22%,transparent 58%);animation:bOut .55s cubic-bezier(.1,.8,.3,1) 1.30s forwards,spin 1.6s linear 1.85s forwards}
-@keyframes bOut{0%{opacity:1;transform:scale(.15) rotate(-20deg)}100%{opacity:.85;transform:none}}
+#splash .sp-plate{width:318px;height:318px;margin:-159px;opacity:1;animation:pglow .6s ease-out 1.90s forwards}
+@keyframes pglow{0%{box-shadow:0 0 0 rgba(232,168,40,0),inset 0 0 0 rgba(232,168,40,0)}30%{box-shadow:0 0 50px rgba(255,214,120,.9),inset 0 0 40px rgba(255,214,120,.5)}100%{box-shadow:0 0 30px rgba(232,168,40,.5),inset 0 0 30px rgba(232,168,40,.25)}}
+/* ring draws exactly like the Score ring: SVG rotated -90deg (starts at 12 o'clock), clockwise, round cap, ease-out */
+#splash .sp-plate svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg);overflow:visible}
+#splash .sp-plate circle{fill:none;stroke:#E8A828;stroke-width:4;stroke-linecap:round;stroke-dasharray:987.72;stroke-dashoffset:987.72;animation:ringdraw .7s ease-out 1.20s forwards}
+@keyframes ringdraw{to{stroke-dashoffset:0}}
+#splash .sp-burst{width:900px;height:900px;margin:-450px;background:repeating-conic-gradient(from 0deg,rgba(232,168,40,.17) 0 6deg,transparent 6deg 15deg);-webkit-mask:radial-gradient(circle,#000 0,#000 22%,transparent 58%);mask:radial-gradient(circle,#000 0,#000 22%,transparent 58%);animation:bOut .5s cubic-bezier(.1,.8,.3,1) 1.92s forwards,spin 1.6s linear 2.42s forwards}
+@keyframes bOut{0%{opacity:1;transform:scale(.3) rotate(-20deg)}45%{opacity:1;transform:scale(1.12) rotate(2deg)}100%{opacity:.85;transform:none}}
 @keyframes spin{from{opacity:.85;transform:rotate(0)}to{opacity:.85;transform:rotate(10deg)}}
-#splash .sp-word{margin-top:80px;animation:wipe .45s ease-out 1.90s both}
+#splash .sp-word{margin-top:80px;animation:wipe .45s ease-out 2.25s both}
 @keyframes wipe{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
-@media (prefers-reduced-motion: reduce){#splash .sp-plate{opacity:1!important}#splash .sp-burst{opacity:.85!important}}
+@media (prefers-reduced-motion: reduce){#splash .sp-plate circle{stroke-dashoffset:0!important}#splash .sp-burst{opacity:.85!important}}
 
 header.sp-wait::before{visibility:hidden}
 #splash{pointer-events:auto}
 
 /* readiness gate: hold every intro animation at frame 0 (black) until splash.js adds .sp-go */
 #splash:not(.sp-go) *{animation-play-state:paused!important}
+
+/* third punch: ring hits full at 1.90s -> shake + gold flash + sparks, rays pop out from behind */
+#splash .sp-logo{animation:shake1 .22s linear .28s both,shake3 .34s linear 1.90s}
+@keyframes shake3{0%,100%{transform:none}20%{transform:translate(-9px,4px) scale(1.03)}45%{transform:translate(8px,-4px)}70%{transform:translate(-4px,2px)}}
+#splash .sp-fl3{background:radial-gradient(circle at 50% 47%,rgba(255,236,170,.9),rgba(232,168,40,.35) 42%,transparent 70%);animation:fl .5s ease-out 1.90s forwards}
+#splash .sp-s3 i{height:22px;animation:sp .6s cubic-bezier(.1,.7,.3,1) 1.90s forwards}
+#splash .sp-s3 i{--d2:1}
+#splash .sp-s3{left:50%;top:50%}

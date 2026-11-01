@@ -1,8 +1,8 @@
-// FightReady cold-open splash (fr-v44). Plays once per cold start (sessionStorage survives resume/tab switch,
+// FightReady cold-open splash (fr-v45). Plays once per cold start (sessionStorage survives resume/tab switch,
 // not a full app close). Tap to skip. Reduced motion: brief static logo. Ends by gliding the mark into the header logo
 // and counting the score up; on sign-up (no score yet) it simply fades.
 (function (root) {
-  const KEY = 'fr_splash', END = 2700, MAXWAIT = 4000;
+  const KEY = 'fr_splash', END = 2950, MAXWAIT = 4000;
   // pure: should the splash play for this load?
   function shouldPlay(o) { o = o || {};
     if (/[?&]nosplash\b/.test(o.search || '')) return false;
@@ -11,8 +11,8 @@
     if (o.played) return false;            // already shown this session (resume, tab switch, reload of a running app)
     return true; }
   const sparks = (n, d) => Array.from({ length: n }, (_, i) => `<i style="--a:${Math.round(i * 360 / n)}deg;--d:${d + (i * 37) % 60}px"></i>`).join('');
-  const HTML = `<div class="sp-flash sp-fl1 sp-hide-rm"></div><div class="sp-flash sp-fl2 sp-hide-rm"></div><div class="sp-logo">
-<div class="sp-mark"><div class="sp-burst"></div><div class="sp-plate"></div><div class="sp-sparks sp-s1 sp-hide-rm">${sparks(10, 80)}</div><div class="sp-sparks sp-s2 sp-hide-rm">${sparks(18, 130)}</div>
+  const HTML = `<div class="sp-flash sp-fl1 sp-hide-rm"></div><div class="sp-flash sp-fl2 sp-hide-rm"></div><div class="sp-flash sp-fl3 sp-hide-rm"></div><div class="sp-logo">
+<div class="sp-mark"><div class="sp-burst"></div><div class="sp-plate"><svg viewBox="0 0 318 318"><circle cx="159" cy="159" r="157.2"/></svg></div><div class="sp-sparks sp-s1 sp-hide-rm">${sparks(10, 80)}</div><div class="sp-sparks sp-s2 sp-hide-rm">${sparks(18, 130)}</div><div class="sp-sparks sp-s3 sp-hide-rm">${sparks(22, 185)}</div>
 <img class="sp-crown" src="brand/splash/crown.webp" alt="" decoding="sync"><img class="sp-fr sp-f" src="brand/splash/f.webp" alt="" decoding="sync"><img class="sp-fr sp-r" src="brand/splash/r.webp" alt="" decoding="sync"></div>
 <div class="sp-word">FIGHT<b>READY</b></div></div><div class="sp-skip sp-hide-rm">tap to skip</div>`;
   function run(doc, win) {
