@@ -135,3 +135,5 @@ nav button span{white-space:nowrap;overflow:hidden;text-overflow:clip;letter-spa
 .wkpick{gap:8px;flex-wrap:nowrap}.wkpick .btn{flex:0 0 52px;width:52px;padding:12px 0}.wkpick select{flex:1;min-width:0;width:auto;margin:0;font-size:1rem;text-align:center;text-align-last:center}
 .bpar{border:1.5px solid #B0101A}.bpar h3{border-left-color:#B0101A!important}.bp-item{margin:8px 0}.bp-item b{color:#ff8a80}.bp-item ul{margin:4px 0 0;padding-left:20px}.bp-item li{margin:3px 0}.bp-ok{color:#7ee29a;font-weight:700}
 @media print{.bpar{border-color:#B0101A!important}.bp-item b{color:#B0101A!important}.bp-ok{color:#2e7d32!important}}
+.opt{display:flex;gap:8px}.opt button{flex:1;padding:14px 6px;font-size:1rem;border-radius:10px;border:2px solid #444;background:#222;color:#eee}
+.opt button.on{background:#E8A828;border-color:#E8A828;color:#000;font-weight:700}

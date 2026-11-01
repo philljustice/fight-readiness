@@ -23,7 +23,7 @@
       `SUMMARY:${esc(summary)}`, `DESCRIPTION:${esc(desc + (url ? '\nOpen app: ' + url : ''))}`, ...(url ? [`URL:${url}`] : []),
       'TRANSP:TRANSPARENT', 'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${esc(summary)}`, 'TRIGGER:-PT0M', 'END:VALARM', 'END:VEVENT'];
     const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//FightReady//Reminders//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:FightReady',
-      ...ev('morning', morning, 'FREQ=DAILY', '🥊 Morning log: sleep + nutrition + how you feel', 'Log last night\'s sleep hours, whether you\'re following your nutrition plan today, and how you feel (energy, soreness, mood, stress 1-5; soreness and stress: 5 = most).'),
+      ...ev('morning', morning, 'FREQ=DAILY', '🥊 Morning log: sleep + nutrition + how you feel', 'Log last night\'s sleep hours, whether you\'re following your nutrition plan today, and how you feel (energy, soreness, mood, stress, sleep quality, motivation, appetite 1-5; injury/illness; resting HR if you use a watch).'),
       ...ev('weighin', morning, 'FREQ=WEEKLY;BYDAY=MO,TH', '⚖️ Weigh-in day (Mon/Thu)', 'Weigh in before eating: after the bathroom, same scale, minimal clothing. Log the weight in the app.', wStart),
       ...ev('evening', evening, 'FREQ=DAILY', '🥊 Evening log: training + screen + family', 'Log training (each session done Y/N, effort RPE + minutes), recreational screen hours, family/friends time, and any notes (injuries, illness, soreness).'),
       ...ev('weekly', '18:00', 'FREQ=WEEKLY;BYDAY=SU', 'Send weekly FightReady report to Phill', 'Open the FightReady app and tap "Send weekly report to Phill" (then pick Mail and tap Send).', sun),
@@ -32,7 +32,8 @@
   }
   const Sc = root.Scoring || (typeof require !== 'undefined' ? require('./scoring.js') : null);
   const num = v => v !== '' && v != null && !isNaN(v);
-  const wellOK = e => !(e.v >= 2) || ['energy','soreness','mood','stress'].every(k => num(e[k]) && +e[k] >= 1);
+  const I3f = () => root.Insights || (typeof require !== 'undefined' ? require('./insights.js') : null);
+  const wellOK = e => !(e.v >= 2) || (['energy','soreness','mood','stress'].every(k => num(e[k]) && +e[k] >= 1) && !(I3f() && I3f().well3Missing(e).length));
   const trainOK = e => e.v >= 2 ? Array.isArray(e.sessions) && e.sessions.every(x => x.done === false || (x.done === true && num(x.rpe) && num(x.mins))) : (e.training === true || e.training === false);
   // goal-mode nutrition (calories/macros eaten) belongs to the evening reminder.
   // morning = sleep + nutrition + wellness (energy/soreness/mood/stress); evening = sessions (+ effort/minutes) + screen + family

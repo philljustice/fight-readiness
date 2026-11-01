@@ -94,3 +94,29 @@ Config lives in `weekly.js` → `CONFIG`:
 - `SHOW_COACH_CONTACT: false` hides the coach email/phone field on sign-up and profile. Existing saved values are kept untouched. The value is never shown on the Coach Report or in the share text. Set it to `true` to bring the field back.
 
 The report week runs Monday–Sunday. On Sunday, and on every open after that until it's sent, the Score screen shows **Send weekly report to Phill**. Tapping it uses the Web Share API with the CSV of all logs attached, plus a text summary: name, score, streak, training sessions done/scheduled + load, wellness average, weight trend, flags (weight-cut warnings, low wellness, notes). The fighter picks Mail. If file sharing isn't supported, it opens a `mailto:` to the admin with subject `FightReady weekly – <fighter> – <Mon> to <Sun>` and the summary plus CSV rows in the body. The body is kept under about 1800 characters by cutting down to the last 14 days (or fewer). The week is marked sent in `weeklySent` (local only). There are manual **Send report to Phill** buttons in Setup and Report. Tested in `test-weekly.js`.
+
+## Extended morning wellness & smart watches (fr-v40)
+
+New morning items: Sleep quality (1–5, 5 = best), Motivation / readiness to train (1–5), Appetite (1–5), Injury / pain (`none` / `minor` / `limiting` + body area; higher = worse), Ill (yes/no), Resting HR (bpm, watch users only). Stored keys: `sleepq`, `motivation`, `appetite`, `injury`, `injuryArea`, `ill`, `rhr`, `sleepDev` (raw device sleep score), `sleepDevice` (device at entry time). Profile: `profile.device`. Entry is manual only; there is no device API integration.
+
+**Wellness weighting** (weighted average of the items present; anything not logged is left out, so older entries score exactly as before): Energy, Soreness (flipped), Mood, Stress (flipped), Sleep quality, Motivation, Injury (None 100 / Minor 50 / Limiting 0), Illness (No 100 / Yes 0), Resting HR: weight 1 each. Appetite: weight 0.5. The 4 core ratings are still required for a wellness score.
+
+**Required on the log** (days from 2026-11-02): motivation, appetite, and perceived sleep quality when no watch is used. Injury defaults to None and illness to No. Watch sleep score and resting HR are optional.
+
+**Resting HR:** baseline = median of readings in the previous 30 days once there are 7+. Score 100 up to +2 bpm over baseline, linear to 0 at +10. 🚩 at +5 or more. No baseline means no effect on the score.
+
+**Red flags (last 3 days):** limiting injury, illness, resting HR +5 over baseline, motivation / sleep quality / appetite 1–2, a watch sleep score that maps under 50.
+
+**Device sleep scores → in-app sleep quality (0–100).** Linear between anchors: start of the maker's top band → 90, start of its "good" band → 75 (par), start of "fair" → 50, 0 → 0.
+
+| Device | Maker's bands | Anchors (device → app) | Source |
+|---|---|---|---|
+| Garmin | Excellent 90–100, Good 80–89, Fair 60–79, Poor <60 | 0→0, 60→50, 80→75, 90→90, 100→100 | https://www.garmin.com/en-US/blog/fitness/how-well-do-you-sleep-new-data-examines-garmin-users-sleep/ |
+| Fitbit / Google | Excellent 90–100, Good 80–89, Fair 60–79, Poor <60 | same as Garmin | https://support.google.com/fitbit/answer/14236513 |
+| Apple Watch (watchOS 26.2+) | Very High 96–100, High 81–95, OK 61–80, Low 41–60, Very Low 0–40 | 0→0, 41→25, 61→50, 81→75, 96→90, 100→100 | https://support.apple.com/guide/watch/view-your-sleep-score-apded441a669/26/watchos/26 |
+| Oura | Optimal 85–100, Good 70–84, Fair 60–69, Pay attention <60 | 0→0, 60→50, 70→75, 85→90, 100→100 | https://support.ouraring.com/hc/en-us/articles/360025445574-Sleep-Score |
+| WHOOP Sleep Performance % | Optimal 85%+, Sufficient 70–84%, Poor <70% | 0→0, 70→75, 85→90, 100→100 | https://www.whoop.com/us/en/thelocker/how-well-whoop-measures-sleep/ |
+| Samsung Galaxy Watch | Excellent / Good / Fair / Needs attention (numeric cut-offs not published; 85+ described as a healthy night) | 0→0, 60→50, 85→90, 100→100 | https://www.samsung.com/uk/mobile-phone-buying-guide/how-do-smartwatches-track-your-sleep/ |
+| Other | generic 0–100 | identity | — |
+
+CSV adds optional columns `Sleep_Quality, Sleep_Device, Device_Sleep_Score, Motivation, Appetite, Injury, Injury_Area, Ill, Resting_HR`. Older CSVs without them import unchanged. JSON backups carry the fields as-is.

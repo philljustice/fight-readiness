@@ -20,9 +20,49 @@
   const hydrationOK = e => !!e && e.hydration !== '' && e.hydration != null && Number.isInteger(+e.hydration) && +e.hydration >= 1 && +e.hydration <= 8;
   const hydrationRequired = e => !!e && e.v >= 2 && String(e.date || '') >= HYD_FROM;
   const isNum = v => v !== '' && v != null && !isNaN(v);
+
+  // ---- Extended morning wellness (fr-v40). All optional for scoring: a missing item is left out of the average (no penalty).
+  // Required on the log only for days from WELL3_FROM: motivation, appetite, and perceived sleep quality when no watch is used.
+  const WELL3_FROM = '2026-11-02';
+  const DEVICES = ['None','Garmin','Fitbit','Apple Watch','Oura','Whoop','Samsung Galaxy Watch','Other'];
+  // Device sleep score -> in-app 0-100 quality. Breakpoints [device score, app score], linear between. Anchor rule: start of the
+  // maker's top band -> 90, start of its "good" band -> 75 (par), start of its "fair" band -> 50, 0 -> 0. See README for sources.
+  const SLEEP_SCALES = {
+    'Garmin': { label:'Garmin Sleep Score (0–100)', unit:'', max:100, pts:[[0,0],[60,50],[80,75],[90,90],[100,100]], bands:[[90,'Excellent'],[80,'Good'],[60,'Fair'],[0,'Poor']] },
+    'Fitbit': { label:'Fitbit Sleep Score (0–100)', unit:'', max:100, pts:[[0,0],[60,50],[80,75],[90,90],[100,100]], bands:[[90,'Excellent'],[80,'Good'],[60,'Fair'],[0,'Poor']] },
+    'Apple Watch': { label:'Apple Watch Sleep Score (0–100)', unit:'', max:100, pts:[[0,0],[41,25],[61,50],[81,75],[96,90],[100,100]], bands:[[96,'Very High'],[81,'High'],[61,'OK'],[41,'Low'],[0,'Very Low']] },
+    'Oura': { label:'Oura Sleep Score (0–100)', unit:'', max:100, pts:[[0,0],[60,50],[70,75],[85,90],[100,100]], bands:[[85,'Optimal'],[70,'Good'],[60,'Fair'],[0,'Pay attention']] },
+    'Whoop': { label:'WHOOP Sleep Performance (%)', unit:'%', max:100, pts:[[0,0],[70,75],[85,90],[100,100]], bands:[[85,'Optimal'],[70,'Sufficient'],[0,'Poor']] },
+    'Samsung Galaxy Watch': { label:'Samsung Health Sleep Score (0–100)', unit:'', max:100, pts:[[0,0],[60,50],[85,90],[100,100]], bands:[[85,'Healthy'],[60,'Fair'],[0,'Needs attention']] },
+    'Other': { label:'Device sleep score (0–100)', unit:'', max:100, pts:[[0,0],[100,100]], bands:[] } };
+  const usesWatch = dev => !!dev && dev !== 'None' && !!SLEEP_SCALES[dev];
+  function deviceSleepQuality(dev, v) { const sc = SLEEP_SCALES[dev]; if (!sc || !isNumW(v)) return null; v = Math.max(0, Math.min(sc.max, +v)); const P = sc.pts;
+    for (let i = 1; i < P.length; i++) if (v <= P[i][0]) { const [x0,y0] = P[i-1], [x1,y1] = P[i]; return y0 + (y1 - y0) * (v - x0) / (x1 - x0); } return 100; }
+  const deviceBand = (dev, v) => { const sc = SLEEP_SCALES[dev]; if (!sc || !isNumW(v)) return ''; const b = sc.bands.find(([th]) => +v >= th); return b ? b[1] : ''; };
+  const INJURY = { none:100, minor:50, limiting:0 }, INJ_AREAS = ['Head/neck','Shoulder','Elbow/arm','Wrist/hand','Back','Ribs/core','Hip/groin','Knee','Ankle/foot','Other'];
+  const median = a => { if (!a.length) return null; const b = a.slice().sort((x,y)=>x-y), m = b.length >> 1; return b.length % 2 ? b[m] : (b[m-1] + b[m]) / 2; };
+  const RHR = { WIN:30, MIN:7, SPIKE:5, ZERO:10, FREE:2 };
+  // Personal resting-HR baseline: median of readings in the 30 days before `date`, once there are 7+ readings. null = no baseline yet.
+  function rhrBaseline(entries, date) { const t = dayNum(date), v = entries.filter(e => { const n = dayNum(e.date); return n < t && n >= t - RHR.WIN && isNumW(e.rhr) && +e.rhr > 25; }).map(e => +e.rhr);
+    return v.length >= RHR.MIN ? median(v) : null; }
+  // 100 up to +2 bpm over baseline, falling to 0 at +10; no score until a baseline exists.
+  const rhrScore = (rhr, base) => base == null || !isNumW(rhr) || !(+rhr > 25) ? null : Math.max(0, Math.min(100, 100 - (+rhr - base - RHR.FREE) / (RHR.ZERO - RHR.FREE) * 100));
+  // Weights inside Wellness: the four Hooper items 1 each, sleep quality 1, motivation 1, injury 1, illness 1, resting HR 1, appetite 0.5.
+  const W3 = { sleepq:1, motivation:1, appetite:0.5, injury:1, ill:1, rhr:1 };
+  function wellnessParts(e, rhrBase) { if (!e) return null; const v = WELL_KEYS.map(k => e[k]);
+    if (!v.every(x => isNumW(x) && +x >= 1 && +x <= 5)) return null;
+    const parts = WELL_KEYS.map(k => [k, (wellGood(k, e[k]) - 1) * 25, 1]), r15 = x => isNumW(x) && +x >= 1 && +x <= 5;
+    const sq = usesWatch(e.sleepDevice) && isNumW(e.sleepDev) ? deviceSleepQuality(e.sleepDevice, e.sleepDev) : r15(e.sleepq) ? (+e.sleepq - 1) * 25 : null;
+    if (sq != null) parts.push(['sleepq', sq, W3.sleepq]);
+    if (r15(e.motivation)) parts.push(['motivation', (+e.motivation - 1) * 25, W3.motivation]);
+    if (r15(e.appetite)) parts.push(['appetite', (+e.appetite - 1) * 25, W3.appetite]);
+    if (e.injury in INJURY) parts.push(['injury', INJURY[e.injury], W3.injury]);
+    if (e.ill === true || e.ill === false) parts.push(['ill', e.ill ? 0 : 100, W3.ill]);
+    const hr = rhrScore(e.rhr, rhrBase); if (hr != null) parts.push(['rhr', hr, W3.rhr]);
+    return parts; }
   // Wellness 0-100 = average of the four ratings mapped 1->0 ... 5->100. null if not all four rated.
-  function wellnessScore(e) { if (!e) return null; const v = WELL_KEYS.map(k => e[k]);
-    if (!v.every(x => isNum(x) && +x >= 1 && +x <= 5)) return null; return WELL_KEYS.reduce((s,k)=>s+(wellGood(k, e[k])-1)*25,0)/4; }
+  function wellnessScore(e, rhrBase = null) { const P = wellnessParts(e, rhrBase); if (!P) return null;
+    return P.reduce((a, p) => a + p[1] * p[2], 0) / P.reduce((a, p) => a + p[2], 0); }
   // Training 0-100 for one day. v2 entries: % of scheduled sessions completed (rest day = 100). Legacy: Y=100, N/blank=0.
   function trainingPct(e) { if (!e) return 0;
     if (Array.isArray(e.sessions)) { if (!e.sessions.length) return 100; return e.sessions.filter(x => x.done === true).length / e.sessions.length * 100; }
@@ -112,7 +152,7 @@
     const pctY = k => N ? w.filter(e => e[k] === true).length / N * 100 : 0; // blank counts as N, like COUNTIFS/N4
     const cats = {
       nutrition: N ? avg(w.map(e => nutritionScore(e) ?? 0)) : 0, training: N ? avg(w.map(trainingPct)) : 0, family: pctY('family'),
-      wellness: N ? (avg(w.map(wellnessScore).filter(v => v != null)) || 0) : 0,
+      wellness: N ? (avg(w.map(e => wellnessScore(e, rhrBaseline(entries, e.date))).filter(v => v != null)) || 0) : 0,
       sleep: N ? (avg(w.filter(e => num(e.sleep)).map(e => sleepScore(+e.sleep, p))) || 0) : 0,
       screen: N ? (avg(w.filter(e => num(e.screen)).map(e => screenScore(+e.screen, p))) || 0) : 0,
     };
@@ -126,7 +166,7 @@
     const weighed = entries.filter(e => num(e.weight) && +e.weight > 0).sort((a,b)=>a.date<b.date?-1:1);
     return { locked, unlockIn, daysSinceStart, score: Math.round(final), base, bonus, consistency, momentum: mom, cats, weights: wt, daysLogged: N, windowDays: p.windowDays,
       delta, trend: trendLabel(delta), verdict: verdict(final), dataQuality: dataQuality(N),
-      latestWeight: weighed.length ? weighed[weighed.length-1] : null, windowEntries: w };
+      latestWeight: weighed.length ? weighed[weighed.length-1] : null, windowEntries: w, rhrBase: Object.fromEntries(w.map(e => [e.date, rhrBaseline(entries, e.date)])) };
   }
 
   // Below par: for each category under PAR (75 = green "Fight Ready" tier) in the score window, list the inputs dragging it down.
@@ -156,6 +196,14 @@
     { const why = [], rated = w.filter(e => wellnessScore(e) != null), names = { energy:['Energy','low energy'], soreness:['Soreness','high soreness'], mood:['Mood','low mood'], stress:['Stress','high stress'] };
       if (rated.length) WELL_KEYS.map(k => { const vs = rated.map(e => +e[k]), inv = WELL_INV.includes(k); return { k, inv, a: avg(vs), g: avg(vs.map(v => wellGood(k, v))), bad: vs.filter(v => wellGood(k, v) <= 2).length }; }).sort((x, y) => x.g - y.g)
         .forEach(x => { if (x.g < 4 || x.bad) why.push(`${names[x.k][0]} avg ${f1(x.a)}/5${x.bad ? ` — ${names[x.k][1]} (${x.inv ? '4–5' : '1–2'}) on ${pl(x.bad, 'day')}` : ''}`); });
+      { const P = rated.map(e => [e, wellnessParts(e, (r.rhrBase || {})[e.date])]), part = k => P.map(([e, ps]) => [e, (ps.find(x => x[0] === k) || [])[1]]).filter(x => x[1] != null);
+        const sq = part('sleepq'); if (sq.length) { const a = avg(sq.map(x => x[1])), poor = sq.filter(x => x[1] < 50).length; if (a < PAR || poor) why.push(`Sleep quality avg ${Math.round(a)}/100${poor ? ` — poor on ${pl(poor, 'night')}` : ''}`); }
+        [['motivation','Motivation / readiness to train','low motivation'],['appetite','Appetite','poor appetite']].forEach(([k, l, b]) => { const vs = rated.filter(e => isNumW(e[k]) && +e[k] >= 1).map(e => +e[k]); if (!vs.length) return;
+          const a = avg(vs), bad = vs.filter(v => v <= 2).length; if (a < 4 || bad) why.push(`${l} avg ${f1(a)}/5${bad ? ` — ${b} (1–2) on ${pl(bad, 'day')}` : ''}`); });
+        const inj = rated.filter(e => e.injury === 'minor' || e.injury === 'limiting'); if (inj.length) { const lim = inj.filter(e => e.injury === 'limiting').length, areas = [...new Set(inj.map(e => e.injuryArea).filter(Boolean))];
+          why.push(`Injury/pain on ${pl(inj.length, 'day')}${lim ? ` (${lim} limiting)` : ''}${areas.length ? ': ' + areas.join(', ') : ''}`); }
+        const ill = rated.filter(e => e.ill === true).length; if (ill) why.push(`Feeling ill on ${pl(ill, 'day')}`);
+        const hr = rated.filter(e => { const b = (r.rhrBase || {})[e.date]; return b != null && isNumW(e.rhr) && +e.rhr - b >= RHR.SPIKE; }); if (hr.length) why.push(`Resting HR ${RHR.SPIKE}+ bpm above baseline on ${pl(hr.length, 'morning')}`); }
       if (N - rated.length) why.push(`How-you-feel not fully rated on ${pl(N - rated.length, 'day')}`);
       const hyd = w.filter(e => hydrationOK(e) && +e.hydration >= 6).length, hydMiss = w.filter(e => hydrationRequired(e) && !hydrationOK(e)).length;
       if (hyd) why.push(`Dark first-pee colour (dehydrated) on ${pl(hyd, 'morning')}`); if (hydMiss) why.push(`Hydration not logged on ${pl(hydMiss, 'morning')}`);
@@ -168,6 +216,6 @@
       if (no) why.push(`No family/friends time on ${pl(no, 'day')} of ${N}`); if (bl) why.push(`Not logged on ${pl(bl, 'day')} (counted as No)`);
       add('family', 'Family/Friends', why); }
     return out; }
-  const api = { WELL_INV, WELL_SCALE, wellGood, migrateWellScale, PAR, belowPar, NUT_FULL, NUT_ZERO, NUT_HIT, MACRO_W, closeness, nutMode, nutritionDone, nutritionScore, nutritionHit, HYD_FROM, hydrationOK, hydrationRequired, WELL_KEYS, wellnessScore, trainingPct, sessionsDone, sessionLoad, DEFAULT_PARAMS, sleepScore, screenScore, weightDelta, trendLabel, compute, momentum, isConsistent, MOM, ymd, dayNum, verdict, dataQuality };
+  const api = { WELL3_FROM, DEVICES, SLEEP_SCALES, usesWatch, deviceSleepQuality, deviceBand, INJURY, INJ_AREAS, RHR, median, rhrBaseline, rhrScore, W3, wellnessParts, WELL_INV, WELL_SCALE, wellGood, migrateWellScale, PAR, belowPar, NUT_FULL, NUT_ZERO, NUT_HIT, MACRO_W, closeness, nutMode, nutritionDone, nutritionScore, nutritionHit, HYD_FROM, hydrationOK, hydrationRequired, WELL_KEYS, wellnessScore, trainingPct, sessionsDone, sessionLoad, DEFAULT_PARAMS, sleepScore, screenScore, weightDelta, trendLabel, compute, momentum, isConsistent, MOM, ymd, dayNum, verdict, dataQuality };
   if (typeof module !== 'undefined') module.exports = api; else root.Scoring = api;
 })(this);

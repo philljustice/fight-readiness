@@ -18,5 +18,5 @@ const d = '2026-10-31', T = new Date(d + 'T12:00');
 let f = I.wellness([{ date:d, energy:5, soreness:5, mood:5, stress:1 }], T).flags; assert.deepEqual(f.map(x => x.value), [5]);
 f = I.wellness([{ date:d, energy:2, soreness:1, mood:5, stress:4 }], T).flags; assert.equal(f.length, 2);
 // CSV carries scale marker
-assert.equal(I.CSV_COLS[I.CSV_COLS.length - 1], 'Wellness_Scale'); assert.ok(I.toCSV([{ date:d, energy:5, soreness:1, mood:5, stress:1 }]).trim().endsWith(',2'));
+assert.ok(I.CSV_COLS.includes('Wellness_Scale')); assert.ok(I.toCSV([{ date:d, energy:5, soreness:1, mood:5, stress:1 }]).includes(',2,'));
 console.log('wellscale ok');

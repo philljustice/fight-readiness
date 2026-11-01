@@ -40,6 +40,6 @@ assert.ok(/Yes or No/.test(I.checklist(yn({ nutrition:null })).find(x => x.key =
 // reminders: goal nutrition belongs to the evening reminder
 assert.ok(R.morningDone(kc(''))); assert.ok(!R.eveningDone(kc(''))); assert.ok(R.eveningDone(kc(2400)));
 // CSV columns
-assert.deepEqual(I.CSV_COLS.slice(-7,-1), ['Nutrition_Mode','Calories','Protein_g','Carbs_g','Fat_g','Nutrition_Score']);
-assert.ok(I.toCSV([kc(2760)]).trim().split('\r\n')[1].endsWith(',kcal,2760,,,,60,2'));
+assert.deepEqual(I.CSV_COLS.slice(-16,-10), ['Nutrition_Mode','Calories','Protein_g','Carbs_g','Fat_g','Nutrition_Score']);
+assert.ok(I.toCSV([kc(2760)]).trim().split('\r\n')[1].endsWith(',kcal,2760,,,,60,2,,,,,,,,,'));
 console.log('nutrition tests OK');

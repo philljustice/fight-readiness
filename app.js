@@ -1,4 +1,4 @@
-const APP_VERSION='fr-v39';
+const APP_VERSION='fr-v40';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -78,9 +78,9 @@ function wellCard(report) { const w = Insights.wellness(S.entries), L = Insights
   if (!w.days && !L.sessions && !report) return '';
   const f = v => v==null?'—':v.toFixed(1);
   return `<div class="card"><h3>💚 Wellness & training load</h3><p class="muted">Wellness is ${S.params.wWellness}% of the score. Session load is for info only.</p>
-   ${w.days?`<p>Wellness (last 7 days, 1–5, higher = better overall): <b>${f(w.avg7)}</b>${w.avg28!=null?` <span class="muted">vs 4-week ${f(w.avg28)}</span>`:''}<br><span class="muted">${Insights.WELL.map(([k,l])=>l+' '+f(w.items[k])).join(' • ')}</span></p>`:'<p class="muted">No wellness check-ins in the last 7 days.</p>'}
+   ${w.days?`<p>Wellness (last 7 days, 1–5, higher = better overall): <b>${f(w.avg7)}</b>${w.avg28!=null?` <span class="muted">vs 4-week ${f(w.avg28)}</span>`:''}<br><span class="muted">${Insights.WELL.map(([k,l])=>l+' '+f(w.items[k])).join(' • ')}${well3Summary()}</span></p>`:'<p class="muted">No wellness check-ins in the last 7 days.</p>'}
    ${w.dropping?'<div class="hint">📉 Wellness is down compared with your normal. Consider lighter training and more sleep, and tell your coach.</div>':''}
-   ${w.flags.length?`<div class="hint">🚩 Low ratings, last 3 days: ${w.flags.map(x=>esc(x.date.slice(5)+' '+x.item+' '+x.value)).join(', ')}</div>`:''}
+   ${w.flags.length?`<div class="hint">🚩 Low ratings, last 3 days: ${w.flags.map(x=>esc(x.date.slice(5)+' '+(x.text||x.item+' '+x.value))).join(', ')}</div>`:''}
    ${L.sessions?`<p>Session load this week: <b>${L.week}</b> AU from ${L.sessions} session${L.sessions==1?'':'s'} <span class="muted">(RPE × minutes)</span></p>${loadBars(L.weeks)}
    <p class="muted">Load (AU = arbitrary units) = effort (RPE 1–10) × minutes. E.g. 60 min at RPE 7 = 420 AU. A sudden jump in weekly load (more than ~10–15% over last week) raises injury and overtraining risk.</p>
    ${L.acwr!=null?`<p>Acute:chronic ratio: <b>${L.acwr}</b> ${L.flag==='spike'?'🔴 big jump in load. Higher injury risk, so ease up.':L.flag==='low'?'🔵 lighter than usual':'🟢 steady'}</p>`:'<p class="muted">Load ratio shows after 4 weeks of RPE logs.</p>'}`:'<p class="muted">No session RPE logged this week.</p>'}</div>`; }
@@ -93,7 +93,7 @@ function weeklySummary() { const r = res(), st = Insights.streak(S.entries), w =
   const flags = [];
   const cp = Insights.cutPlan(r.latestWeight ? r.latestWeight.weight : p.startWeight, p.targetWeight, p.fightDate), vd = Insights.weightVerdict(S.entries, p);
   if (c.level) flags.push(`Weight loss ${-c.pctPerWeek}%/wk (${c.level})`); if (cp && cp.level !== 'ok') flags.push(`Target needs ${cp.perWeek} lbs/wk (${cp.pct}%), ${cp.short} lbs short at safe pace`);
-  if (w.dropping) flags.push('Wellness below normal'); w.flags.forEach(f => flags.push(`Low ${f.item} ${f.value} on ${f.date.slice(5)}`));
+  if (w.dropping) flags.push('Wellness below normal'); w.flags.forEach(f => flags.push(f.text ? `${f.text} on ${f.date.slice(5)}` : `Low ${f.item} ${f.value} on ${f.date.slice(5)}`));
   Insights.hydrationFlags(S.entries, new Date(), p).forEach(f => flags.push(f));
   const notes = S.entries.filter(e => e.notes && Scoring.dayNum(e.date) >= Scoring.dayNum(today())-6).map(e => `${e.date.slice(5)}: ${e.notes}`);
   return `Fighter: ${p.name||S.fighter||'—'}${p.gym?' ('+p.gym+')':''}\nDate: ${today()}\nScore: ${r.locked?lockMsg(r):r.score+'/100 – '+r.verdict+'\n'+breakdown(r)}\n` +
@@ -113,7 +113,7 @@ function reportData() { const r = res(), p = S.profile||{}, P = weeklyParts(), w
   const wk = S.entries.filter(e => Scoring.dayNum(e.date) > t-7), es = S.entries.slice().sort((a,b)=>a.date<b.date?-1:1).slice(-21);
   const c = Insights.cutSafety(S.entries, new Date(), p), cp = Insights.cutPlan(lw ? lw.weight : p.startWeight, p.targetWeight, p.fightDate), flags = [];
   if (c.level) flags.push(`Weight loss ${-c.pctPerWeek}%/week (${c.level})`); if (cp && cp.level !== 'ok') flags.push(`Target needs ${cp.perWeek} lbs/week (${cp.pct}%), ${cp.short} lbs short at a safe pace`);
-  if (w.dropping) flags.push('Wellness below normal'); w.flags.forEach(f => flags.push(`Low ${f.item} (${f.value}/5) on ${f.date.slice(5)}`));
+  if (w.dropping) flags.push('Wellness below normal'); w.flags.forEach(f => flags.push(f.text ? `${f.text} on ${f.date.slice(5)}` : `Low ${f.item} (${f.value}/5) on ${f.date.slice(5)}`));
   Insights.hydrationFlags(S.entries, new Date(), p).forEach(f => flags.push(f));
   const hw = Insights.hydrationWeek(S.entries, new Date()), hc = k => hw.days.filter(x => x.status && x.status.level === k).length;
   const lp = L.weeks[2] ? Math.round((L.weeks[3]-L.weeks[2])/L.weeks[2]*100) : null; if (lp != null && lp > 15) flags.push(`Training load up ${lp}% vs last week`);
@@ -301,6 +301,7 @@ const V = {
    ${hydPicker(e)}
    <p style="margin:14px 0 0"><b>How do you feel? *</b></p>
    ${Insights.WELL.map(([k,l,lo,hi])=>`<label>${l} <span class="muted">(${lo} … ${hi})</span></label><div class="sc" data-k="${k}">${[1,2,3,4,5].map(n=>`<button class="${+e[k]===n?'on':''}" data-val="${n}">${n}</button>`).join('')}</div>`).join('')}
+   ${well3Html(e)}
    </div>`,
    nutrition: `<div class="card" id="sec_nutrition">${head('nutrition','🍽️ Nutrition')}${nutLogHtml(e)}</div>`,
    training: `<div class="card" id="sec_training">${head('training','🥊 Training')}${sessCard()}</div>`,
@@ -367,6 +368,7 @@ const V = {
    ${fld('dob','Date of birth','type="date" max="'+today()+'"')}${p.dob&&!V._pdraft?`<p class="muted">Age ${Profile.age(p.dob)}</p>`:''}
    ${sel('discipline','Discipline focus',Profile.DISCIPLINES)}</div>
   <div class="card"><h3>Team</h3>${fld('gym','Gym name','maxlength="60"')}${fld('coach','Head coach','maxlength="60"')}${Weekly.CONFIG.SHOW_COACH_CONTACT?fld('coachContact','Coach email or phone','type="text" inputmode="email" maxlength="80"'):''}</div>
+  <div class="card"><h3>⌚ Smart watch / sleep tracker</h3>${sel('device','Do you use a smart watch or sleep tracker?',Scoring.DEVICES)}<p class="muted">With a watch, the morning check-in asks for your watch's sleep score and resting heart rate (typed in by hand) instead of a 1–5 sleep quality rating.</p></div>
   <div class="card"><h3>Weight & fight</h3>${sel('weightClass','Weight class',Profile.WEIGHT_CLASSES)}
    ${fld('startWeight','Starting weight (lbs)',num+(first?'':' disabled'))}${first?'<p class="muted">Saved as your first weigh-in.</p>':''}
    ${fld('targetWeight','Target weight (lbs)',num)}<p class="muted">🥊 Fight date: <b>${esc((S.profile||{}).fightDate||'not set')}</b>. Set it with camp start in Setup → Fight camp.</p><div id="cutBox"></div></div>
@@ -382,7 +384,7 @@ const V = {
   const p = S.params, n = (k,l) => `<label>${l}</label><input data-p="${k}" type="number" step="any" value="${p[k]}">`;
   const pr = S.profile || {};
   const cd = Profile.countdown(pr.fightDate);
-  return `<div class="card camp"><h3>🥊 Fight camp</h3><p class="muted">Set these at the start of camp. Momentum and the countdown are weighted by days to fight.</p>
+  return deviceCard() + `<div class="card camp"><h3>🥊 Fight camp</h3><p class="muted">Set these at the start of camp. Momentum and the countdown are weighted by days to fight.</p>
    <label for="c_start">Camp start date</label><input id="c_start" type="date" value="${esc(S.startDate||'')}">
    <label for="c_fight">Fight date</label><input id="c_fight" type="date" value="${esc(pr.fightDate||'')}">
    ${cd?`<p class="camp-count">🥊 <b>${cd.days}</b> days to fight</p>`:'<p class="muted">No fight date yet: momentum assumes a 10-week camp.</p>'}
@@ -415,7 +417,7 @@ const V = {
   <div class="card"><h3>Backup & import</h3>
    <button class="btn" data-send="1">🖼️ Send report with charts to ${Weekly.CONFIG.ADMIN_NAME}</button><button class="btn alt" id="exportBtn">⬇️ Export backup (JSON)</button><button class="btn alt" id="csvBtn">📊 Export log as CSV (Excel / Google Sheets)</button><button class="btn alt" data-sharefile="1">📎 Share full log file (CSV)</button>
    <label>Restore backup (JSON) or import FightLog CSV</label><input type="file" id="importFile" accept=".json,.csv,application/json,text/csv">
-   <p class="muted">CSV columns: Date, Nutrition, Training, Sleep_Hours, Screen_Hours, Family_Friends, [Sleep_Score, Screen_Score,] Weight, Notes, plus optional Energy, Soreness, Mood, Stress, RPE, Session_Min, Wellness_Scale. Soreness/Stress: 5 = worst when Wellness_Scale is 2 (current exports); older CSVs without it are read as 5 = best and converted. Existing dates are overwritten.</p>
+   <p class="muted">CSV columns: Date, Nutrition, Training, Sleep_Hours, Screen_Hours, Family_Friends, [Sleep_Score, Screen_Score,] Weight, Notes, plus optional Energy, Soreness, Mood, Stress, RPE, Session_Min, Wellness_Scale, Sleep_Quality, Sleep_Device, Device_Sleep_Score, Motivation, Appetite, Injury, Injury_Area, Ill, Resting_HR (all optional). Soreness/Stress: 5 = worst when Wellness_Scale is 2 (current exports); older CSVs without it are read as 5 = best and converted. Existing dates are overwritten.</p>
    <button class="btn alt" id="wipeBtn" style="background:#5d1010">🗑️ Erase all data on this phone</button></div>
   <div class="card"><button class="btn alt" id="updBtn">🔄 Check for update</button><p class="muted" style="text-align:center;font-size:12px">Version ${APP_VERSION}</p></div>`;
  },
@@ -431,6 +433,8 @@ const V = {
   <p><b>Weight:</b> weigh Monday & Thursday mornings: fasted, after the bathroom, same scale, minimal clothing.</p>
   <p><b>Streak:</b> 🔥 counts days in a row with a full log (nutrition, every scheduled session with effort + minutes, sleep, screen, family, and all 4 wellness ratings). Today not done yet doesn't break it. Miss a whole day and it resets.</p>
   <p><b>How you feel (Hooper-style check-in):</b> four quick 1–5 ratings modelled on the Hooper Index used by pro teams: fatigue/energy, muscle soreness, stress and mood. Energy and mood: 5 = best. Soreness and stress: higher = more (1 = none / very relaxed, 5 = very sore / very stressed); the app flips them when scoring. Sleep is logged separately as hours. It's 15% of the score.</p>
+  <p><b>More morning items:</b> Sleep quality (1–5, 5 = best), Motivation / readiness to train (1–5), Appetite (1–5), Injury / pain (None / Minor / Limiting, plus where; higher = worse) and Feeling ill (No / Yes). Injury starts on None and illness on No, so most mornings they need no tap.</p>
+  <p><b>Smart watch / sleep tracker:</b> pick your device at sign-up or in Setup (None, Garmin, Fitbit, Apple Watch, Oura, Whoop, Samsung Galaxy Watch, Other). With a device, the morning check-in asks for your watch's sleep score instead of the 1–5 sleep quality, plus your resting heart rate. You type both in by hand: the app does not connect to the watch. Each maker's sleep score is converted with that maker's own bands (e.g. Garmin/Fitbit Excellent 90+, Good 80–89, Fair 60–79, Poor under 60) into a 0–100 sleep quality. Resting HR builds your personal baseline (median of the last 30 days once you have 7 readings); 5+ bpm above it raises a 🚩. It has no effect on the score until the baseline exists.</p>
   <p><b>Weight verdict:</b> the Dashboard shows one line every day. 🟢 <b>On track</b> = losing at roughly the pace you need, within the safe ~1%/week. 🔴 <b>Too fast</b> = losing more than 1.5%/week. 🟠 <b>Too slow</b> = well under the pace you need. ⚪ <b>No target</b> = set a target weight in your profile.</p>
   <p><b>Impossible-cut check:</b> with a target weight and fight date set, the app works out the weekly loss needed. Over 1%/week of bodyweight shows a caution and over 1.5% says the plan is unsafe. It shows the weight a safe pace reaches by fight day and how far short that is, so you can talk to your coach about a higher weight class or a later date.</p>
   <p><b>Fight week:</b> in the last 7 days before your fight date (used as weigh-in day) the Dashboard and Report show a day-by-day card covering taper, water, salt and carbs. It's general, conservative guidance based on the ISSN 2025 combat-sports position stand, not medical advice. Follow your coach and dietitian. No saunas, diuretics or fluid restriction for minors.</p>
@@ -441,7 +445,7 @@ const V = {
   <p><b>💧 Hydration:</b> in the Morning check-in, tap the colour closest to your first pee of the day (pale straw to dark amber). 🟢 pale = hydrated, 🟡 mid-yellow = drink more, 🔴 dark = dehydrated. It's a quick guide, not a medical test, and it doesn't change your score. It's required for each new day. The Score screen shows your last 7 mornings, and 2 or more dark mornings in a week shows a flag. In fight week do not cut water to make weight, and minors (under 18) should never dehydrate.</p>
   <p><b>Notes:</b> injuries, illness, soreness, bad sleep causes, low energy. These show up on the Coach Report.</p></div>
   <div class="card"><h3>Scoring</h3><p>Score 0–100 from the last 3 weeks of logs. Nutrition 25%, Training 25%, Sleep 15%, Wellness 15%, Screen 10%, Family 10% (editable in Setup, must add up to 100).</p>
-  <p>• Nutrition / Family = % of logged days marked Yes.<br>• Training = average daily % of scheduled sessions completed (rest day = 100%; older days: Yes = 100).<br>• Wellness = average of Energy, Mood (1→0 … 5→100) and Soreness, Stress (flipped: 1→100 … 5→0) (days with all 4 rated).<br>• Sleep: 100 at 8h, −25 per hour off (6h or 10h = 50).<br>• Screen: 100 if ≤2h, −40 per extra hour (3h = 60, 4h = 20).<br>
+  <p>• Nutrition / Family = % of logged days marked Yes.<br>• Training = average daily % of scheduled sessions completed (rest day = 100%; older days: Yes = 100).<br>• Wellness = weighted average of Energy, Mood (1→0 … 5→100), Soreness, Stress (flipped: 1→100 … 5→0), Sleep quality or watch sleep score, Motivation, Injury (None 100 / Minor 50 / Limiting 0), Illness (No 100 / Yes 0), Resting HR (100 up to +2 bpm over baseline, 0 at +10; only once a baseline exists) — weight 1 each — and Appetite (weight ½). Items not logged are left out, so they never lower the score. Needs the 4 core ratings.<br>• Sleep: 100 at 8h, −25 per hour off (6h or 10h = 50).<br>• Screen: 100 if ≤2h, −40 per extra hour (3h = 60, 4h = 20).<br>
   • Consistency bonus: +5 if ≥90% of days had Nutrition = Yes AND all scheduled sessions done, +3 if ≥75%, +1 if ≥60%. Capped at 100.<br>• <b>Momentum</b> (up to +5, on top): covers your whole camp from camp start. Each day is consistent if Nutrition was hit and all sessions were done; unlogged days count as missed. Days closer to fight night count more (up to double). 50% weighted consistency starts earning, 95% earns +4; a 🔥 streak of 14+ consistent days in a row adds +1. Total score still caps at 100.<br>• 90+ Elite (gold) • 75+ Fight Ready (green) • 60+ Solid (blue) • below 60 Off Pace (red).</p>
   <p><b>Weight trend</b> = average weight of the last 7 days minus the previous 7 days:<br>🔴 > +1.5 rapid gain • 🟠 +0.5 to +1.5 gaining • 🟡 −0.5 to +0.5 stable • 🟢 −0.5 to −1.5 good cut • 🔵 below −1.5 aggressive cut. A steady 0.75–1.5 lbs/week loss is ideal in the final 8–12 weeks.</p></div>
   <div class="card"><h3>Your data</h3><p>Everything stays on this phone only. Nothing is uploaded. Use Setup → Export backup regularly (e.g. weekly), and before you switch phones or clear browser data. Share the Coach Report as a PDF or text.</p></div>`;
@@ -454,8 +458,35 @@ function nutLogHtml(e) { if (e.cheat) return `<p class="hint ok">🍕 <b>Cheat d
   const body = m === 'kcal' ? box('kcal','Calories eaten today *','kcal',t.kcal) : MACROS.map(([k,l]) => box(k, l + ' eaten today (g) *', 'g', t[k])).join('');
   return `<p class="muted" style="margin:0 0 6px">${m === 'kcal' ? 'Calorie goal' : 'Macros goal (score: protein 50%, carbs 25%, fat 25%)'}: 100 within ±${Scoring.NUT_FULL}% of goal, 0 at ±${Scoring.NUT_ZERO}% over or under.</p>${body}<p id="nutScore" class="hydst">${nutScoreHtml(e)}</p>`; }
 function nutScoreHtml(e) { const sc = Scoring.nutritionScore(e); return sc == null ? 'Enter what you ate to see today\'s nutrition score.' : `Nutrition score today: <b>${Math.round(sc)}/100</b>${sc >= Scoring.NUT_HIT ? ' ✅ on target' : ''}`; }
+// Extended morning wellness: sleep quality (or the watch's sleep score), motivation, appetite, injury/pain, illness, resting HR (watch users).
+const devOf = () => (S.profile || {}).device || 'None';
+function well3Html(e) { const dev = e.sleepDevice || devOf(), watch = Scoring.usesWatch(dev), sc = Scoring.SLEEP_SCALES[dev], scale = (k, l, lo, hi) => `<label>${l} <span class="muted">(${lo} … ${hi})</span></label><div class="sc" data-k="${k}">${[1,2,3,4,5].map(n=>`<button class="${+e[k]===n?'on':''}" data-val="${n}">${n}</button>`).join('')}</div>`;
+  const W = Object.fromEntries(Insights.WELL3.map(x => [x[0], x])), q = Scoring.deviceSleepQuality(dev, e.sleepDev), base = Scoring.rhrBaseline(S.entries, e.date);
+  const inj = e.injury || '', io = (v, l) => `<button class="${inj===v?'on':''}" data-val="${v}">${l}</button>`;
+  return (watch ? `<label for="f_sleepDev">⌚ ${esc(sc.label)} <span class="muted">from your ${esc(dev)} app</span></label><input id="f_sleepDev" type="number" inputmode="numeric" min="0" max="${sc.max}" step="1" value="${esc(e.sleepDev ?? '')}" placeholder="e.g. 82">
+     <p class="muted" id="sleepDevNote" style="margin:4px 0 0">${q == null ? 'Optional. Enter the number your watch shows for last night.' : `${esc(Scoring.deviceBand(dev, e.sleepDev))} → sleep quality ${Math.round(q)}/100`}</p>` : scale('sleepq', ...W.sleepq.slice(1)))
+   + scale('motivation', ...W.motivation.slice(1)) + scale('appetite', ...W.appetite.slice(1))
+   + `<label>Injury / pain <span class="muted">(higher = worse)</span></label><div class="opt" data-k="injury">${io('none','None')}${io('minor','Minor')}${io('limiting','Limiting')}</div>
+   <div id="injAreaBox" style="${inj==='minor'||inj==='limiting'?'':'display:none'}"><label for="f_injArea">Where?</label><select id="f_injArea"><option value="">—</option>${Scoring.INJ_AREAS.map(a=>`<option ${e.injuryArea===a?'selected':''}>${a}</option>`).join('')}</select></div>
+   <label>Feeling ill today? <span class="muted">(cold, flu, stomach)</span></label><div class="yn" data-k="ill"><button class="n ${e.ill===false?'on':''}" data-val="0">No</button><button class="y ${e.ill===true?'on':''}" data-val="1">🤒 Yes</button></div>`
+   + (watch ? `<label for="f_rhr">❤️ Resting heart rate (bpm) <span class="muted">from your watch</span></label><input id="f_rhr" type="number" inputmode="numeric" min="30" max="120" step="1" value="${esc(e.rhr ?? '')}" placeholder="e.g. 52">
+     <p class="muted" style="margin:4px 0 0">${base == null ? `Building your baseline: ${S.entries.filter(x => +x.rhr > 25 && x.date < e.date).length}/${Scoring.RHR.MIN} readings. No effect on the score until then.` : `Your baseline: ${Math.round(base)} bpm. ${Scoring.RHR.SPIKE}+ above it raises a 🚩 flag.`}</p>` : ''); }
+function deviceCard() { const d = devOf();
+  return `<div class="card"><h3>⌚ Smart watch / sleep tracker</h3><p class="muted">Pick your device to log its sleep score and resting heart rate each morning. Entry is manual: the app doesn't connect to the watch.</p>
+   <label for="c_device">Do you use a smart watch or sleep tracker?</label><select id="c_device">${Scoring.DEVICES.map(x=>`<option ${x===d?'selected':''}>${x}</option>`).join('')}</select>
+   ${Scoring.usesWatch(d) ? `<p class="muted">Sleep: ${esc(Scoring.SLEEP_SCALES[d].label)}${Scoring.SLEEP_SCALES[d].bands.length ? ' • ' + Scoring.SLEEP_SCALES[d].bands.map(([t,l])=>`${l} ${t}+`).join(', ') : ''}</p>` : '<p class="muted">None: you rate sleep quality 1–5 and resting HR is hidden.</p>'}
+   <button class="btn" id="saveDevice">💾 Save device</button></div>`; }
+function well3Summary() { const t = Scoring.dayNum(today()), wk = S.entries.filter(e => { const n = Scoring.dayNum(e.date); return n > t - 7 && n <= t; }), out = [];
+  const av = k => { const v = wk.map(e => +e[k]).filter(x => x >= 1 && x <= 5); return v.length ? (v.reduce((a,b)=>a+b,0)/v.length).toFixed(1) : null; };
+  const sq = wk.map(e => Scoring.usesWatch(e.sleepDevice) && e.sleepDev !== '' && e.sleepDev != null ? Scoring.deviceSleepQuality(e.sleepDevice, e.sleepDev) : +e.sleepq >= 1 ? (+e.sleepq - 1) * 25 : null).filter(x => x != null);
+  if (sq.length) out.push('Sleep quality ' + Math.round(sq.reduce((a,b)=>a+b,0)/sq.length) + '/100'); if (av('motivation')) out.push('Motivation ' + av('motivation')); if (av('appetite')) out.push('Appetite ' + av('appetite'));
+  const inj = wk.filter(e => e.injury === 'minor' || e.injury === 'limiting').length, ill = wk.filter(e => e.ill === true).length, hr = wk.filter(e => +e.rhr > 25);
+  if (inj) out.push(`Injury ${inj}d`); if (ill) out.push(`Ill ${ill}d`); if (hr.length) out.push(`Resting HR ${hr[hr.length-1].rhr} bpm`);
+  return out.length ? '<br>' + out.map(esc).join(' • ') : ''; }
 function blankOr(ex, d) { const e = JSON.parse(JSON.stringify(ex || {date:d, v:2, nutrition:null, training:null, family:null, sleep:'', screen:'', weight:'', notes:''}));
   if (!(ex && !Array.isArray(ex.sessions) && ex.v !== 2) && !Array.isArray(e.sessions)) { e.sessions = Profile.sessionsFor(S.profile && S.profile.schedule, d) || []; e.v = 2; }
+  if (e.sleepDevice == null) e.sleepDevice = devOf();
+  if (d >= Scoring.WELL3_FROM && e.v >= 2) { if (e.injury == null) e.injury = 'none'; if (e.ill == null) e.ill = false; }
   return e; }
 // ---- Log menu: one tile per section; tapping opens that section full-screen, Done / back returns to the menu ----
 function tileSummary(x, e) { const has = k => x.items.some(i => k.test(i.key));
@@ -480,7 +511,7 @@ function closeSection() { if (history.state && history.state.frSec) return histo
 window.addEventListener('popstate', () => { if (cur === 'log' && V._sec) leaveSection(); });
 try { if (history.state && history.state.frSec) history.replaceState(null, ''); } catch (e) {}
 // ---- Log screen: every field autosaves silently; one Save button validates and reports what's missing ----
-const hasData = b => ['nutrition','training','family'].some(k => b[k] === true || b[k] === false) || ['sleep','screen','weight'].some(k => b[k] !== '' && b[k] != null) || Scoring.WELL_KEYS.some(k => +b[k] > 0) || Scoring.hydrationOK(b) || ['kcal','protein','carbs','fat'].some(k => b[k] !== '' && b[k] != null)
+const hasData = b => ['nutrition','training','family'].some(k => b[k] === true || b[k] === false) || ['sleep','screen','weight'].some(k => b[k] !== '' && b[k] != null) || Scoring.WELL_KEYS.concat(['sleepq','motivation','appetite','rhr','sleepDev']).some(k => +b[k] > 0) || b.injury === 'minor' || b.injury === 'limiting' || b.ill === true || Scoring.hydrationOK(b) || ['kcal','protein','carbs','fat'].some(k => b[k] !== '' && b[k] != null)
   || !!(b.notes && String(b.notes).trim()) || !!b.extra || (Array.isArray(b.sessions) && b.sessions.some(x => x.done != null));
 // Build the day's entry from what is on screen + the taps held in V._e. Out-of-range numbers keep the last good value (and show up at Save).
 function readDraft() { const u = V._e; if (!u) return null;
@@ -489,6 +520,9 @@ function readDraft() { const u = V._e; if (!u) return null;
   // Only one section is on screen at a time: fields that aren't on screen keep their stored value.
   if (has('#f_sleep')) b.sleep = rng(nv('#f_sleep'), b.sleep, 0, 24); if (has('#f_screen')) b.screen = rng(nv('#f_screen'), b.screen, 0, 24); if (has('#f_weight')) b.weight = rng(nv('#f_weight'), b.weight, 60, 400);
   if (has('#f_notes')) b.notes = $('#f_notes').value; b.nutrition = u.nutrition ?? null; b.family = u.family ?? null; Scoring.WELL_KEYS.forEach(k => { b[k] = u[k] ?? ''; });
+  ['sleepq','motivation','appetite'].forEach(k => { if (u[k] !== undefined) b[k] = u[k]; }); ['injury','ill','sleepDevice'].forEach(k => { if (u[k] !== undefined) b[k] = u[k]; });
+  if (has('#f_injArea')) b.injuryArea = (b.injury === 'minor' || b.injury === 'limiting') ? $('#f_injArea').value : '';
+  if (has('#f_rhr')) b.rhr = rng(nv('#f_rhr'), b.rhr ?? '', 30, 120); if (has('#f_sleepDev')) b.sleepDev = rng(nv('#f_sleepDev'), b.sleepDev ?? '', 0, 100);
   { const m = entryNutMode(b.nutrition != null || b.nmode ? b : Object.assign({}, b, { nutrition: u.nutrition ?? null }));
     if (m === 'yn') { delete b.nmode; delete b.ntarget; ['kcal','protein','carbs','fat'].forEach(k => delete b[k]); }
     else { const ks = m === 'kcal' ? ['kcal'] : ['protein','carbs','fat'];
@@ -557,12 +591,15 @@ function download(name, text, type) { const a = document.createElement('a'); a.h
 function parseCSV(text) {
   const rows = text.trim().split(/\r?\n/).map(l => { const out=[]; let cur='', q=false; for (const ch of l) { if (ch=='"') q=!q; else if (ch==',' && !q) { out.push(cur); cur=''; } else cur+=ch; } out.push(cur); return out.map(s=>s.trim()); });
   const h = rows.shift().map(s=>s.toLowerCase()), col = re => h.findIndex(x=>re.test(x));
-  const c = { d:col(/^date/), n:col(/^nutrition/), t:col(/^training/), sl:col(/^sleep_?hours|^sleep$/), sc:col(/^screen_?hours|^screen$/), f:col(/^family/), w:col(/^weight/), no:col(/^notes/), en:col(/^energy/), so:col(/^soreness/), mo:col(/^mood/), stx:col(/^stress/), rp:col(/^rpe/), mi:col(/^session_?min/), s1l:col(/^s1_label/), s1d:col(/^s1_done/), s1r:col(/^s1_rpe/), s1m:col(/^s1_min/), s2l:col(/^s2_label/), s2d:col(/^s2_done/), s2r:col(/^s2_rpe/), s2m:col(/^s2_min/), ss:col(/^sessions_scheduled/), xl:col(/^extra_label/), xr:col(/^extra_rpe/), xm:col(/^extra_min/), wsv:col(/^wellness_?scale/), hy:col(/^hydration_?colou?r$/) };
+  const c = { d:col(/^date/), n:col(/^nutrition/), t:col(/^training/), sl:col(/^sleep_?hours|^sleep$/), sc:col(/^screen_?hours|^screen$/), f:col(/^family/), w:col(/^weight/), no:col(/^notes/), en:col(/^energy/), so:col(/^soreness/), mo:col(/^mood/), stx:col(/^stress/), rp:col(/^rpe/), mi:col(/^session_?min/), s1l:col(/^s1_label/), s1d:col(/^s1_done/), s1r:col(/^s1_rpe/), s1m:col(/^s1_min/), s2l:col(/^s2_label/), s2d:col(/^s2_done/), s2r:col(/^s2_rpe/), s2m:col(/^s2_min/), ss:col(/^sessions_scheduled/), xl:col(/^extra_label/), xr:col(/^extra_rpe/), xm:col(/^extra_min/), wsv:col(/^wellness_?scale/), sq:col(/^sleep_?quality/), sdv:col(/^sleep_?device/), dss:col(/^device_?sleep/), mot:col(/^motivation/), app:col(/^appetite/), inj:col(/^injury$/), ina:col(/^injury_?area/), ill:col(/^ill$/), rhr:col(/^resting_?hr/), hy:col(/^hydration_?colou?r$/) };
   if (c.d < 0) throw new Error('CSV needs a Date column');
   const YN = v => /^y/i.test(v||'') ? true : /^n/i.test(v||'') ? false : null, numv = v => v===''||v==null||isNaN(v) ? '' : +v;
   return rows.filter(r=>r[c.d]).map(r => { let d = r[c.d]; const m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); if (m) d = `${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
     if (!/^\d{4}-\d{2}-\d{2}/.test(d)) throw new Error('Bad date: '+d);
     const g = j => c[j]>=0 ? r[c[j]] : '', o = { date:d.slice(0,10), nutrition:YN(r[c.n]), training:YN(r[c.t]), sleep:numv(r[c.sl]), screen:numv(r[c.sc]), family:YN(r[c.f]), weight:numv(r[c.w]), notes:c.no>=0?r[c.no]||'':'', ...Object.fromEntries([['energy','en'],['soreness','so'],['mood','mo'],['stress','stx'],['rpe','rp'],['mins','mi'],['hydration','hy']].filter(([,j])=>c[j]>=0&&numv(r[c[j]])!=='').map(([k,j])=>[k,numv(r[c[j]])])) };
+    [['sleepq','sq'],['sleepDev','dss'],['motivation','mot'],['appetite','app'],['rhr','rhr']].forEach(([k, j]) => { if (c[j] >= 0 && numv(g(j)) !== '') o[k] = numv(g(j)); });
+    if (c.sdv >= 0 && g('sdv')) o.sleepDevice = g('sdv'); if (c.inj >= 0 && /^(none|minor|limiting)$/i.test(g('inj'))) o.injury = g('inj').toLowerCase(); if (c.ina >= 0 && g('ina')) o.injuryArea = g('ina');
+    if (c.ill >= 0 && /^(true|false|y|n|yes|no)$/i.test(g('ill'))) o.ill = /^(true|y)/i.test(g('ill'));
     if (!(+g('wsv') >= 2)) Scoring.WELL_INV.forEach(k => { if (o[k] !== undefined && +o[k] >= 1 && +o[k] <= 5) o[k] = 6 - +o[k]; }); // CSVs without Wellness_Scale=2 use the old 5 = best soreness/stress
     if (c.ss>=0 && g('ss')!=='') { const n = +g('ss'); o.v = 2; o.sessions = [['s1l','s1d','s1r','s1m'],['s2l','s2d','s2r','s2m']].slice(0,n).map(([l,dd,rr,mm]) => ({ label:g(l), done:YN(g(dd)), rpe:numv(g(rr)), mins:numv(g(mm)) }));
       o.training = o.sessions.some(x=>x.done==null) ? null : Scoring.trainingPct(o) === 100; delete o.rpe; delete o.mins; }
@@ -599,6 +636,7 @@ document.addEventListener('click', async ev => {
   if (t.closest('.hyd')) { const n = +t.dataset.hyd; V._e.hydration = +V._e.hydration === n ? '' : n; const on = V._e.hydration !== '';
     t.parentNode.querySelectorAll('button').forEach(b => { const s = on && +b.dataset.hyd === n; b.classList.toggle('on', s); b.setAttribute('aria-pressed', s); });
     const st = $('#hydStatus'); if (st) { const s = Insights.hydrationStatus(V._e.hydration); st.className = 'hydst ' + hydLevelCls(s); st.innerHTML = hydStatusHtml(V._e.hydration); } autosave(); return; }
+  if (t.closest('.opt') && t.dataset.val) { const k = t.closest('.opt').dataset.k; V._e[k] = t.dataset.val; t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t)); const ab = $('#injAreaBox'); if (ab) ab.style.display = V._e[k]==='none' ? 'none' : ''; autosave(); return; }
   if (t.closest('.sc')) { const k = t.closest('.sc').dataset.k, n = +t.dataset.val; V._e[k] = V._e[k]===n ? '' : n; t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t && V._e[k]!=='')); autosave(); return; }
   if (t.dataset.chip) { $('#f_'+t.dataset.chip).value = t.dataset.val; t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t)); autosave(); return; }
   if (t.dataset.step) { const i = $('#f_'+t.dataset.step); i.value = Math.max(0, Math.min(24, (+i.value||0) + +t.dataset.d)); autosave(); return; }
@@ -632,7 +670,7 @@ document.addEventListener('click', async ev => {
     case 'shareBtn': { const txt = shareText();
       if (navigator.share) { try { await navigator.share({ title:'FightReady Report', text:txt }); } catch (e) {} }
       else if (navigator.clipboard) { await navigator.clipboard.writeText(txt); alert('Summary copied to clipboard.'); } else alert(txt); return; }
-    case 'saveProfile': { const keys = ['name','nickname','dob','discipline','gym','coach','coachContact','weightClass','startWeight','targetWeight','fightDate','emName','emPhone','medical'];
+    case 'saveProfile': { const keys = ['name','nickname','dob','discipline','gym','coach','coachContact','weightClass','startWeight','targetWeight','fightDate','emName','emPhone','medical','device'];
       const first = !S.profile, d = {}; keys.forEach(k => { const el = $('#p_'+k); d[k] = el ? el.value.trim() : ''; });
       d.fightDate = (S.profile && S.profile.fightDate) || '';
       if (!first) d.startWeight = S.profile.startWeight || '';
@@ -643,6 +681,7 @@ document.addEventListener('click', async ev => {
       if (first) { if (!S.startDate) S.startDate = today();
         if (+d.startWeight > 0 && !S.entries.some(e=>+e.weight>0)) upsert([{ date:today(), v:2, sessions:Profile.sessionsFor(d.schedule, today()), nutrition:null, training:null, family:null, sleep:'', screen:'', weight:+d.startWeight, notes:'' }]); }
       save(); V._date = null; return show(first ? 'log' : 'setup'); }
+    case 'saveDevice': { const v = $('#c_device').value; S.profile = Object.assign({}, S.profile||{}, { device: v }); const te = S.entries.find(x => x.date === today()); if (te) te.sleepDevice = v; save(); alert('Saved ✔'); return show('setup'); }
     case 'saveCamp': { const s = $('#c_start').value, fd = $('#c_fight').value; if (!s) return alert('Enter a camp start date.'); if (fd && fd <= s) return alert('Fight date must be after camp start.');
       S.startDate = s; S.profile = Object.assign({}, S.profile||{}, { fightDate: fd }); save(); alert('Saved ✔'); return show('setup'); }
     case 'saveSetup': { if (!S.startDate) S.startDate = today();
@@ -654,7 +693,7 @@ document.addEventListener('click', async ev => {
     case 'wipeBtn': if (confirm('Erase ALL data on this phone? Export a backup first!') && confirm('Really erase?')) { localStorage.removeItem(KEY); S = load(); show('setup'); } return;
   }
 });
-const LOGF = ['f_kcal','f_protein','f_carbs','f_fat','f_sleep','f_screen','f_weight','f_notes','f_xlabel','f_xrpe','f_xmin'];
+const LOGF = ['f_kcal','f_protein','f_carbs','f_fat','f_sleep','f_screen','f_weight','f_notes','f_xlabel','f_xrpe','f_xmin','f_sleepDev','f_rhr','f_injArea'];
 document.addEventListener('input', ev => { const t = ev.target, w = S.weeks[S.weekIdx];
   if (cur === 'log' && (LOGF.includes(t.id) || t.dataset.srpe != null || t.dataset.smin != null)) return void autosave();
   if (['p_startWeight','p_targetWeight','p_fightDate'].includes(t.id)) refreshCut();
