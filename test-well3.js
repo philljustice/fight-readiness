@@ -23,7 +23,7 @@ assert.equal(S.rhrScore(52, 50), 100); assert.equal(S.rhrScore(60, 50), 0); asse
 // flags
 const T = new Date('2026-11-05T12:00'), f = I.wellness([...es.map((e, i) => Object.assign({}, e, { date: S.ymd(new Date(2026, 10, i - 3)) })),
   Object.assign({ date:'2026-11-05', rhr:57, injury:'limiting', injuryArea:'Knee', ill:true, motivation:2, appetite:1, sleepDevice:'Garmin', sleepDev:45 }, core)], T).flags.map(x => x.text || x.item);
-['Limiting injury (Knee)', 'Feeling ill', 'Motivation', 'Appetite', 'Poor Garmin sleep score 45 (Poor)'].forEach(x => assert.ok(f.includes(x), x + ' | ' + f.join('|')));
+['Limiting injury (Knee)', 'Feeling ill', 'Low motivation (2/5)', 'Low appetite (1/5)', 'Poor Garmin sleep score 45 (Poor)'].forEach(x => assert.ok(f.includes(x), x + ' | ' + f.join('|')));
 assert.ok(f.some(x => /^Resting HR 57 bpm \(\+7 vs baseline 50\)/.test(x)), f.join('|'));
 // required items from WELL3_FROM only
 const v2 = (date, o) => Object.assign({ date, v:2 }, core, o);

@@ -9,6 +9,7 @@
   // Hooper-style check-in (sleep quality/duration is logged separately). Keys unchanged for data compatibility; 5 = best.
   const WELL = [['energy','Fatigue / energy','1 = always tired','5 = very fresh'],['soreness','Muscle soreness','1 = no soreness','5 = very sore'],['stress','Stress','1 = very relaxed','5 = very stressed'],['mood','Mood','1 = irritable / down','5 = very positive']];
   // Extra morning items required from S.WELL3_FROM (v2 days): motivation, appetite, and perceived sleep quality unless a watch score is used.
+  const FLAG_TXT = { energy:'Low energy / tired', soreness:'High muscle soreness', stress:'High stress', mood:'Low mood', sleepq:'Poor sleep quality', motivation:'Low motivation', appetite:'Low appetite' };
   const WELL3 = [['sleepq','Sleep quality','1 = very poor','5 = excellent'],['motivation','Motivation / readiness to train','1 = none','5 = can\'t wait'],['appetite','Appetite','1 = no appetite','5 = normal / hungry']];
   const ok15 = v => num(v) && +v >= 1 && +v <= 5;
   const well3Missing = e => !e || !(e.v >= 2) || String(e.date || '') < S.WELL3_FROM ? [] : WELL3.filter(([k]) => k === 'sleepq' ? !S.usesWatch(e.sleepDevice) && !ok15(e.sleepq) : !ok15(e[k])).map(([k, l]) => [k, l.split(' / ')[0].toLowerCase()]);
@@ -76,9 +77,9 @@
     const t = dayNum(ymd(today)), last7 = inRange(entries, t, 6, 0), base = inRange(entries, t, 27, 0);
     const a7 = avg(last7.map(dayWellness).filter(v => v != null)), a28 = avg(base.map(dayWellness).filter(v => v != null));
     const items = {}; WELL.forEach(([k]) => items[k] = avg(last7.map(e => e[k]).filter(v => num(v) && v >= 1)));
-    const flags = []; inRange(entries, t, 2, 0).forEach(e => { WELL.forEach(([k,l]) => { if (num(e[k]) && +e[k] >= 1 && S.wellGood(k, e[k]) <= 2) flags.push({ date:e.date, item:l, value:+e[k] }); });
+    const flags = []; inRange(entries, t, 2, 0).forEach(e => { WELL.forEach(([k,l]) => { if (num(e[k]) && +e[k] >= 1 && S.wellGood(k, e[k]) <= 2) flags.push({ date:e.date, item:l, value:+e[k], text:FLAG_TXT[k] + ' (' + e[k] + '/5)' }); });
       WELL3.forEach(([k, l]) => { if (k === 'sleepq' && S.usesWatch(e.sleepDevice) && num(e.sleepDev)) { const q = S.deviceSleepQuality(e.sleepDevice, e.sleepDev); if (q < 50) flags.push({ date:e.date, item:'Sleep score', value:+e.sleepDev, text:`Poor ${e.sleepDevice} sleep score ${e.sleepDev} (${S.deviceBand(e.sleepDevice, e.sleepDev)})` }); }
-        else if (ok15(e[k]) && +e[k] <= 2) flags.push({ date:e.date, item:l.split(' / ')[0], value:+e[k] }); });
+        else if (ok15(e[k]) && +e[k] <= 2) flags.push({ date:e.date, item:l.split(' / ')[0], value:+e[k], text:FLAG_TXT[k] + ' (' + e[k] + '/5)' }); });
       if (e.injury === 'limiting') flags.push({ date:e.date, item:'Injury', value:'limiting', text:`Limiting injury${e.injuryArea ? ' (' + e.injuryArea + ')' : ''}` });
       if (e.ill === true) flags.push({ date:e.date, item:'Illness', value:'yes', text:'Feeling ill' });
       { const b = S.rhrBaseline(entries, e.date); if (b != null && num(e.rhr) && +e.rhr - b >= S.RHR.SPIKE) flags.push({ date:e.date, item:'Resting HR', value:+e.rhr, text:`Resting HR ${e.rhr} bpm (+${Math.round(+e.rhr - b)} vs baseline ${Math.round(b)})` }); } });
@@ -222,13 +223,13 @@
     wk.forEach(e => { if (Array.isArray(e.sessions)) e.sessions.forEach((x,i) => { sch++; if (x.done === true) done++; else miss.push(e.date.slice(5)+' '+(x.label||'session '+(i+1))); }); else if (e.training != null) { sch++; if (e.training) done++; else miss.push(e.date.slice(5)); } });
     if (sch && done === sch) out.well.push(`All ${sch} scheduled sessions done`); else if (sch) out.missed.push(`${sch-done} of ${sch} sessions missed${miss.length?' ('+miss.slice(0,4).join(', ')+')':''}`);
     worst.forEach(([k,v]) => out.missed.push(`${NAMES[k]} only ${v}/100`));
-    const w = wellness(entries, today); if (w.flags.length) out.missed.push(`🚩 Low ratings: ${w.flags.slice(0,3).map(f=>f.item+' '+f.value).join(', ')}`);
+    const w = wellness(entries, today); if (w.flags.length) out.missed.push(`🚩 Wellness flags: ${w.flags.slice(0,3).map(f=>f.text||(f.item+' '+f.value)).join(', ')}`);
     const v = weightVerdict(entries, profile, today); if (v.word === 'On track') out.well.push('Weight on track'); else if (v.word === 'Too fast' || v.word === 'Too slow') out.missed.push(`Weight ${v.word.toLowerCase()}`);
     const tips = { nutrition:'Hit your nutrition plan or goal every day: prep meals ahead', training:'Make every scheduled session, or tell your coach early', sleep:`Aim for ${params.idealSleep||8}h of sleep: same bedtime nightly`, wellness:'Recovery: sleep, food and easier sessions; tell your coach how you feel', screen:'Cut recreational screens to 2h or less, especially before bed', family:'Plan real time with family or friends' };
     worst.forEach(([k]) => out.focus.push(tips[k]));
     if (v.word === 'Too fast') out.focus.push('Slow the cut to about 1%/week: eat enough carbs and protein');
     if (v.word === 'Too slow') out.focus.push('Tighten nutrition to get to about 0.5–1%/week loss');
-    if (w.flags.length && !worst.some(c=>c[0]==='wellness')) out.focus.push('Talk to your coach about the low wellness ratings');
+    if (w.flags.length && !worst.some(c=>c[0]==='wellness')) out.focus.push('Talk to your coach about the wellness flags');
     if (!out.focus.length) out.focus.push('Keep the same habits: consistency wins camps');
     if (!out.well.length) out.well.push('You showed up and logged: build from here');
     return out;
