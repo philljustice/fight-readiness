@@ -132,3 +132,4 @@ nav button.on{background:#444!important;border-color:#5a5a5a!important;color:#ff
 
 @media print{.hero::before{background-image:url(brand/mark-red-gold.png)!important;filter:none!important}}
 nav button span{white-space:nowrap;overflow:hidden;text-overflow:clip;letter-spacing:-.01em}
+.wkpick{gap:8px;flex-wrap:nowrap}.wkpick .btn{flex:0 0 52px;width:52px;padding:12px 0}.wkpick select{flex:1;min-width:0;width:auto;margin:0;font-size:1rem;text-align:center;text-align-last:center}

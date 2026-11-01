@@ -1,4 +1,4 @@
-const APP_VERSION='fr-v36';
+const APP_VERSION='fr-v37';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -312,8 +312,8 @@ const V = {
  },
  plan() {
   const w = S.weeks[S.weekIdx], f = (i,k,ph) => `<input data-d="${i}" data-k="${k}" placeholder="${ph}" value="${esc(w.days[i][k])}">`;
-  return `<div class="card noprint"><div class="row"><button class="btn alt" id="wkPrev" style="margin:0">◀</button>
-   <select id="wkSel">${S.weeks.map((x,i)=>`<option value="${i}" ${i==S.weekIdx?'selected':''}>Week of ${x.start}</option>`).join('')}</select>
+  return `<div class="card noprint"><div class="row wkpick"><button class="btn alt" id="wkPrev" style="margin:0">◀</button>
+   <select id="wkSel">${S.weeks.map((x,i)=>`<option value="${i}" ${i==S.weekIdx?'selected':''}>Week of ${new Date(x.start+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</option>`).join('')}</select>
    <button class="btn alt" id="wkNext" style="margin:0">▶</button></div>
    <button class="btn" id="wkDup">📋 Duplicate as next week</button><button class="btn alt" id="wkDel">Delete this week</button></div>
   <div class="card"><h3>🥊 Weekly Training Outline</h3>
