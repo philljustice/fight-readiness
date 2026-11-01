@@ -1,4 +1,4 @@
-const APP_VERSION='fr-v37';
+const APP_VERSION='fr-v38';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -26,6 +26,19 @@ const save = () => localStorage.setItem(KEY, JSON.stringify(S));
 const $ = s => document.querySelector(s), esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const today = () => Scoring.ymd(new Date());
 const res = () => Scoring.compute(S.entries, new Date(), Object.assign({}, S.params, {startDate:S.startDate||null, fightDate:(S.profile||{}).fightDate||null}));
+// Below par (Coach Report): categories under Scoring.PAR in the 3-week window plus weight, with the reasons.
+function belowParList(r) { const L = Scoring.belowPar(r, S.params), p = S.profile || {}, c = Insights.cutSafety(S.entries, new Date(), p), tw = +(p.targetWeight || S.targetWeight), lw = r.latestWeight;
+  const why = []; if (c.level) why.push(c.msg);
+  if (r.delta != null && tw > 0 && lw && +lw.weight > tw && r.delta > 0.5) why.push(`Gaining ${r.delta} lbs/wk while ${(+lw.weight - tw).toFixed(1)} lbs above target`);
+  if (why.length) L.push({ key:'weight', label:'Weight', score:null, why });
+  return L; }
+function belowParNote(r) { const un = Math.max(0, r.windowDays - r.daysLogged); return un ? `${un} of the last ${r.windowDays} days not logged (left out of the score, but no data to coach from).` : ''; }
+function belowParCard(r) { if (r.locked || !r.daysLogged) return ''; const L = belowParList(r), n = belowParNote(r);
+  return `<div class="card bpar"><h3>⚠️ Below par: why it's low</h3><p class="muted" style="margin:0 0 8px">Par = ${Scoring.PAR}/100 (green Fight Ready tier) per category over the last 3 weeks.</p>
+   ${L.length ? L.map(x => `<div class="bp-item"><b>${esc(x.label)}${x.score != null ? ` ${x.score}/100` : ''}</b><ul>${x.why.map(y => `<li>${esc(y)}</li>`).join('')}</ul></div>`).join('') : '<p class="bp-ok">✅ All categories on par.</p>'}
+   ${n ? `<p class="muted" style="margin:6px 0 0">${esc(n)}</p>` : ''}</div>`; }
+function belowParText(r) { if (r.locked || !r.daysLogged) return ''; const L = belowParList(r);
+  return `Below par (under ${Scoring.PAR}/100):\n` + (L.length ? L.map(x => `• ${x.label}${x.score != null ? ' ' + x.score + '/100' : ''}: ${x.why.join('; ')}`).join('\n') : '• All categories on par') + '\n'; }
 function reportHeader(r) { const p = S.profile || {}, cd = Profile.countdown(p.fightDate), lw = r.latestWeight, ws = Profile.weightStatus(lw && lw.weight, p.targetWeight);
   const cell = (l, v) => `<td><span class="muted">${l}</span><br><b>${esc(v||'—')}</b></td>`;
   return `<table class="hdr"><tr>${cell('Fighter', p.name + (p.nickname?' “'+p.nickname+'”':''))}${cell('Gym', p.gym)}${cell('Head coach', p.coach)}</tr>
@@ -83,7 +96,7 @@ function weeklySummary() { const r = res(), st = Insights.streak(S.entries), w =
   Insights.hydrationFlags(S.entries, new Date(), p).forEach(f => flags.push(f));
   const notes = S.entries.filter(e => e.notes && Scoring.dayNum(e.date) >= Scoring.dayNum(today())-6).map(e => `${e.date.slice(5)}: ${e.notes}`);
   return `Fighter: ${p.name||S.fighter||'—'}${p.gym?' ('+p.gym+')':''}\nDate: ${today()}\nScore: ${r.locked?lockMsg(r):r.score+'/100 – '+r.verdict+'\n'+breakdown(r)}\n` +
-   `Streak: ${st.current} days (best ${st.best}) • Days logged (3 wks): ${r.daysLogged}\n` +
+   belowParText(r) + `Streak: ${st.current} days (best ${st.best}) • Days logged (3 wks): ${r.daysLogged}\n` +
    `Training (7 days): ${tr7()} • Wellness (7 days, 1–5): ${w.avg7==null?'—':w.avg7.toFixed(1)}\n` +
    `Weight: ${r.latestWeight?r.latestWeight.weight+' lbs':'—'} • Trend: ${r.locked?'locked':(r.delta==null?'—':r.delta+' lbs/wk '+r.trend.emoji)} • Verdict: ${vd.word}\n` +
    Insights.reviewText(Insights.weekReview(S.entries, new Date(), S.params, p)) + '\n' +
@@ -105,7 +118,7 @@ function reportData() { const r = res(), p = S.profile||{}, P = weeklyParts(), w
   const lp = L.weeks[2] ? Math.round((L.weeks[3]-L.weeks[2])/L.weeks[2]*100) : null; if (lp != null && lp > 15) flags.push(`Training load up ${lp}% vs last week`);
   const rpes = wk.flatMap(e => Scoring.sessionsDone(e)).map(x => +x.rpe).filter(x => x > 0), sl = wk.map(e => +e.sleep).filter(x => x > 0), avg = a => a.length ? (a.reduce((s,x)=>s+x,0)/a.length).toFixed(1) : '—';
   return { subject: P.subj, name: P.name, meta: [p.gym && 'Gym: '+p.gym, p.coach && 'Coach: '+p.coach, p.weightClass].filter(Boolean).join(' • '),
-    score: r.daysLogged ? (r.locked ? Math.round(r.base) : r.score) : null, breakdown: breakdown(r), scoreLabel: r.locked ? `Early FightReady Score (${r.daysLogged} day${r.daysLogged==1?'':'s'})` : 'FightReady Score (3 weeks)',
+    belowPar: r.locked || !r.daysLogged ? null : { par: Scoring.PAR, items: belowParList(r), note: belowParNote(r) }, score: r.daysLogged ? (r.locked ? Math.round(r.base) : r.score) : null, breakdown: breakdown(r), scoreLabel: r.locked ? `Early FightReady Score (${r.daysLogged} day${r.daysLogged==1?'':'s'})` : 'FightReady Score (3 weeks)',
     verdict: r.locked ? lockMsg(r).replace('🔒 ','') : r.verdict,
     head: [['Days logged this week', `${wk.length}/7`], ['Streak', `${Insights.streak(S.entries).current} days`], ['Weight vs target', ws ? `${ws.current} lbs • ${ws.text}` : (lw ? lw.weight+' lbs' : '—')], ['Fight', cd ? cd.text : '—'],
       ['Wellness (1–5)', w.avg7==null?'—':w.avg7.toFixed(1)], ['Avg sleep', sl.length ? avg(sl)+' h' : '—']],
@@ -329,7 +342,7 @@ const V = {
   const r = res(), notes = S.entries.filter(e=>e.notes && Scoring.dayNum(e.date) >= Scoring.dayNum(today())-14).sort((a,b)=>a.date<b.date?1:-1);
   return `<div class="card"><h2 style="margin:0">🥊 Coach Report: FightReady Summary</h2>
   ${reportHeader(r)}<p class="muted">Report date: ${today()} • Data period: last 3 weeks (${r.daysLogged} days logged)</p></div>${r.locked?'':momCard(r)}
-  ${scoreHero(r)}${r.locked?`<div class="card"><p style="text-align:center"><b>${lockMsg(r)}</b></p>${todayRow()}</div>`:''}
+  ${scoreHero(r)}${r.locked?`<div class="card"><p style="text-align:center"><b>${lockMsg(r)}</b></p>${todayRow()}</div>`:''}${belowParCard(r)}
   <div class="card"><h3>Weight & trend</h3>${verdictLine()}<p>Latest: ${r.latestWeight?r.latestWeight.weight+' lbs ('+r.latestWeight.date+')':'—'}${+S.targetWeight?' • Target: '+esc(S.targetWeight)+' lbs':''}<br>
    7-day trend: ${r.locked?lockMsg(r):(r.delta==null?'—':r.delta+' lbs/wk')+' '+r.trend.emoji+' '+esc(r.trend.label)}</p>${cutWarn()}${weightChart()}</div>
   ${reviewCard()}${fightWeekCard()}

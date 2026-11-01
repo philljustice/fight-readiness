@@ -121,6 +121,46 @@
       delta, trend: trendLabel(delta), verdict: verdict(final), dataQuality: dataQuality(N),
       latestWeight: weighed.length ? weighed[weighed.length-1] : null, windowEntries: w };
   }
-  const api = { NUT_FULL, NUT_ZERO, NUT_HIT, MACRO_W, closeness, nutMode, nutritionDone, nutritionScore, nutritionHit, HYD_FROM, hydrationOK, hydrationRequired, WELL_KEYS, wellnessScore, trainingPct, sessionsDone, sessionLoad, DEFAULT_PARAMS, sleepScore, screenScore, weightDelta, trendLabel, compute, momentum, isConsistent, MOM, ymd, dayNum, verdict, dataQuality };
+
+  // Below par: for each category under PAR (75 = green "Fight Ready" tier) in the score window, list the inputs dragging it down.
+  const PAR = 75;
+  function belowPar(r, params = {}) { const p = Object.assign({}, DEFAULT_PARAMS, params), w = r.windowEntries || [], N = w.length, out = [];
+    if (!N) return out; const pl = (n, s) => n + ' ' + s + (n == 1 ? '' : 's'), f1 = x => (Math.round(x * 10) / 10).toFixed(1);
+    const add = (key, label, why) => { const v = r.cats[key]; if (v < PAR && why.length) out.push({ key, label, score: Math.round(v), why }); };
+    { const why = [], miss = w.filter(e => !nutritionDone(e)).length, cheat = w.filter(e => e.cheat).length;
+      const ys = w.filter(e => nutritionDone(e) && !e.cheat && nutMode(e) === 'yn' && e.nutrition !== true).length;
+      const off = w.filter(e => nutritionDone(e) && !e.cheat && nutMode(e) !== 'yn' && (nutritionScore(e) ?? 0) < NUT_HIT);
+      if (ys) why.push(`Plan not followed on ${pl(ys, 'day')} of ${N}`);
+      if (off.length) why.push(`Off calorie/macro target on ${pl(off.length, 'day')} of ${N} (avg ${Math.round(avg(off.map(e => nutritionScore(e) ?? 0)))}/100 on those days)`);
+      if (miss) why.push(`Not logged on ${pl(miss, 'day')} (scored 0)`);
+      if (cheat) why.push(`${pl(cheat, 'cheat day')} (counted as on plan)`);
+      add('nutrition', 'Nutrition', why); }
+    { const why = []; let sch = 0, done = 0, legacyMiss = 0; w.forEach(e => { if (Array.isArray(e.sessions)) { sch += e.sessions.length; done += e.sessions.filter(x => x.done === true).length; } else if (e.training !== true) legacyMiss++; });
+      const daysShort = w.filter(e => trainingPct(e) < 100).length;
+      if (sch > done) why.push(`Missed ${sch - done} of ${pl(sch, 'scheduled session')}`);
+      if (legacyMiss) why.push(`Training marked No/blank on ${pl(legacyMiss, 'day')}`);
+      if (daysShort) why.push(`${pl(daysShort, 'day')} of ${N} not fully completed`);
+      add('training', 'Training', why); }
+    { const why = [], sl = w.filter(e => num(e.sleep)).map(e => +e.sleep), un = N - sl.length;
+      if (sl.length) { why.push(`Average ${f1(avg(sl))}h vs ${p.idealSleep}h target`); const lo = sl.filter(h => h < p.idealSleep - 1).length, hi = sl.filter(h => h > p.idealSleep + 1).length;
+        if (lo) why.push(`Under ${p.idealSleep - 1}h on ${pl(lo, 'night')}`); if (hi) why.push(`Over ${p.idealSleep + 1}h on ${pl(hi, 'night')}`); }
+      if (un) why.push(`Sleep not logged on ${pl(un, 'day')}`);
+      add('sleep', 'Sleep', why); }
+    { const why = [], rated = w.filter(e => wellnessScore(e) != null), names = { energy:['Energy','low energy'], soreness:['Soreness','high soreness'], mood:['Mood','low mood'], stress:['Stress','high stress'] };
+      if (rated.length) WELL_KEYS.map(k => { const vs = rated.map(e => +e[k]); return { k, a: avg(vs), bad: vs.filter(v => v <= 2).length }; }).sort((x, y) => x.a - y.a)
+        .forEach(x => { if (x.a < 4 || x.bad) why.push(`${names[x.k][0]} avg ${f1(x.a)}/5${x.bad ? ` — ${names[x.k][1]} (1–2) on ${pl(x.bad, 'day')}` : ''}`); });
+      if (N - rated.length) why.push(`How-you-feel not fully rated on ${pl(N - rated.length, 'day')}`);
+      const hyd = w.filter(e => hydrationOK(e) && +e.hydration >= 6).length, hydMiss = w.filter(e => hydrationRequired(e) && !hydrationOK(e)).length;
+      if (hyd) why.push(`Dark first-pee colour (dehydrated) on ${pl(hyd, 'morning')}`); if (hydMiss) why.push(`Hydration not logged on ${pl(hydMiss, 'morning')}`);
+      add('wellness', 'Wellness', why); }
+    { const why = [], sc = w.filter(e => num(e.screen)).map(e => +e.screen), un = N - sc.length;
+      if (sc.length) { why.push(`Average ${f1(avg(sc))}h/day vs ${p.screenFree}h limit`); const ov = sc.filter(h => h > p.screenFree).length; if (ov) why.push(`Over ${p.screenFree}h on ${pl(ov, 'day')}`); }
+      if (un) why.push(`Screen time not logged on ${pl(un, 'day')}`);
+      add('screen', 'Screen Time', why); }
+    { const why = [], no = w.filter(e => e.family === false).length, bl = w.filter(e => e.family !== true && e.family !== false).length;
+      if (no) why.push(`No family/friends time on ${pl(no, 'day')} of ${N}`); if (bl) why.push(`Not logged on ${pl(bl, 'day')} (counted as No)`);
+      add('family', 'Family/Friends', why); }
+    return out; }
+  const api = { PAR, belowPar, NUT_FULL, NUT_ZERO, NUT_HIT, MACRO_W, closeness, nutMode, nutritionDone, nutritionScore, nutritionHit, HYD_FROM, hydrationOK, hydrationRequired, WELL_KEYS, wellnessScore, trainingPct, sessionsDone, sessionLoad, DEFAULT_PARAMS, sleepScore, screenScore, weightDelta, trendLabel, compute, momentum, isConsistent, MOM, ymd, dayNum, verdict, dataQuality };
   if (typeof module !== 'undefined') module.exports = api; else root.Scoring = api;
 })(this);

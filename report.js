@@ -25,7 +25,7 @@
         for (const side of [-1, 1]) { ctx.save(); ctx.translate(x, y); ctx.rotate(a + Math.PI / 2 + side * 0.7);
           ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(L / 2, -Wd, L, 0); ctx.quadraticCurveTo(L / 2, Wd, 0, 0); filled ? ctx.fill() : ctx.stroke(); ctx.restore(); } }
       ctx.restore(); } }
-  function draw(canvas, d, scale = 1) { const H = 3000; canvas.width = W * scale; canvas.height = H * scale; const ctx = canvas.getContext('2d'); ctx.scale(scale, scale);
+  function draw(canvas, d, scale = 1) { const H = 4400; canvas.width = W * scale; canvas.height = H * scale; const ctx = canvas.getContext('2d'); ctx.scale(scale, scale);
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = '#111'; ctx.fillRect(0, 0, W, 150); ctx.fillStyle = '#fff'; ctx.font = 'bold 46px -apple-system,Helvetica,Arial'; ctx.fillText('🥊 FightReady weekly report', PAD, 70);
     ctx.font = '28px Helvetica,Arial'; ctx.fillStyle = '#ddd'; ctx.fillText(d.subject.split(' – ').filter((_, i) => i !== 1).join(' • '), PAD, 118);
@@ -54,7 +54,12 @@
     d.cats.forEach(([l, v, wt]) => { ctx.fillStyle = INK; ctx.font = '28px Helvetica,Arial'; ctx.fillText(`${l} (${wt}%)`, PAD, y + 26);
       const bx = PAD + 330, bw = W - 2*PAD - 330 - 110; ctx.fillStyle = '#eee'; ctx.fillRect(bx, y + 4, bw, 28); ctx.fillStyle = v >= 80 ? OK : v >= 60 ? '#f9a825' : RED; ctx.fillRect(bx, y + 4, bw * Math.max(0, Math.min(100, v)) / 100, 28);
       ctx.fillStyle = INK; ctx.font = 'bold 28px Helvetica,Arial'; ctx.textAlign = 'right'; ctx.fillText(Math.round(v), W - PAD, y + 28); ctx.textAlign = 'left'; y += 50; });
-    y += 20; y = section(ctx, 'Daily FightReady score', y); y = line(ctx, d.daily, y, 200, { min: 0, max: 100 });
+    y += 20; if (d.belowPar) { y = section(ctx, `Below par (under ${d.belowPar.par}/100): why it's low`, y);
+      if (!d.belowPar.items.length) { ctx.fillStyle = OK; ctx.font = '28px Helvetica,Arial'; y = wrap(ctx, '✅ All categories on par', PAD, y + 4, W - 2*PAD, 36); }
+      d.belowPar.items.forEach(x => { ctx.fillStyle = RED; ctx.font = 'bold 28px Helvetica,Arial'; ctx.fillText(x.label + (x.score != null ? ' ' + x.score + '/100' : ''), PAD, y + 4); y += 40;
+        ctx.fillStyle = '#333'; ctx.font = '26px Helvetica,Arial'; x.why.forEach(t => { y = wrap(ctx, '• ' + t, PAD + 20, y, W - 2*PAD - 20, 34); }); y += 8; });
+      if (d.belowPar.note) { ctx.fillStyle = MUTE; ctx.font = '22px Helvetica,Arial'; y = wrap(ctx, d.belowPar.note, PAD, y + 4, W - 2*PAD, 30); } y += 20; }
+    y = section(ctx, 'Daily FightReady score', y); y = line(ctx, d.daily, y, 200, { min: 0, max: 100 });
     y = section(ctx, 'Weight vs target', y); y = line(ctx, d.weight, y, 220, { ref: d.target, unit: ' lbs' });
     y = section(ctx, 'Sleep hours', y); y = line(ctx, d.sleep, y, 200, { ref: d.idealSleep, unit: 'h' });
     if (d.hydration) { y = section(ctx, 'Hydration (first pee colour, last 7 mornings)', y); const hd = d.hydration.days, cw = (W - 2*PAD) / hd.length;

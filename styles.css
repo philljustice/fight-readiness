@@ -133,3 +133,5 @@ nav button.on{background:#444!important;border-color:#5a5a5a!important;color:#ff
 @media print{.hero::before{background-image:url(brand/mark-red-gold.png)!important;filter:none!important}}
 nav button span{white-space:nowrap;overflow:hidden;text-overflow:clip;letter-spacing:-.01em}
 .wkpick{gap:8px;flex-wrap:nowrap}.wkpick .btn{flex:0 0 52px;width:52px;padding:12px 0}.wkpick select{flex:1;min-width:0;width:auto;margin:0;font-size:1rem;text-align:center;text-align-last:center}
+.bpar{border:1.5px solid #B0101A}.bpar h3{border-left-color:#B0101A!important}.bp-item{margin:8px 0}.bp-item b{color:#ff8a80}.bp-item ul{margin:4px 0 0;padding-left:20px}.bp-item li{margin:3px 0}.bp-ok{color:#7ee29a;font-weight:700}
+@media print{.bpar{border-color:#B0101A!important}.bp-item b{color:#B0101A!important}.bp-ok{color:#2e7d32!important}}
