@@ -1,4 +1,4 @@
-const APP_VERSION='fr-v46';
+const APP_VERSION='fr-v47';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -761,7 +761,14 @@ function reminderTick() {
 setInterval(reminderTick, 60000); document.addEventListener('visibilitychange', () => { if (document.hidden) { if (_stTimer) sendStatusNow(); } else reminderTick(); });
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   const hadCtl = !!navigator.serviceWorker.controller; let reloaded = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => { if (!hadCtl || reloaded || sessionStorage.getItem('frReload')===APP_VERSION) return; reloaded = true; sessionStorage.setItem('frReload', APP_VERSION); location.reload(); });
+  // fr-v47: a new SW (skipWaiting + claim) can take over during the cold-open splash, because the browser checks sw.js on every
+  // navigation. Never hard-reload in front of the user: note the update, show a small toast after the splash, and swap to the
+  // new version silently the next time the app is backgrounded (so the next open is the new version, without a restart).
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (!hadCtl || reloaded) return; reloaded = true;
+    (window.__frSplashDone || Promise.resolve()).then(() => { const t = document.createElement('div'); t.id = 'updToast'; t.textContent = '✅ FightReady updated. New version applies next time you open it.';
+      t.style.cssText = 'position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:9000;background:#1d3b24;color:#fff;border-left:4px solid #43a047;padding:10px 12px;border-radius:8px;font-size:.9rem;box-shadow:0 4px 16px rgba(0,0,0,.5);transition:opacity .4s';
+      document.body.appendChild(t); setTimeout(() => { t.style.opacity = 0; setTimeout(() => t.remove(), 500); }, 4500); });
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { sessionStorage.setItem('fr_splash', '1'); location.reload(); } }, { once: true }); });
   // registered after the cold-open splash so SW install/precache doesn't compete with the animation
   const regSW = () => navigator.serviceWorker.register('sw.js', { updateViaCache:'none' }).then(reg => { reg.update().catch(()=>{}); document.addEventListener('visibilitychange', () => { if (document.visibilityState==='visible') reg.update().catch(()=>{}); }); }).catch(()=>{});
   window.addEventListener('load', () => Promise.race([window.__frSplashDone || Promise.resolve(), new Promise(r => setTimeout(r, 12000))]).then(regSW));

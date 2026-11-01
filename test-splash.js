@@ -17,3 +17,8 @@ assert.ok(/#splash:not\(\.sp-go\) \*\{animation-play-state:paused/.test(css), 'i
 assert.ok(/decode\(\)/.test(js) && /fonts\.load/.test(js) && Sp.MAXWAIT <= 4000, 'waits for images + font, capped');
 assert.ok(/__frSplashDone/.test(app) && /regSW/.test(app), 'SW registration deferred until after splash');
 console.log('splash gate ok');
+// fr-v47: no restart mid-splash
+const cc = app.slice(app.indexOf("addEventListener('controllerchange'"), app.indexOf('const regSW'));
+assert.ok(!/=>\s*\{[^{}]*location\.reload\(\);\s*\}\);/.test(cc.split('\n')[0]) && /visibilityState === 'hidden'/.test(cc), 'SW update never hard-reloads in front of the user; applies when backgrounded');
+assert.ok(/__frSplashRan/.test(js) && /pageshow/.test(js), 'timeline starts once per page load; bfcache restore handled');
+console.log('splash no-restart ok');

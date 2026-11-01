@@ -1,4 +1,4 @@
-// FightReady cold-open splash (fr-v46). Plays once per cold start (sessionStorage survives resume/tab switch,
+// FightReady cold-open splash (fr-v47). Plays once per cold start (sessionStorage survives resume/tab switch,
 // not a full app close). Tap to skip. Reduced motion: brief static logo. Ends by gliding the mark into the header logo
 // and counting the score up; on sign-up (no score yet) it simply fades.
 (function (root) {
@@ -16,6 +16,7 @@
 <img class="sp-crown" src="brand/splash/crown.webp" alt="" decoding="sync"><img class="sp-fr sp-f" src="brand/splash/f.webp" alt="" decoding="sync"><img class="sp-fr sp-r" src="brand/splash/r.webp" alt="" decoding="sync"></div>
 <div class="sp-word">FIGHT<b>READY</b></div></div><div class="sp-skip sp-hide-rm">tap to skip</div>`;
   function run(doc, win) {
+    if (win.__frSplashRan) return null; win.__frSplashRan = true; // guard: one timeline per page load
     let played = false; try { played = !!win.sessionStorage.getItem(KEY); } catch (e) {}
     if (!shouldPlay({ search: win.location.search, hidden: doc.visibilityState === 'hidden', played })) { doc.documentElement.classList.remove('sp-pre'); return null; }
     const REC = /[?&]splashrec\b/.test(win.location.search), rm = win.matchMedia && win.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -54,6 +55,7 @@
       const frames = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
       return Promise.all([...imgs, font]).then(idle).then(frames).then(() => true); }
     const capped = new Promise(r => setTimeout(() => r(false), MAXWAIT));
+    win.addEventListener('pageshow', ev => { if (ev.persisted) finish(); }); // restored from back/forward cache: don't resume a half-played splash
     const api = { END, buildOut, tickOut, finish, el: sp, done }; root.__frSplash = api;
     if (REC) { sp.classList.add('sp-go'); return api; }
     const reveal = () => { const os = buildOut(), st = performance.now(), total = os.total;
