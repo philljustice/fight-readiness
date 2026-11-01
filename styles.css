@@ -86,7 +86,10 @@ nav button.on{background:#E8A828;border-color:#ffd36b;color:#000}
 .bar i{background:#E8A828}
 .hint{background:#2a0a0c;border-left-color:#B0101A}
 .yn button.y.on{background:#E8A828;border-color:#E8A828;color:#000}.yn button.n.on{background:#B0101A;border-color:#B0101A}
-.tile{background:#161616!important;border-color:#E8A82866!important;color:#fff!important}
+.tile.todo{background:#161616;border-color:#E8A82866;color:#fff}.tile.todo .tk{color:#E8A828}
+.tile.done{background:#0f2a1a;border-color:#2e9d55;color:#d8f5dc;box-shadow:none}.tile.done .tt b{color:#fff}
+.tile.done .tk{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:#2e9d55;color:#fff;font-size:1.2rem}
+.tile.done .ts::before{content:'LOGGED \2022  ';color:#7ee29a;font-weight:800;letter-spacing:.05em}
 .tile b,.tile strong{font-family:'Exo2';font-style:italic}
 
 .hero::before{content:'';display:block;width:96px;height:72px;margin:0 auto 6px;background:url(brand/mark-white-gold.png) center/contain no-repeat;filter:drop-shadow(0 0 1px #000) drop-shadow(0 3px 8px rgba(0,0,0,.65))}
