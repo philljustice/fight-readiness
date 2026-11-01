@@ -131,3 +131,4 @@ nav button.on{background:#444!important;border-color:#5a5a5a!important;color:#ff
 @media print{.mom-chip{background:#f2f2f2!important;border-color:#bbb!important}}
 
 @media print{.hero::before{background-image:url(brand/mark-red-gold.png)!important;filter:none!important}}
+nav button span{white-space:nowrap;overflow:hidden;text-overflow:clip;letter-spacing:-.01em}
