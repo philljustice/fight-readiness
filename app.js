@@ -1,4 +1,4 @@
-const APP_VERSION='fr-v30';
+const APP_VERSION='fr-v31';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -225,12 +225,12 @@ const V = {
   const r = res(), lw = r.latestWeight;
   const isWeighDay = [1,4].includes(new Date().getDay()) && !S.entries.some(e=>e.date===today() && +e.weight>0);
   const dueNow = Reminders.due(S.entries.find(e=>e.date===today()), new Date(), S.reminders.morning, S.reminders.evening);
-  return `${day1Banner(false)}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning log not done: sleep hours, nutrition plan, first pee colour, how you feel (energy, soreness, mood, stress)'+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: each training session (effort + minutes), screen hours, family/friends, notes'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${weeklyCard()}${fightCard()}${fightWeekCard()}${cheatCard()}${streakCard()}${nutCard()}
-  ${isWeighDay?'<div class="card hint">⚖️ It\'s a weigh-in day (Mon/Thu). Weigh in this morning, fasted, and log it.</div>':''}
-  ${r.locked?`${earlyCard(r)}${todayCard()}<div class="card"><h3>Categories so far (${r.daysLogged} day${r.daysLogged==1?'':'s'})</h3>${catTable(r)}<p class="muted">Consistency bonus: 🔒 unlocks in ${r.unlockIn} day${r.unlockIn==1?'':'s'}.</p></div>`:`${todayCard()}
-  <div class="card"><div class="muted" style="text-align:center">FightReady Score</div><div class="big">${r.daysLogged?r.score:'—'}</div>
+  const top = r.locked ? earlyCard(r) : `<div class="card"><div class="muted" style="text-align:center">FightReady Score</div><div class="big">${r.daysLogged?r.score:'—'}</div>
   <p style="text-align:center">${r.daysLogged?esc(r.verdict):'No entries in the last 3 weeks yet.'}</p>
-  <p class="muted" style="text-align:center">Base ${r.base.toFixed(1)} + bonus ${r.bonus} • Data Quality: ${esc(r.dataQuality)} (${r.daysLogged} days logged)</p></div>
+  <p class="muted" style="text-align:center">Base ${r.base.toFixed(1)} + bonus ${r.bonus} • Data Quality: ${esc(r.dataQuality)} (${r.daysLogged} days logged)</p></div>`;
+  return `${top}${day1Banner(false)}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning log not done: sleep hours, nutrition plan, first pee colour, how you feel (energy, soreness, mood, stress)'+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: each training session (effort + minutes), screen hours, family/friends, notes'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${weeklyCard()}${fightCard()}${fightWeekCard()}${cheatCard()}${streakCard()}${nutCard()}
+  ${isWeighDay?'<div class="card hint">⚖️ It\'s a weigh-in day (Mon/Thu). Weigh in this morning, fasted, and log it.</div>':''}
+  ${r.locked?`${todayCard()}<div class="card"><h3>Categories so far (${r.daysLogged} day${r.daysLogged==1?'':'s'})</h3>${catTable(r)}<p class="muted">Consistency bonus: 🔒 unlocks in ${r.unlockIn} day${r.unlockIn==1?'':'s'}.</p></div>`:`${todayCard()}
   <div class="card"><h3>Categories (last 3 weeks)</h3>${catTable(r)}
   <p>Core consistency (Nutrition hit + all Training done${(S.params.nutMode||'yn')==='yn'?'':'; goal days count at 80+'}): <b>${r.consistency.toFixed(0)}%</b> → ${r.bonus?'+'+r.bonus+' pts for daily discipline!':'Build streaks on both key plans'}</p>
   <p class="muted">Bonus: +5 at ≥90%, +3 at ≥75%, +1 at ≥60%.</p></div>`}
