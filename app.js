@@ -1,4 +1,4 @@
-const APP_VERSION='fr-v43';
+const APP_VERSION='fr-v44';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -748,7 +748,9 @@ setInterval(reminderTick, 60000); document.addEventListener('visibilitychange', 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   const hadCtl = !!navigator.serviceWorker.controller; let reloaded = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (!hadCtl || reloaded || sessionStorage.getItem('frReload')===APP_VERSION) return; reloaded = true; sessionStorage.setItem('frReload', APP_VERSION); location.reload(); });
-  navigator.serviceWorker.register('sw.js', { updateViaCache:'none' }).then(reg => { reg.update().catch(()=>{}); document.addEventListener('visibilitychange', () => { if (document.visibilityState==='visible') reg.update().catch(()=>{}); }); }).catch(()=>{});
+  // registered after the cold-open splash so SW install/precache doesn't compete with the animation
+  const regSW = () => navigator.serviceWorker.register('sw.js', { updateViaCache:'none' }).then(reg => { reg.update().catch(()=>{}); document.addEventListener('visibilitychange', () => { if (document.visibilityState==='visible') reg.update().catch(()=>{}); }); }).catch(()=>{});
+  window.addEventListener('load', () => Promise.race([window.__frSplashDone || Promise.resolve(), new Promise(r => setTimeout(r, 12000))]).then(regSW));
 }
 if (!S.profile && S.fighter) S.profile = { name:S.fighter, coach:S.coach||'', targetWeight:S.targetWeight||'', startWeight:'' }; // migrate older installs
 { const q = new URLSearchParams(location.search).get('tab'); show(['dash','log','plan','report','setup','help'].includes(q) ? q : 'dash'); }

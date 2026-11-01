@@ -47,3 +47,6 @@
 
 header.sp-wait::before{visibility:hidden}
 #splash{pointer-events:auto}
+
+/* readiness gate: hold every intro animation at frame 0 (black) until splash.js adds .sp-go */
+#splash:not(.sp-go) *{animation-play-state:paused!important}

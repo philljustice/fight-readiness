@@ -71,7 +71,7 @@ ul.chk{margin:8px 0 0;padding-left:20px}ul.chk li{margin:6px 0}ul.chk a{color:#f
 .card.hero *{color:#111!important;text-shadow:none!important}.hero-ring .trk{stroke:#e3e3e3!important}.hero .hero-ring .val{stroke:#1e6fb8!important;transition:none}.hero.elite .hero-ring .val{stroke:#2e9d55!important}.hero.build .hero-ring .val{stroke:#d9771e!important}
 .hero-badge{background:#f2f2f2!important;border-color:#bbb!important}.hero-ring svg{max-height:none!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 /* ===== BRAND PREVIEW ===== */
-@font-face{font-family:'Exo2';src:url(fonts/exo2i.ttf);font-style:italic;font-weight:100 900}
+@font-face{font-family:'Exo2';src:url(fonts/exo2i.woff2) format('woff2');font-style:italic;font-weight:100 900}
 body{background:#0b0b0b;color:#fff}
 header{background:#000;border-bottom:2px solid #E8A828;display:flex;align-items:center;gap:10px;padding:8px 16px}
 header h1{font-family:'Exo2';font-style:italic;font-weight:900;letter-spacing:.06em;color:#E8A828;text-transform:uppercase;font-size:1.25rem}

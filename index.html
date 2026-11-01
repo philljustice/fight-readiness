@@ -3,6 +3,9 @@
 <meta name="theme-color" content="#000000"><title>FightReady</title>
 <link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icons/favicon-32.png" sizes="32x32"><link rel="icon" href="icons/icon-192.png" sizes="192x192">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="FightReady">
+<link rel="preload" as="image" href="brand/splash/f.webp"><link rel="preload" as="image" href="brand/splash/r.webp"><link rel="preload" as="image" href="brand/splash/crown.webp"><link rel="preload" as="font" type="font/woff2" href="fonts/exo2i.woff2" crossorigin>
+<style>html.sp-pre,html.sp-pre body{background:#000!important}html.sp-pre body>*{visibility:hidden!important}</style>
+<script>/* cold-open splash pre-gate: black until splash.js mounts its overlay (fail-safe 15s) */try{if(!/[?&]nosplash\b/.test(location.search)&&(!sessionStorage.getItem('fr_splash')||/[?&](replay|splashrec)\b/.test(location.search))&&document.visibilityState!=='hidden'){document.documentElement.classList.add('sp-pre');setTimeout(function(){document.documentElement.classList.remove('sp-pre')},15000)}}catch(e){}</script>
 <link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="splash.css"></head><body>
 <header><h1 id="title">FightReady</h1></header>
 <main id="view"></main>
