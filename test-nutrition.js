@@ -6,7 +6,7 @@ near(S.closeness(2000, 2000), 100); near(S.closeness(2100, 2000), 100); near(S.c
 near(S.closeness(2300, 2000), 60); near(S.closeness(1700, 2000), 60); // 15% off -> 60
 near(S.closeness(2600, 2000), 0); near(S.closeness(1000, 2000), 0); near(S.closeness(2500, 2000), 20);
 assert.equal(S.closeness('', 2000), null); assert.equal(S.closeness(2000, 0), null);
-const base = { date:'2026-10-29', v:2, sessions:[], family:true, sleep:8, screen:1, energy:5, soreness:5, mood:5, stress:5, hydration:2 };
+const base = { date:'2026-10-29', v:2, sessions:[], family:true, sleep:8, screen:1, energy:5, soreness:1, mood:5, stress:1, hydration:2 };
 const yn = o => Object.assign({}, base, { nutrition:true }, o);
 const kc = (k, o) => Object.assign({}, base, { nmode:'kcal', ntarget:{ kcal:2400 }, kcal:k }, o);
 const mc = (p, c, f, o) => Object.assign({}, base, { nmode:'macros', ntarget:{ protein:180, carbs:250, fat:70 }, protein:p, carbs:c, fat:f }, o);
@@ -40,6 +40,6 @@ assert.ok(/Yes or No/.test(I.checklist(yn({ nutrition:null })).find(x => x.key =
 // reminders: goal nutrition belongs to the evening reminder
 assert.ok(R.morningDone(kc(''))); assert.ok(!R.eveningDone(kc(''))); assert.ok(R.eveningDone(kc(2400)));
 // CSV columns
-assert.deepEqual(I.CSV_COLS.slice(-6), ['Nutrition_Mode','Calories','Protein_g','Carbs_g','Fat_g','Nutrition_Score']);
-assert.ok(I.toCSV([kc(2760)]).trim().split('\r\n')[1].endsWith(',kcal,2760,,,,60'));
+assert.deepEqual(I.CSV_COLS.slice(-7,-1), ['Nutrition_Mode','Calories','Protein_g','Carbs_g','Fat_g','Nutrition_Score']);
+assert.ok(I.toCSV([kc(2760)]).trim().split('\r\n')[1].endsWith(',kcal,2760,,,,60,2'));
 console.log('nutrition tests OK');

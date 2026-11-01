@@ -1,6 +1,6 @@
 // Earned weekend cheat day. Run: node test-cheatday.js
 const C = require('./cheat.js'), S = require('./scoring.js'), I = require('./insights.js'), assert = require('assert');
-const mk = (d, o) => Object.assign({ date:d, v:2, sessions:[], nutrition:true, family:true, sleep:8, screen:1, energy:5, soreness:5, mood:5, stress:5, hydration:2, weight:'', notes:'' }, o);
+const mk = (d, o) => Object.assign({ date:d, v:2, sessions:[], nutrition:true, family:true, sleep:8, screen:1, energy:5, soreness:1, mood:5, stress:1, hydration:2, weight:'', notes:'' }, o);
 const days = (from, n, o) => Array.from({ length:n }, (_, i) => { const d = new Date(from + 'T12:00'); d.setDate(d.getDate() + i); return mk(S.ymd(d), typeof o === 'function' ? o(i) : o); });
 const at = d => new Date(d + 'T12:00');
 const START = '2026-10-12'; // Monday: first weekend of camp = Oct 17-18 (blocked); Oct 24-25 is the first eligible weekend

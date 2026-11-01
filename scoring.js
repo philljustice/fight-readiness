@@ -6,7 +6,14 @@
     bonusTiers:[[90,5],[75,3],[60,1]],
     // Nutrition mode: 'yn' (plan followed Yes/No, default), 'kcal' (daily calorie goal) or 'macros' (protein/carbs/fat grams)
     nutMode:'yn', nutKcal:'', nutP:'', nutC:'', nutF:'' };
-  const WELL_KEYS = ['energy','soreness','mood','stress']; // all stored 1-5 with 5 = best (fresh / no soreness / great / no stress)
+  const WELL_KEYS = ['energy','soreness','mood','stress']; // all stored 1-5. Energy/mood: 5 = best. Soreness/stress (scale v2): 5 = very sore / very stressed (worst).
+  const WELL_INV = ['soreness','stress'], WELL_SCALE = 2;
+  const wellGood = (k, v) => WELL_INV.includes(k) ? 6 - +v : +v; // 1 = worst .. 5 = best, for scoring
+  // One-time migration: scale v1 stored soreness/stress as 5 = best. Flip to v2 (v -> 6-v). Idempotent via state.wellScale.
+  function migrateWellScale(st) { if (!st || st.wellScale === WELL_SCALE) return false;
+    (st.entries || []).forEach(e => WELL_INV.forEach(k => { if (isNumW(e[k]) && +e[k] >= 1 && +e[k] <= 5) e[k] = 6 - +e[k]; }));
+    st.wellScale = WELL_SCALE; return true; }
+  const isNumW = v => v !== '' && v != null && !isNaN(v);
   // Morning hydration: first-pee colour swatch 1 (pale) .. 8 (dark amber/brown). Stored as e.hydration (1-8). Does not affect any score.
   // Required only for new days (v2 entries dated HYD_FROM or later); older days without it still count complete.
   const HYD_FROM = '2026-10-28';
@@ -15,7 +22,7 @@
   const isNum = v => v !== '' && v != null && !isNaN(v);
   // Wellness 0-100 = average of the four ratings mapped 1->0 ... 5->100. null if not all four rated.
   function wellnessScore(e) { if (!e) return null; const v = WELL_KEYS.map(k => e[k]);
-    if (!v.every(x => isNum(x) && +x >= 1 && +x <= 5)) return null; return v.reduce((s,x)=>s+(+x-1)*25,0)/4; }
+    if (!v.every(x => isNum(x) && +x >= 1 && +x <= 5)) return null; return WELL_KEYS.reduce((s,k)=>s+(wellGood(k, e[k])-1)*25,0)/4; }
   // Training 0-100 for one day. v2 entries: % of scheduled sessions completed (rest day = 100). Legacy: Y=100, N/blank=0.
   function trainingPct(e) { if (!e) return 0;
     if (Array.isArray(e.sessions)) { if (!e.sessions.length) return 100; return e.sessions.filter(x => x.done === true).length / e.sessions.length * 100; }
@@ -147,8 +154,8 @@
       if (un) why.push(`Sleep not logged on ${pl(un, 'day')}`);
       add('sleep', 'Sleep', why); }
     { const why = [], rated = w.filter(e => wellnessScore(e) != null), names = { energy:['Energy','low energy'], soreness:['Soreness','high soreness'], mood:['Mood','low mood'], stress:['Stress','high stress'] };
-      if (rated.length) WELL_KEYS.map(k => { const vs = rated.map(e => +e[k]); return { k, a: avg(vs), bad: vs.filter(v => v <= 2).length }; }).sort((x, y) => x.a - y.a)
-        .forEach(x => { if (x.a < 4 || x.bad) why.push(`${names[x.k][0]} avg ${f1(x.a)}/5${x.bad ? ` — ${names[x.k][1]} (1–2) on ${pl(x.bad, 'day')}` : ''}`); });
+      if (rated.length) WELL_KEYS.map(k => { const vs = rated.map(e => +e[k]), inv = WELL_INV.includes(k); return { k, inv, a: avg(vs), g: avg(vs.map(v => wellGood(k, v))), bad: vs.filter(v => wellGood(k, v) <= 2).length }; }).sort((x, y) => x.g - y.g)
+        .forEach(x => { if (x.g < 4 || x.bad) why.push(`${names[x.k][0]} avg ${f1(x.a)}/5${x.bad ? ` — ${names[x.k][1]} (${x.inv ? '4–5' : '1–2'}) on ${pl(x.bad, 'day')}` : ''}`); });
       if (N - rated.length) why.push(`How-you-feel not fully rated on ${pl(N - rated.length, 'day')}`);
       const hyd = w.filter(e => hydrationOK(e) && +e.hydration >= 6).length, hydMiss = w.filter(e => hydrationRequired(e) && !hydrationOK(e)).length;
       if (hyd) why.push(`Dark first-pee colour (dehydrated) on ${pl(hyd, 'morning')}`); if (hydMiss) why.push(`Hydration not logged on ${pl(hydMiss, 'morning')}`);
@@ -161,6 +168,6 @@
       if (no) why.push(`No family/friends time on ${pl(no, 'day')} of ${N}`); if (bl) why.push(`Not logged on ${pl(bl, 'day')} (counted as No)`);
       add('family', 'Family/Friends', why); }
     return out; }
-  const api = { PAR, belowPar, NUT_FULL, NUT_ZERO, NUT_HIT, MACRO_W, closeness, nutMode, nutritionDone, nutritionScore, nutritionHit, HYD_FROM, hydrationOK, hydrationRequired, WELL_KEYS, wellnessScore, trainingPct, sessionsDone, sessionLoad, DEFAULT_PARAMS, sleepScore, screenScore, weightDelta, trendLabel, compute, momentum, isConsistent, MOM, ymd, dayNum, verdict, dataQuality };
+  const api = { WELL_INV, WELL_SCALE, wellGood, migrateWellScale, PAR, belowPar, NUT_FULL, NUT_ZERO, NUT_HIT, MACRO_W, closeness, nutMode, nutritionDone, nutritionScore, nutritionHit, HYD_FROM, hydrationOK, hydrationRequired, WELL_KEYS, wellnessScore, trainingPct, sessionsDone, sessionLoad, DEFAULT_PARAMS, sleepScore, screenScore, weightDelta, trendLabel, compute, momentum, isConsistent, MOM, ymd, dayNum, verdict, dataQuality };
   if (typeof module !== 'undefined') module.exports = api; else root.Scoring = api;
 })(this);

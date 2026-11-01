@@ -9,7 +9,7 @@ assert.equal(I.streak([full(0,{sleep:''}),full(1)], today).current,1); // today 
 assert.equal(I.streak([full(2)], today).current,0); // missed yesterday
 assert.equal(I.isComplete(full(0,{family:null})), false);
 // v2 completion needs wellness + all sessions answered with effort/minutes
-const W4 = {energy:4,soreness:4,mood:4,stress:4}, v2 = o => full(0, Object.assign({v:2, training:undefined, sessions:[{label:'A',done:true,rpe:6,mins:60}]}, W4, o));
+const W4 = {energy:4,soreness:2,mood:4,stress:2}, v2 = o => full(0, Object.assign({v:2, training:undefined, sessions:[{label:'A',done:true,rpe:6,mins:60}]}, W4, o));
 assert.equal(I.isComplete(v2({})), true); assert.deepEqual(I.missing(v2({energy:''})), ['wellness (energy, soreness, mood, stress)']);
 assert.deepEqual(I.missing(v2({sessions:[{done:true,rpe:'',mins:60}]})), ['session effort + minutes']);
 assert.deepEqual(I.missing(v2({sessions:[{done:null}]})), ['training']); assert.equal(I.isComplete(v2({sessions:[]})), true);
@@ -17,8 +17,8 @@ assert.equal(I.isComplete(v2({sessions:[{done:false,rpe:'',mins:''}]})), true);
 assert.equal(I.missing(undefined).length, 6); assert.equal(I.isPartial({date:d(0),weight:170,nutrition:null}), true);
 const g = I.grid([full(0),{date:d(1),weight:170}], today, 7); assert.equal(g.length,7); assert.equal(g[6].status,'done'); assert.equal(g[5].status,'partial'); assert.equal(g[0].status,'none');
 // wellness
-assert.equal(I.dayWellness({energy:4,soreness:2,mood:'',stress:null}),3); assert.equal(I.dayWellness({}),null);
-let w = I.wellness([full(0,{energy:1,mood:5}),full(1,{energy:3,soreness:3}),full(10,{energy:5,soreness:5,mood:5,stress:5})], today);
+assert.equal(I.dayWellness({energy:4,soreness:4,mood:'',stress:null}),3); assert.equal(I.dayWellness({}),null);
+let w = I.wellness([full(0,{energy:1,mood:5}),full(1,{energy:3,soreness:3}),full(10,{energy:5,soreness:1,mood:5,stress:1})], today);
 assert.equal(w.days,2); assert.equal(w.flags.length,1); assert.equal(w.flags[0].item,'Fatigue / energy'); assert.equal(w.items.energy,2);
 // load
 assert.equal(I.sessionLoad({rpe:7,mins:90}),630); assert.equal(I.sessionLoad({rpe:7,mins:''}),null);
@@ -34,11 +34,11 @@ let p = I.cutSafety([full(0,{weight:170})], today, {targetWeight:155, fightDate:
 p = I.cutSafety([full(0,{weight:160})], today, {targetWeight:155, fightDate:S.ymd(new Date(2026,9,19+70))}).pace; assert.equal(p.level,'ok');
 // CSV
 const csv = I.toCSV([full(0,{notes:'sore, "left" knee',rpe:6,mins:90}), full(1)]);
-const csv2 = I.toCSV([full(0,{v:2,energy:4,soreness:4,mood:4,stress:4,sessions:[{label:'Wrestling',done:true,rpe:7,mins:90},{label:'Strength',done:false,rpe:'',mins:''}],extra:{label:'Run',rpe:3,mins:20}})]).trim().split('\r\n')[1];
+const csv2 = I.toCSV([full(0,{v:2,energy:4,soreness:2,mood:4,stress:2,sessions:[{label:'Wrestling',done:true,rpe:7,mins:90},{label:'Strength',done:false,rpe:'',mins:''}],extra:{label:'Run',rpe:3,mins:20}})]).trim().split('\r\n')[1];
 assert.ok(csv2.includes(',75,2,1,50,Wrestling,Y,7,90,Strength,N,,,Run,3,20,690,Y'), csv2); const lines = csv.trim().split('\r\n');
 assert.equal(lines[0], I.CSV_COLS.join(',')); assert.ok(lines[1].startsWith(d(1)+',Y,Y,8,1,N')); assert.ok(lines[2].includes('"sore, ""left"" knee"')); assert.ok(lines[2].includes(',1,100,,Y,6,90,,,,,,,,540,Y'), lines[2]);
 // core score unaffected by optional fields
-const base = Array.from({length:10},(_,i)=>full(i)); const extra = base.map(e=>Object.assign({},e,{energy:1,soreness:1,rpe:10,mins:200}));
+const base = Array.from({length:10},(_,i)=>full(i)); const extra = base.map(e=>Object.assign({},e,{energy:1,soreness:5,rpe:10,mins:200}));
 assert.equal(S.compute(base,today).score, S.compute(extra,today).score);
 // impossible-cut check
 const fd = n => S.ymd(new Date(2026,9,19+n));
@@ -58,7 +58,7 @@ assert.equal(I.fightWeek(fd(8),today),null); assert.equal(I.fightWeek(fd(-1),tod
 let fw = I.fightWeek(fd(3),today); assert.equal(fw.days.length,8); assert.equal(fw.days[0].offset,-7); assert.equal(fw.days[7].date,fd(3)); assert.ok(fw.days.find(d=>d.today).offset===-3);
 assert.ok(!fw.days.some(d => /sauna/i.test(d.water) && !/no sauna/i.test(d.water)));
 // weekly review
-const wkd = Array.from({length:7},(_,i)=>full(i,{v:2,family:true,energy:5,soreness:5,mood:5,stress:5,sessions:[{label:'Wrestling',done:i!==2,rpe:i!==2?6:'',mins:i!==2?60:''}],screen:i<3?5:1}));
+const wkd = Array.from({length:7},(_,i)=>full(i,{v:2,family:true,energy:5,soreness:1,mood:5,stress:1,sessions:[{label:'Wrestling',done:i!==2,rpe:i!==2?6:'',mins:i!==2?60:''}],screen:i<3?5:1}));
 let rv = I.weekReview(wkd, today, S.DEFAULT_PARAMS, {});
 assert.ok(rv.missed.some(x=>/1 of 7 sessions missed.*Wrestling/.test(x)), rv.missed); assert.ok(rv.missed.some(x=>/Screen time/.test(x))); assert.ok(rv.focus.some(x=>/screens/.test(x)));
 assert.ok(rv.well.some(x=>/Nutrition 100/.test(x))); assert.ok(I.reviewText(rv).startsWith('What went well: '));
@@ -82,7 +82,7 @@ assert.deepEqual(I.dayStatus(v2({})), {complete:true, missing:0}); assert.deepEq
 assert.deepEqual(Object.keys(I.dayStatus(v2({notes:'secret', weight:180}))).sort(), ['complete','missing']);
 console.log('All insights tests passed');
 // log menu: sectionInfo agrees with sections()/checklist() and maps every item to a tile
-{ const W = {energy:4,soreness:4,mood:4,stress:4}, base = { date:d(0), v:2, nutrition:null, training:null, family:null, sleep:'', screen:'', sessions:[{label:'A',done:null,rpe:'',mins:''},{label:'B',done:null,rpe:'',mins:''}] };
+{ const W = {energy:4,soreness:2,mood:4,stress:2}, base = { date:d(0), v:2, nutrition:null, training:null, family:null, sleep:'', screen:'', sessions:[{label:'A',done:null,rpe:'',mins:''},{label:'B',done:null,rpe:'',mins:''}] };
   const cases = [undefined, base, Object.assign({}, base, {sleep:8}, W), Object.assign({}, base, {nutrition:true, sleep:8, screen:1, family:true}, W, {sessions:[{label:'A',done:true,rpe:7,mins:60},{label:'B',done:true,rpe:'',mins:''}]}),
     Object.assign({}, base, {nutrition:false, sleep:7, screen:2, family:false}, W, {sessions:[{done:true,rpe:7,mins:60},{done:false,rpe:'',mins:''}]}), Object.assign({}, base, {sessions:[]}), full(0)];
   cases.forEach(c => { const info = I.sectionInfo(c), st = I.sections(c); assert.deepEqual(info.map(x => x.key), ['morning','nutrition','training','evening']);

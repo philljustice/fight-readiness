@@ -23,7 +23,7 @@
       `SUMMARY:${esc(summary)}`, `DESCRIPTION:${esc(desc + (url ? '\nOpen app: ' + url : ''))}`, ...(url ? [`URL:${url}`] : []),
       'TRANSP:TRANSPARENT', 'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${esc(summary)}`, 'TRIGGER:-PT0M', 'END:VALARM', 'END:VEVENT'];
     const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//FightReady//Reminders//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:FightReady',
-      ...ev('morning', morning, 'FREQ=DAILY', '🥊 Morning log: sleep + nutrition + how you feel', 'Log last night\'s sleep hours, whether you\'re following your nutrition plan today, and how you feel (energy, soreness, mood, stress 1-5).'),
+      ...ev('morning', morning, 'FREQ=DAILY', '🥊 Morning log: sleep + nutrition + how you feel', 'Log last night\'s sleep hours, whether you\'re following your nutrition plan today, and how you feel (energy, soreness, mood, stress 1-5; soreness and stress: 5 = most).'),
       ...ev('weighin', morning, 'FREQ=WEEKLY;BYDAY=MO,TH', '⚖️ Weigh-in day (Mon/Thu)', 'Weigh in before eating: after the bathroom, same scale, minimal clothing. Log the weight in the app.', wStart),
       ...ev('evening', evening, 'FREQ=DAILY', '🥊 Evening log: training + screen + family', 'Log training (each session done Y/N, effort RPE + minutes), recreational screen hours, family/friends time, and any notes (injuries, illness, soreness).'),
       ...ev('weekly', '18:00', 'FREQ=WEEKLY;BYDAY=SU', 'Send weekly FightReady report to Phill', 'Open the FightReady app and tap "Send weekly report to Phill" (then pick Mail and tap Send).', sun),

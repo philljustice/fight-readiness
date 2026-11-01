@@ -1,6 +1,6 @@
 const S = require('./scoring.js'), I = require('./insights.js'), R = require('./reminders.js'), assert = require('assert'), fs = require('fs');
 const today = new Date(2026,10,3), d = i => S.ymd(new Date(2026,10,3-i)); // Nov 3 2026 (after HYD_FROM)
-const W4 = {energy:4,soreness:4,mood:4,stress:4};
+const W4 = {energy:4,soreness:2,mood:4,stress:2};
 const v2 = (date, o) => Object.assign({date, v:2, nutrition:true, training:undefined, family:false, sleep:8, screen:1, sessions:[{label:'A',done:true,rpe:6,mins:60}]}, W4, o);
 // validity + status mapping (1-3 green, 4-5 amber, 6-8 red)
 assert.equal(I.HYD_COLORS.length, 8); assert.equal(new Set(I.HYD_COLORS).size, 8);
@@ -38,12 +38,12 @@ assert.deepEqual(I.hydrationFlags([v2(d(0),{hydration:2})], today, fw), [], 'wel
 assert.deepEqual(I.hydrationFlags([v2(d(0),{hydration:5})], today, {fightDate: S.ymd(new Date(2026,11,20))}), [], 'not fight week');
 assert.equal(I.hydrationFlags(es, today, fw).length, 2);
 // CSV: appended columns, old columns unchanged
-assert.deepEqual(I.CSV_COLS.slice(-9,-6), ['Complete','Hydration_Colour','Hydration_Status']);
-const rows = I.toCSV([v2(d(0),{hydration:6}), v2('2026-10-27',{})]).trim().split('\r\n').map(r => r.split(',').slice(0,-6).join(','));
+assert.deepEqual(I.CSV_COLS.slice(-10,-7), ['Complete','Hydration_Colour','Hydration_Status']);
+const rows = I.toCSV([v2(d(0),{hydration:6}), v2('2026-10-27',{})]).trim().split('\r\n').map(r => r.split(',').slice(0,-7).join(','));
 assert.ok(rows[2].endsWith(',N,6,Dehydrated') || rows[2].endsWith(',Y,6,Dehydrated'), rows[2]); assert.ok(rows[1].endsWith(',Y,,'), rows[1]);
 // wiring
 const app = fs.readFileSync(__dirname+'/app.js','utf8'), rep = fs.readFileSync(__dirname+'/report.js','utf8'), sw = fs.readFileSync(__dirname+'/sw.js','utf8');
 assert.ok(app.includes('hydPicker(e)') && app.includes('hydrationCard()') && app.includes('hydration: { days:') && app.includes('hydrationFlags'));
-assert.ok(rep.includes('d.hydration')); assert.ok(sw.includes("'fr-v38'"));
+assert.ok(rep.includes('d.hydration')); assert.ok(sw.includes("'fr-v39'"));
 assert.ok(!/<button[^>]*class="[^"]*"[^>]*data-hyd[^>]*>[^<]+</.test(app.match(/function hydPicker[\s\S]*?\n function|function hydPicker[\s\S]{0,900}/)[0]), 'swatches carry no visible text');
 console.log('All hydration tests passed');

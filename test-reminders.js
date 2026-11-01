@@ -36,7 +36,7 @@ assert.deepEqual(R.due({nutrition:true, sleep:7}, new Date(2026,9,19,21,30)), ['
 assert.deepEqual(R.due(undefined, new Date(2026,9,19,21,30)), ['morning','evening']);
 assert.deepEqual(R.due(full, new Date(2026,9,19,23,0)), []);
 // v2 entries: wellness needed in the morning, sessions with effort/minutes in the evening
-const v2 = Object.assign({}, full, {v:2, energy:4, soreness:4, mood:4, stress:4, sessions:[{done:true,rpe:6,mins:60}]});
+const v2 = Object.assign({}, full, {v:2, energy:4, soreness:2, mood:4, stress:2, sessions:[{done:true,rpe:6,mins:60}]});
 assert.deepEqual(R.due(v2, new Date(2026,9,19,23,0)), []);
 assert.deepEqual(R.due(Object.assign({}, v2, {mood:''}), new Date(2026,9,19,23,0)), ['morning']);
 assert.deepEqual(R.due(Object.assign({}, v2, {sessions:[{done:true,rpe:'',mins:60}]}), new Date(2026,9,19,23,0)), ['evening']);

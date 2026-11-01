@@ -7,7 +7,7 @@
   const avg = a => a.length ? a.reduce((s,v)=>s+v,0)/a.length : null;
   const CORE = ['nutrition','training','sleep','screen','family'];
   // Hooper-style check-in (sleep quality/duration is logged separately). Keys unchanged for data compatibility; 5 = best.
-  const WELL = [['energy','Fatigue / energy','1 = always tired','5 = very fresh'],['soreness','Muscle soreness','1 = very sore','5 = no soreness'],['stress','Stress','1 = very stressed','5 = very relaxed'],['mood','Mood','1 = irritable / down','5 = very positive']];
+  const WELL = [['energy','Fatigue / energy','1 = always tired','5 = very fresh'],['soreness','Muscle soreness','1 = no soreness','5 = very sore'],['stress','Stress','1 = very relaxed','5 = very stressed'],['mood','Mood','1 = irritable / down','5 = very positive']];
   // What's still missing for a complete day. v2 (current) entries need wellness + every scheduled session answered (with RPE + minutes if done).
   function missing(e) { const m = [];
     if (!S.nutritionDone(e)) m.push('nutrition');
@@ -59,14 +59,14 @@
       out.push({ date:d, status: isComplete(e) ? 'done' : isPartial(e) ? 'partial' : 'none' }); }
     return out;
   }
-  const dayWellness = e => { const v = WELL.map(w => e && e[w[0]]).filter(x => num(x) && x >= 1 && x <= 5).map(Number); return v.length ? avg(v) : null; };
+  const dayWellness = e => { const v = WELL.filter(([k]) => e && num(e[k]) && e[k] >= 1 && e[k] <= 5).map(([k]) => S.wellGood(k, e[k])); return v.length ? avg(v) : null; };
   const sessionLoad = S.sessionLoad;
   const inRange = (entries, t, from, to) => entries.filter(e => { const n = dayNum(e.date); return n >= t - from && n <= t - to; });
   function wellness(entries, today = new Date()) {
     const t = dayNum(ymd(today)), last7 = inRange(entries, t, 6, 0), base = inRange(entries, t, 27, 0);
     const a7 = avg(last7.map(dayWellness).filter(v => v != null)), a28 = avg(base.map(dayWellness).filter(v => v != null));
     const items = {}; WELL.forEach(([k]) => items[k] = avg(last7.map(e => e[k]).filter(v => num(v) && v >= 1)));
-    const flags = []; inRange(entries, t, 2, 0).forEach(e => WELL.forEach(([k,l]) => { if (num(e[k]) && +e[k] <= 2) flags.push({ date:e.date, item:l, value:+e[k] }); }));
+    const flags = []; inRange(entries, t, 2, 0).forEach(e => WELL.forEach(([k,l]) => { if (num(e[k]) && +e[k] >= 1 && S.wellGood(k, e[k]) <= 2) flags.push({ date:e.date, item:l, value:+e[k] }); }));
     const n7 = last7.filter(e => dayWellness(e) != null).length;
     return { avg7: a7, avg28: a28, items, flags, days: n7, dropping: a7 != null && a28 != null && n7 >= 3 && a7 <= a28 - 0.5 };
   }
@@ -189,12 +189,12 @@
     if (fw && h.latest && h.latest.v >= 4) out.push('Fight week: do not water-cut or restrict fluids to make weight. Minors (under 18) should never dehydrate. Follow your coach and dietitian.');
     return out; }
   const csvCell = v => { const s = v == null ? '' : v === true ? 'Y' : v === false ? 'N' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; };
-  const CSV_COLS = ['Date','Nutrition','Training','Sleep_Hours','Screen_Hours','Family_Friends','Weight','Notes','Energy','Soreness','Mood','Stress','Wellness_Score','Sessions_Scheduled','Sessions_Done','Training_Pct','S1_Label','S1_Done','S1_RPE','S1_Min','S2_Label','S2_Done','S2_RPE','S2_Min','Extra_Label','Extra_RPE','Extra_Min','Session_Load','Complete','Hydration_Colour','Hydration_Status','Nutrition_Mode','Calories','Protein_g','Carbs_g','Fat_g','Nutrition_Score'];
+  const CSV_COLS = ['Date','Nutrition','Training','Sleep_Hours','Screen_Hours','Family_Friends','Weight','Notes','Energy','Soreness','Mood','Stress','Wellness_Score','Sessions_Scheduled','Sessions_Done','Training_Pct','S1_Label','S1_Done','S1_RPE','S1_Min','S2_Label','S2_Done','S2_RPE','S2_Min','Extra_Label','Extra_RPE','Extra_Min','Session_Load','Complete','Hydration_Colour','Hydration_Status','Nutrition_Mode','Calories','Protein_g','Carbs_g','Fat_g','Nutrition_Score','Wellness_Scale'];
   function toCSV(entries) {
     const sess = e => Array.isArray(e.sessions) ? e.sessions : (e.training != null || num(e.rpe) ? [{ label:'', done:e.training, rpe:e.rpe, mins:e.mins }] : []);
     const rows = entries.slice().sort((a,b)=>a.date<b.date?-1:1).map(e => { const ss = sess(e), x = e.extra || {}, sc = i => ss[i] ? [ss[i].label, ss[i].done, ss[i].rpe, ss[i].mins] : ['','','',''];
       const ws = S.wellnessScore(e);
-      return [e.date,e.nutrition,S.trainingPct(e)===100,e.sleep,e.screen,e.family,e.weight,e.notes,e.energy,e.soreness,e.mood,e.stress,ws==null?'':ws,Array.isArray(e.sessions)?ss.length:'',ss.filter(s=>s.done===true).length,Math.round(S.trainingPct(e)),...sc(0),...sc(1),x.label,x.rpe,x.mins,sessionLoad(e),isComplete(e)?'Y':'N',S.hydrationOK(e)?+e.hydration:'',S.hydrationOK(e)?hydrationStatus(e.hydration).label:'',S.nutMode(e),e.kcal??'',e.protein??'',e.carbs??'',e.fat??'',S.nutritionScore(e)==null?'':Math.round(S.nutritionScore(e))].map(csvCell).join(','); });
+      return [e.date,e.nutrition,S.trainingPct(e)===100,e.sleep,e.screen,e.family,e.weight,e.notes,e.energy,e.soreness,e.mood,e.stress,ws==null?'':ws,Array.isArray(e.sessions)?ss.length:'',ss.filter(s=>s.done===true).length,Math.round(S.trainingPct(e)),...sc(0),...sc(1),x.label,x.rpe,x.mins,sessionLoad(e),isComplete(e)?'Y':'N',S.hydrationOK(e)?+e.hydration:'',S.hydrationOK(e)?hydrationStatus(e.hydration).label:'',S.nutMode(e),e.kcal??'',e.protein??'',e.carbs??'',e.fat??'',S.nutritionScore(e)==null?'':Math.round(S.nutritionScore(e)),S.WELL_SCALE].map(csvCell).join(','); });
     return [CSV_COLS.join(',')].concat(rows).join('\r\n') + '\r\n';
   }
   const api = { HYD_COLORS, hydrationStatus, hydrationWeek, hydrationFlags, sectionInfo, sectionOf, SECTION_META, checklist, dayStatus, sections, cutPlan, weightVerdict, fightWeek, weekReview, reviewText, WELL, missing, isComplete, isPartial, streak, grid, dayWellness, sessionLoad, wellness, load, cutSafety, toCSV, CSV_COLS };

@@ -1,6 +1,6 @@
 // Camp momentum. Run: node test-momentum.js
 const S = require('./scoring.js'), assert = require('assert');
-const mk = (d, o) => Object.assign({ date:d, v:2, sessions:[], nutrition:true, family:true, sleep:8, screen:1, energy:5, soreness:5, mood:5, stress:5, weight:'', notes:'' }, o);
+const mk = (d, o) => Object.assign({ date:d, v:2, sessions:[], nutrition:true, family:true, sleep:8, screen:1, energy:5, soreness:1, mood:5, stress:1, weight:'', notes:'' }, o);
 const days = (from, n, f) => Array.from({ length:n }, (_, i) => { const d = new Date(from + 'T12:00'); d.setDate(d.getDate() + i); return mk(S.ymd(d), f ? f(i) : {}); });
 const at = d => new Date(d + 'T12:00'), ST = '2026-09-19', FD = '2026-11-21', T = at('2026-10-31'); // 42 closed camp days, 21 to fight
 const M = (es, o = {}) => S.momentum(es, o.today || T, o.start === undefined ? ST : o.start, o.fight === undefined ? FD : o.fight);

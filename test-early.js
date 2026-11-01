@@ -1,13 +1,13 @@
 const E = require('./early.js'), S = require('./scoring.js'), assert = require('assert');
 const _c=S.compute; S.compute=(e,t,p={})=>_c(e,t,Object.assign({includeToday:true},p)); // legacy fixtures include today
-const mk = (d,o) => Object.assign({date:d, v:2, nutrition:true, sessions:[{label:'',done:true,rpe:6,mins:60}], training:true, family:true, sleep:8, screen:1, weight:170, energy:5, soreness:5, mood:5, stress:5, notes:''}, o);
+const mk = (d,o) => Object.assign({date:d, v:2, nutrition:true, sessions:[{label:'',done:true,rpe:6,mins:60}], training:true, family:true, sleep:8, screen:1, weight:170, energy:5, soreness:1, mood:5, stress:1, notes:''}, o);
 assert.equal(E.daily(null), null);
 assert.equal(E.daily(mk('2026-10-19')).score, 100);
 let d = E.daily(mk('2026-10-19',{nutrition:false, sleep:6})); assert.equal(d.score, 68); // 0+25+7.5+15+10+10, no bonus on daily
 let f = E.feedback(d, mk('2026-10-19',{nutrition:false, sleep:6})); assert.equal(f.fix, 'nutrition'); assert.ok(/\+25 pts/.test(f.text));
 f = E.feedback(E.daily(mk('2026-10-19')), mk('2026-10-19')); assert.equal(f.fix, null); assert.ok(/Nothing to fix/.test(f.text));
 // partial day mentions finishing the log
-const part = {date:'2026-10-19', nutrition:true, sleep:8, screen:'', family:null, energy:4, soreness:4, mood:4, stress:4};
+const part = {date:'2026-10-19', nutrition:true, sleep:8, screen:'', family:null, energy:4, soreness:2, mood:4, stress:2};
 assert.ok(/Finish the rest/.test(E.feedback(E.daily(part), part).text));
 // provisional score from day 1 with same weights
 const today = new Date(2026,9,19);

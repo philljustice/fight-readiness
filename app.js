@@ -1,4 +1,4 @@
-const APP_VERSION='fr-v38';
+const APP_VERSION='fr-v39';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -19,6 +19,7 @@ function load() {
 }
 function migrate(S) {
   if (S.params && S.params.wWellness == null) Object.assign(S.params, { wNutrition:25, wTraining:25, wSleep:15, wWellness:15, wScreen:10, wFamily:10 }); // v2: Wellness enters the score
+  if (!S.entries || !S.entries.length) S.wellScale = Scoring.WELL_SCALE; else if (Scoring.migrateWellScale(S)) { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} } // soreness/stress now 5 = worst
   if (S.profile && !S.profile.schedule) S.profile.schedule = Profile.scheduleFromWeek(S.weeks[S.weekIdx||0]);
   return S; }
 let S = migrate(load()); S.reminders = Object.assign({morning:'07:00', evening:'21:00', untilDone:true}, S.reminders);
@@ -77,7 +78,7 @@ function wellCard(report) { const w = Insights.wellness(S.entries), L = Insights
   if (!w.days && !L.sessions && !report) return '';
   const f = v => v==null?'—':v.toFixed(1);
   return `<div class="card"><h3>💚 Wellness & training load</h3><p class="muted">Wellness is ${S.params.wWellness}% of the score. Session load is for info only.</p>
-   ${w.days?`<p>Wellness (last 7 days, 1–5, 5 = best): <b>${f(w.avg7)}</b>${w.avg28!=null?` <span class="muted">vs 4-week ${f(w.avg28)}</span>`:''}<br><span class="muted">${Insights.WELL.map(([k,l])=>l+' '+f(w.items[k])).join(' • ')}</span></p>`:'<p class="muted">No wellness check-ins in the last 7 days.</p>'}
+   ${w.days?`<p>Wellness (last 7 days, 1–5, higher = better overall): <b>${f(w.avg7)}</b>${w.avg28!=null?` <span class="muted">vs 4-week ${f(w.avg28)}</span>`:''}<br><span class="muted">${Insights.WELL.map(([k,l])=>l+' '+f(w.items[k])).join(' • ')}</span></p>`:'<p class="muted">No wellness check-ins in the last 7 days.</p>'}
    ${w.dropping?'<div class="hint">📉 Wellness is down compared with your normal. Consider lighter training and more sleep, and tell your coach.</div>':''}
    ${w.flags.length?`<div class="hint">🚩 Low ratings, last 3 days: ${w.flags.map(x=>esc(x.date.slice(5)+' '+x.item+' '+x.value)).join(', ')}</div>`:''}
    ${L.sessions?`<p>Session load this week: <b>${L.week}</b> AU from ${L.sessions} session${L.sessions==1?'':'s'} <span class="muted">(RPE × minutes)</span></p>${loadBars(L.weeks)}
@@ -414,7 +415,7 @@ const V = {
   <div class="card"><h3>Backup & import</h3>
    <button class="btn" data-send="1">🖼️ Send report with charts to ${Weekly.CONFIG.ADMIN_NAME}</button><button class="btn alt" id="exportBtn">⬇️ Export backup (JSON)</button><button class="btn alt" id="csvBtn">📊 Export log as CSV (Excel / Google Sheets)</button><button class="btn alt" data-sharefile="1">📎 Share full log file (CSV)</button>
    <label>Restore backup (JSON) or import FightLog CSV</label><input type="file" id="importFile" accept=".json,.csv,application/json,text/csv">
-   <p class="muted">CSV columns: Date, Nutrition, Training, Sleep_Hours, Screen_Hours, Family_Friends, [Sleep_Score, Screen_Score,] Weight, Notes, plus optional Energy, Soreness, Mood, Stress, RPE, Session_Min. Existing dates are overwritten.</p>
+   <p class="muted">CSV columns: Date, Nutrition, Training, Sleep_Hours, Screen_Hours, Family_Friends, [Sleep_Score, Screen_Score,] Weight, Notes, plus optional Energy, Soreness, Mood, Stress, RPE, Session_Min, Wellness_Scale. Soreness/Stress: 5 = worst when Wellness_Scale is 2 (current exports); older CSVs without it are read as 5 = best and converted. Existing dates are overwritten.</p>
    <button class="btn alt" id="wipeBtn" style="background:#5d1010">🗑️ Erase all data on this phone</button></div>
   <div class="card"><button class="btn alt" id="updBtn">🔄 Check for update</button><p class="muted" style="text-align:center;font-size:12px">Version ${APP_VERSION}</p></div>`;
  },
@@ -429,7 +430,7 @@ const V = {
   <p><b>Reminders:</b> Setup → Reminders → pick a morning (5:00–10:00) and evening (18:00–23:00) time in 30-min steps → tap <i>Add reminders to my calendar</i>. <b>On iPhone</b> Safari opens a calendar preview: tap <b>Add All</b>. This works from the home-screen app too. You get a daily morning and evening alarm, a Mon/Thu weigh-in, and a Sunday 6 PM weekly-report reminder, even when the app is closed. (Push notifications, which you turn on in the same Reminders card, also follow up until your log is finished; calendar alarms can't.) Alternatives: <i>Subscribe (webcal)</i> (then turn off "Remove Alerts" in Settings → Calendar → Accounts → Subscribed Calendars) or <i>Share / save the calendar file</i>. The app also shows a banner if today's morning or evening items aren't logged after those times.</p>
   <p><b>Weight:</b> weigh Monday & Thursday mornings: fasted, after the bathroom, same scale, minimal clothing.</p>
   <p><b>Streak:</b> 🔥 counts days in a row with a full log (nutrition, every scheduled session with effort + minutes, sleep, screen, family, and all 4 wellness ratings). Today not done yet doesn't break it. Miss a whole day and it resets.</p>
-  <p><b>How you feel (Hooper-style check-in):</b> four quick 1–5 ratings modelled on the Hooper Index used by pro teams: fatigue/energy, muscle soreness, stress and mood (5 = best). Sleep is logged separately as hours. It's 15% of the score.</p>
+  <p><b>How you feel (Hooper-style check-in):</b> four quick 1–5 ratings modelled on the Hooper Index used by pro teams: fatigue/energy, muscle soreness, stress and mood. Energy and mood: 5 = best. Soreness and stress: higher = more (1 = none / very relaxed, 5 = very sore / very stressed); the app flips them when scoring. Sleep is logged separately as hours. It's 15% of the score.</p>
   <p><b>Weight verdict:</b> the Dashboard shows one line every day. 🟢 <b>On track</b> = losing at roughly the pace you need, within the safe ~1%/week. 🔴 <b>Too fast</b> = losing more than 1.5%/week. 🟠 <b>Too slow</b> = well under the pace you need. ⚪ <b>No target</b> = set a target weight in your profile.</p>
   <p><b>Impossible-cut check:</b> with a target weight and fight date set, the app works out the weekly loss needed. Over 1%/week of bodyweight shows a caution and over 1.5% says the plan is unsafe. It shows the weight a safe pace reaches by fight day and how far short that is, so you can talk to your coach about a higher weight class or a later date.</p>
   <p><b>Fight week:</b> in the last 7 days before your fight date (used as weigh-in day) the Dashboard and Report show a day-by-day card covering taper, water, salt and carbs. It's general, conservative guidance based on the ISSN 2025 combat-sports position stand, not medical advice. Follow your coach and dietitian. No saunas, diuretics or fluid restriction for minors.</p>
@@ -440,7 +441,7 @@ const V = {
   <p><b>💧 Hydration:</b> in the Morning check-in, tap the colour closest to your first pee of the day (pale straw to dark amber). 🟢 pale = hydrated, 🟡 mid-yellow = drink more, 🔴 dark = dehydrated. It's a quick guide, not a medical test, and it doesn't change your score. It's required for each new day. The Score screen shows your last 7 mornings, and 2 or more dark mornings in a week shows a flag. In fight week do not cut water to make weight, and minors (under 18) should never dehydrate.</p>
   <p><b>Notes:</b> injuries, illness, soreness, bad sleep causes, low energy. These show up on the Coach Report.</p></div>
   <div class="card"><h3>Scoring</h3><p>Score 0–100 from the last 3 weeks of logs. Nutrition 25%, Training 25%, Sleep 15%, Wellness 15%, Screen 10%, Family 10% (editable in Setup, must add up to 100).</p>
-  <p>• Nutrition / Family = % of logged days marked Yes.<br>• Training = average daily % of scheduled sessions completed (rest day = 100%; older days: Yes = 100).<br>• Wellness = average of Energy, Soreness, Mood, Stress mapped 1→0, 2→25, 3→50, 4→75, 5→100 (days with all 4 rated).<br>• Sleep: 100 at 8h, −25 per hour off (6h or 10h = 50).<br>• Screen: 100 if ≤2h, −40 per extra hour (3h = 60, 4h = 20).<br>
+  <p>• Nutrition / Family = % of logged days marked Yes.<br>• Training = average daily % of scheduled sessions completed (rest day = 100%; older days: Yes = 100).<br>• Wellness = average of Energy, Mood (1→0 … 5→100) and Soreness, Stress (flipped: 1→100 … 5→0) (days with all 4 rated).<br>• Sleep: 100 at 8h, −25 per hour off (6h or 10h = 50).<br>• Screen: 100 if ≤2h, −40 per extra hour (3h = 60, 4h = 20).<br>
   • Consistency bonus: +5 if ≥90% of days had Nutrition = Yes AND all scheduled sessions done, +3 if ≥75%, +1 if ≥60%. Capped at 100.<br>• <b>Momentum</b> (up to +5, on top): covers your whole camp from camp start. Each day is consistent if Nutrition was hit and all sessions were done; unlogged days count as missed. Days closer to fight night count more (up to double). 50% weighted consistency starts earning, 95% earns +4; a 🔥 streak of 14+ consistent days in a row adds +1. Total score still caps at 100.<br>• 90+ Elite (gold) • 75+ Fight Ready (green) • 60+ Solid (blue) • below 60 Off Pace (red).</p>
   <p><b>Weight trend</b> = average weight of the last 7 days minus the previous 7 days:<br>🔴 > +1.5 rapid gain • 🟠 +0.5 to +1.5 gaining • 🟡 −0.5 to +0.5 stable • 🟢 −0.5 to −1.5 good cut • 🔵 below −1.5 aggressive cut. A steady 0.75–1.5 lbs/week loss is ideal in the final 8–12 weeks.</p></div>
   <div class="card"><h3>Your data</h3><p>Everything stays on this phone only. Nothing is uploaded. Use Setup → Export backup regularly (e.g. weekly), and before you switch phones or clear browser data. Share the Coach Report as a PDF or text.</p></div>`;
@@ -556,12 +557,13 @@ function download(name, text, type) { const a = document.createElement('a'); a.h
 function parseCSV(text) {
   const rows = text.trim().split(/\r?\n/).map(l => { const out=[]; let cur='', q=false; for (const ch of l) { if (ch=='"') q=!q; else if (ch==',' && !q) { out.push(cur); cur=''; } else cur+=ch; } out.push(cur); return out.map(s=>s.trim()); });
   const h = rows.shift().map(s=>s.toLowerCase()), col = re => h.findIndex(x=>re.test(x));
-  const c = { d:col(/^date/), n:col(/^nutrition/), t:col(/^training/), sl:col(/^sleep_?hours|^sleep$/), sc:col(/^screen_?hours|^screen$/), f:col(/^family/), w:col(/^weight/), no:col(/^notes/), en:col(/^energy/), so:col(/^soreness/), mo:col(/^mood/), stx:col(/^stress/), rp:col(/^rpe/), mi:col(/^session_?min/), s1l:col(/^s1_label/), s1d:col(/^s1_done/), s1r:col(/^s1_rpe/), s1m:col(/^s1_min/), s2l:col(/^s2_label/), s2d:col(/^s2_done/), s2r:col(/^s2_rpe/), s2m:col(/^s2_min/), ss:col(/^sessions_scheduled/), xl:col(/^extra_label/), xr:col(/^extra_rpe/), xm:col(/^extra_min/), hy:col(/^hydration_?colou?r$/) };
+  const c = { d:col(/^date/), n:col(/^nutrition/), t:col(/^training/), sl:col(/^sleep_?hours|^sleep$/), sc:col(/^screen_?hours|^screen$/), f:col(/^family/), w:col(/^weight/), no:col(/^notes/), en:col(/^energy/), so:col(/^soreness/), mo:col(/^mood/), stx:col(/^stress/), rp:col(/^rpe/), mi:col(/^session_?min/), s1l:col(/^s1_label/), s1d:col(/^s1_done/), s1r:col(/^s1_rpe/), s1m:col(/^s1_min/), s2l:col(/^s2_label/), s2d:col(/^s2_done/), s2r:col(/^s2_rpe/), s2m:col(/^s2_min/), ss:col(/^sessions_scheduled/), xl:col(/^extra_label/), xr:col(/^extra_rpe/), xm:col(/^extra_min/), wsv:col(/^wellness_?scale/), hy:col(/^hydration_?colou?r$/) };
   if (c.d < 0) throw new Error('CSV needs a Date column');
   const YN = v => /^y/i.test(v||'') ? true : /^n/i.test(v||'') ? false : null, numv = v => v===''||v==null||isNaN(v) ? '' : +v;
   return rows.filter(r=>r[c.d]).map(r => { let d = r[c.d]; const m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); if (m) d = `${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
     if (!/^\d{4}-\d{2}-\d{2}/.test(d)) throw new Error('Bad date: '+d);
     const g = j => c[j]>=0 ? r[c[j]] : '', o = { date:d.slice(0,10), nutrition:YN(r[c.n]), training:YN(r[c.t]), sleep:numv(r[c.sl]), screen:numv(r[c.sc]), family:YN(r[c.f]), weight:numv(r[c.w]), notes:c.no>=0?r[c.no]||'':'', ...Object.fromEntries([['energy','en'],['soreness','so'],['mood','mo'],['stress','stx'],['rpe','rp'],['mins','mi'],['hydration','hy']].filter(([,j])=>c[j]>=0&&numv(r[c[j]])!=='').map(([k,j])=>[k,numv(r[c[j]])])) };
+    if (!(+g('wsv') >= 2)) Scoring.WELL_INV.forEach(k => { if (o[k] !== undefined && +o[k] >= 1 && +o[k] <= 5) o[k] = 6 - +o[k]; }); // CSVs without Wellness_Scale=2 use the old 5 = best soreness/stress
     if (c.ss>=0 && g('ss')!=='') { const n = +g('ss'); o.v = 2; o.sessions = [['s1l','s1d','s1r','s1m'],['s2l','s2d','s2r','s2m']].slice(0,n).map(([l,dd,rr,mm]) => ({ label:g(l), done:YN(g(dd)), rpe:numv(g(rr)), mins:numv(g(mm)) }));
       o.training = o.sessions.some(x=>x.done==null) ? null : Scoring.trainingPct(o) === 100; delete o.rpe; delete o.mins; }
     if (g('xl') || g('xr')) o.extra = { label:g('xl')||'Extra session', rpe:numv(g('xr')), mins:numv(g('xm')) };
@@ -670,7 +672,7 @@ document.addEventListener('change', async ev => { const t = ev.target;
   if (t.id === 'importFile' && t.files[0]) { const text = await t.files[0].text();
     try { if (/\.json$/i.test(t.files[0].name) || text.trim().startsWith('{')) { const d = JSON.parse(text); if (!Array.isArray(d.entries)) throw new Error('Not a FightReady backup');
         if (!confirm(`Restore backup for "${d.fighter||'fighter'}" with ${d.entries.length} days? This replaces data on this phone.`)) return;
-        delete d.app; delete d.version; delete d.exported; S = Object.assign(load(), d); S.params = Object.assign({}, Scoring.DEFAULT_PARAMS, d.params); save(); alert('Restored ✔'); }
+        delete d.app; delete d.version; delete d.exported; S = Object.assign(load(), d); S.wellScale = d.wellScale; Scoring.migrateWellScale(S); S.params = Object.assign({}, Scoring.DEFAULT_PARAMS, d.params); save(); alert('Restored ✔'); }
       else { const rows = parseCSV(text); upsert(rows); alert(`Imported ${rows.length} days ✔`); }
       show('dash'); } catch (e) { alert('Import failed: ' + e.message); } }
 });
