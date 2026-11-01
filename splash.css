@@ -1,0 +1,49 @@
+/* FightReady cold-open splash (fr-v43): one-two punch, belt plate, glide into header. */
+
+
+#splash{position:fixed;inset:0;z-index:9999;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;-webkit-tap-highlight-color:transparent}
+#splash.out{animation:spOut .35s ease forwards}
+@keyframes spOut{to{opacity:0;visibility:hidden}}
+#splash .sp-logo{position:relative;width:250px;display:flex;flex-direction:column;align-items:center}
+#splash .sp-mark{position:relative;width:250px;height:226px}
+#splash .sp-mark img{position:absolute;left:0;width:250px;display:block}
+#splash .sp-crown{top:0}#splash .sp-fr,#splash .sp-frl{top:62px}
+#splash .sp-word{margin-top:22px;font-family:'Exo2',sans-serif;font-style:italic;font-weight:800;font-size:34px;line-height:1;letter-spacing:.06em;color:#fff;white-space:nowrap}
+#splash .sp-word b{color:#E8A828;font-weight:800}
+#splash .sp-skip{position:absolute;bottom:34px;left:0;right:0;text-align:center;color:#666;font:12px system-ui;letter-spacing:.1em;text-transform:uppercase}
+
+@media (prefers-reduced-motion: reduce){#splash *{animation:none!important;transition:none!important}#splash .sp-hide-rm{display:none!important}}
+
+/* timeline: F hit .28s → R hit .70s → crown .95s → ring+rays 1.30s → wordmark 1.90s → out 2.7s */
+#splash .sp-mark{z-index:1}#splash .sp-mark img{z-index:2}#splash .sp-fr{top:62.18px}
+#splash .sp-f{animation:slamF .28s cubic-bezier(.5,0,.75,0) both}
+@keyframes slamF{0%{opacity:0;transform:translateX(-60px) scale(2.6) rotate(-8deg);filter:blur(6px)}100%{opacity:1;transform:none;filter:none}}
+#splash .sp-r{animation:slamR .25s cubic-bezier(.5,0,.75,0) .45s both}
+@keyframes slamR{0%{opacity:0;transform:translateX(70px) scale(3.2) rotate(8deg);filter:blur(7px)}100%{opacity:1;transform:none;filter:none}}
+#splash .sp-logo{animation:shake1 .22s linear .28s both}
+@keyframes shake1{0%,100%{transform:none}33%{transform:translate(-5px,2px)}66%{transform:translate(4px,-2px)}}
+#splash .sp-mark{animation:shake2 .38s linear .70s both}
+@keyframes shake2{0%,100%{transform:none}15%{transform:translate(12px,-5px) rotate(1deg)}35%{transform:translate(-11px,6px) rotate(-1deg)}55%{transform:translate(7px,-3px)}75%{transform:translate(-4px,2px)}}
+#splash .sp-flash{position:fixed;inset:0;opacity:0;z-index:3;pointer-events:none}
+#splash .sp-fl1{background:radial-gradient(circle at 40% 47%,rgba(255,220,120,.55),transparent 40%);animation:fl .3s ease-out .27s forwards}
+#splash .sp-fl2{background:radial-gradient(circle at 58% 47%,rgba(255,230,150,.95),rgba(232,168,40,.3) 38%,transparent 65%);animation:fl .5s ease-out .69s forwards}
+@keyframes fl{from{opacity:1}to{opacity:0}}
+#splash .sp-sparks{position:absolute;width:0;height:0;z-index:3}
+#splash .sp-s1{left:30%;top:62%}#splash .sp-s2{left:64%;top:62%}
+#splash .sp-sparks i{position:absolute;width:4px;height:16px;margin:-8px -2px;background:linear-gradient(#fff3c4,#E8A828);border-radius:2px;opacity:0}
+#splash .sp-s1 i{animation:sp .45s cubic-bezier(.1,.7,.3,1) .28s forwards}#splash .sp-s2 i{height:20px;animation:sp .6s cubic-bezier(.1,.7,.3,1) .70s forwards}
+@keyframes sp{0%{opacity:1;transform:rotate(var(--a)) translateY(-16px) scaleY(1.4)}100%{opacity:0;transform:rotate(var(--a)) translateY(calc(-1*var(--d))) scaleY(.3)}}
+#splash .sp-crown{animation:settle .55s cubic-bezier(.3,1.5,.5,1) .95s both}
+@keyframes settle{0%{opacity:0;transform:translateY(-70px) rotate(18deg)}100%{opacity:1;transform:none}}
+#splash .sp-plate,#splash .sp-burst{position:absolute;left:50%;top:50%;border-radius:50%;pointer-events:none;opacity:0}
+#splash .sp-plate{width:318px;height:318px;margin:-159px;border:3px solid #E8A828;box-shadow:0 0 30px rgba(232,168,40,.5),inset 0 0 30px rgba(232,168,40,.25);animation:plate .5s cubic-bezier(.2,1.4,.4,1) 1.30s forwards}
+@keyframes plate{0%{opacity:1;transform:scale(.3)}100%{opacity:1;transform:none}}
+#splash .sp-burst{width:900px;height:900px;margin:-450px;background:repeating-conic-gradient(from 0deg,rgba(232,168,40,.17) 0 6deg,transparent 6deg 15deg);-webkit-mask:radial-gradient(circle,#000 0,#000 22%,transparent 58%);mask:radial-gradient(circle,#000 0,#000 22%,transparent 58%);animation:bOut .55s cubic-bezier(.1,.8,.3,1) 1.30s forwards,spin 1.6s linear 1.85s forwards}
+@keyframes bOut{0%{opacity:1;transform:scale(.15) rotate(-20deg)}100%{opacity:.85;transform:none}}
+@keyframes spin{from{opacity:.85;transform:rotate(0)}to{opacity:.85;transform:rotate(10deg)}}
+#splash .sp-word{margin-top:80px;animation:wipe .45s ease-out 1.90s both}
+@keyframes wipe{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+@media (prefers-reduced-motion: reduce){#splash .sp-plate{opacity:1!important}#splash .sp-burst{opacity:.85!important}}
+
+header.sp-wait::before{visibility:hidden}
+#splash{pointer-events:auto}
