@@ -1,4 +1,4 @@
-// FightReady cold-open splash (fr-v45). Plays once per cold start (sessionStorage survives resume/tab switch,
+// FightReady cold-open splash (fr-v46). Plays once per cold start (sessionStorage survives resume/tab switch,
 // not a full app close). Tap to skip. Reduced motion: brief static logo. Ends by gliding the mark into the header logo
 // and counting the score up; on sign-up (no score yet) it simply fades.
 (function (root) {

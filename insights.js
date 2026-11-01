@@ -96,6 +96,60 @@
     const weeks = []; for (let i = 3; i >= 0; i--) weeks.push(L(inRange(entries, t, i*7+6, i*7)).reduce((s,v)=>s+v,0));
     return { week, sessions: nSess, days: w.length, acwr, weeks, flag: acwr == null ? null : acwr > 1.5 ? 'spike' : acwr < 0.8 ? 'low' : 'ok' };
   }
+
+  // Overtraining risk: training-load context + persistent recovery warning signs vs the athlete's own baseline.
+  // Load context: ACWR >1.3 (elevated) / >1.5 (high); before 28 days, week-over-week jump >=30% / >=50% or 7-day load >=40% above
+  // the running weekly average; or Foster monotony (7-day mean / SD of daily load) >2.0 with high strain (load x monotony).
+  // Signs count only if present on 2+ of the last 5 days. Illness during/right after a high-load stretch is a trigger on its own.
+  const OT = { WIN:5, PERSIST:2, MIN_DAYS:7, ILL_LOOKBACK:10, ILL_RECENT:3, MONO:2.0, STRAIN:6000 };
+  function loadContext(entries, tt) {
+    const byN = {}; entries.forEach(e => { const n = dayNum(e.date); if (n <= tt) byN[n] = (byN[n] || 0) + (sessionLoad(e) || 0); });
+    const ns = Object.keys(byN).map(Number); if (!ns.length) return { level:null, reasons:[] };
+    const first = Math.min(...ns), sum = (a, b) => { let s = 0; for (let n = a; n <= b; n++) s += byN[n] || 0; return s; };
+    const wk = sum(tt-6, tt), prev = sum(tt-13, tt-7), span = tt - first + 1, reasons = []; let lvl = 0;
+    const L = load(entries, (u => new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate(), 12))(new Date(tt * 864e5))), acwr = span >= 28 ? L.acwr : null;
+    if (acwr != null) { if (acwr > 1.5) { lvl = 2; reasons.push(`training load spiked (acute:chronic ${acwr})`); } else if (acwr > 1.3) { lvl = 1; reasons.push(`training load up (acute:chronic ${acwr})`); } }
+    else if (span >= 10) { const pct = prev > 0 ? Math.round((wk - prev) / prev * 100) : null, past = span - 7, run = past > 0 ? sum(first, tt-7) / past * 7 : 0;
+      if (pct != null && pct >= 50) { lvl = 2; reasons.push(`training load up ${pct}% on last week`); } else if (pct != null && pct >= 30) { lvl = 1; reasons.push(`training load up ${pct}% on last week`); }
+      if (!lvl && run > 0 && wk >= 1.4 * run) { lvl = 1; reasons.push(`7-day load ${Math.round((wk / run - 1) * 100)}% above your average`); } }
+    const d = []; for (let n = tt-6; n <= tt; n++) d.push(byN[n] || 0); const mean = wk / 7, sd = Math.sqrt(d.reduce((s, v) => s + (v - mean) ** 2, 0) / 7);
+    const mono = mean > 0 ? (sd > 0 ? mean / sd : 99) : 0, strain = Math.round(wk * Math.min(mono, 10));
+    if (span >= 7 && mono > OT.MONO && strain >= OT.STRAIN) { lvl = Math.max(lvl, 1); reasons.push(`same hard load every day with no easy days (monotony ${mono >= 99 ? '>10' : mono.toFixed(1)})`); }
+    return { level: lvl === 2 ? 'high' : lvl === 1 ? 'elevated' : null, acwr, week: wk, prevWeek: prev, monotony: mono >= 99 ? null : Math.round(mono * 10) / 10, strain, reasons };
+  }
+  function overtraining(entries, today = new Date()) {
+    const t = dayNum(ymd(today)), es = entries.filter(e => dayNum(e.date) <= t), days = es.length, out = { level:null, reasons:[], signs:[], actions:[], load:null, ill:false };
+    if (!days) return out;
+    const lc = loadContext(entries, t); out.load = lc;
+    const win = inRange(entries, t, OT.WIN - 1, 0), base = inRange(entries, t, 35, 7), mean = a => avg(a.filter(v => v != null));
+    const g15 = (e, k) => k === 'energy' || k === 'soreness' || k === 'stress' || k === 'mood' ? (ok15(e[k]) ? S.wellGood(k, e[k]) : null) : (ok15(e[k]) ? +e[k] : null);
+    const SIGNS = [['soreness','muscle soreness high'],['energy','energy low / always tired'],['motivation','motivation low'],['mood','mood down'],['stress','stress high'],['appetite','appetite low'],['sleepq','sleep quality poor']];
+    SIGNS.forEach(([k, label]) => { const b = mean(base.map(e => g15(e, k)));
+      const bad = win.filter(e => { if (k === 'sleepq' && S.usesWatch(e.sleepDevice)) return false; const g = g15(e, k); return g != null && (g <= 2 || (b != null && g <= 3 && g <= b - 1.5)); }).length;
+      if (bad >= OT.PERSIST) out.signs.push({ key:k, text:`${label} (${bad} of last ${OT.WIN} days)` }); });
+    { const q = e => S.usesWatch(e.sleepDevice) && num(e.sleepDev) ? S.deviceSleepQuality(e.sleepDevice, e.sleepDev) : null, b = mean(base.map(q));
+      const bad = win.filter(e => { const v = q(e); return v != null && (v < 50 || (b != null && v <= b - 20)); }).length;
+      if (bad >= OT.PERSIST) out.signs.push({ key:'sleepDev', text:`watch sleep score down (${bad} of last ${OT.WIN} days)` }); }
+    { const bad = win.filter(e => { const b = S.rhrBaseline(entries, e.date); return b != null && num(e.rhr) && +e.rhr - b >= S.RHR.SPIKE; });
+      if (bad.length >= OT.PERSIST) out.signs.push({ key:'rhr', text:`resting HR up ${Math.round(+bad[bad.length-1].rhr - S.rhrBaseline(entries, bad[bad.length-1].date))}+ bpm on ${bad.length} of last ${OT.WIN} days` }); }
+    { const inj = win.filter(e => e.injury === 'minor' || e.injury === 'limiting');
+      if (inj.length >= OT.PERSIST || win.some(e => e.injury === 'limiting')) out.signs.push({ key:'injury', text:`niggles / injury logged (${inj.length} of last ${OT.WIN} days)` }); }
+    // illness in the last 3 days, during or right after high load in the last ~10 days (hard days if there isn't enough history)
+    const ill = inRange(entries, t, OT.ILL_RECENT - 1, 0).some(e => e.ill === true); out.ill = ill;
+    let hiLoad = false; if (ill) { for (let n = t; n >= t - OT.ILL_LOOKBACK && !hiLoad; n--) if (loadContext(entries, n).level) hiLoad = true;
+      if (!hiLoad) { const hard = inRange(entries, t, OT.ILL_LOOKBACK, 0).filter(e => S.sessionsDone(e).some(x => +x.rpe >= 8)).length; if (hard >= 3) hiLoad = true; } }
+    const loadHigh = !!lc.level, n = out.signs.length, rhr = out.signs.some(x => x.key === 'rhr');
+    if (ill && hiLoad) out.level = 'high';
+    else if (days >= OT.MIN_DAYS) { if ((loadHigh && n >= 2) || (rhr && loadHigh)) out.level = 'high'; else if ((loadHigh && n >= 1) || n >= 2) out.level = 'watch'; }
+    if (!out.level) return out;
+    if (ill && hiLoad) out.reasons.push('feeling ill during / right after a hard training stretch, which often means the body is run down');
+    if (loadHigh) out.reasons.push(...lc.reasons); out.reasons.push(...out.signs.map(x => x.text));
+    out.actions = out.level === 'high'
+      ? [ill ? 'Rest or very light work until the illness clears' : 'Back right off intensity for a few days (light technique, no hard sparring)', 'Extra recovery: sleep 9+ h, eat enough, hydrate', 'Talk to your coach today']
+      : ['Ease intensity or add an easy / rest day', 'Prioritise sleep and food', 'Keep an eye on it and tell your coach if it continues'];
+    out.label = out.level === 'high' ? 'High risk' : 'Watch'; out.summary = `Overtraining risk: ${out.label} (${out.reasons.slice(0,3).join('; ')})`;
+    return out;
+  }
   // Weight-cut safety. ISSN (2025) combat-sports position stand: aim ~0.5-1 kg/week of gradual loss.
   // We flag loss faster than 1%/week as caution and >1.5%/week as warning.
   function cutSafety(entries, today = new Date(), profile = {}) {
@@ -212,6 +266,6 @@
       return [e.date,e.nutrition,S.trainingPct(e)===100,e.sleep,e.screen,e.family,e.weight,e.notes,e.energy,e.soreness,e.mood,e.stress,ws==null?'':ws,Array.isArray(e.sessions)?ss.length:'',ss.filter(s=>s.done===true).length,Math.round(S.trainingPct(e)),...sc(0),...sc(1),x.label,x.rpe,x.mins,sessionLoad(e),isComplete(e)?'Y':'N',S.hydrationOK(e)?+e.hydration:'',S.hydrationOK(e)?hydrationStatus(e.hydration).label:'',S.nutMode(e),e.kcal??'',e.protein??'',e.carbs??'',e.fat??'',S.nutritionScore(e)==null?'':Math.round(S.nutritionScore(e)),S.WELL_SCALE,e.sleepq??'',e.sleepDevice??'',e.sleepDev??'',e.motivation??'',e.appetite??'',e.injury??'',e.injuryArea??'',e.ill==null?'':e.ill,e.rhr??''].map(csvCell).join(','); });
     return [CSV_COLS.join(',')].concat(rows).join('\r\n') + '\r\n';
   }
-  const api = { morningDone, eveningDone, morningMissing, WELL3, well3Missing, HYD_COLORS, hydrationStatus, hydrationWeek, hydrationFlags, sectionInfo, sectionOf, SECTION_META, checklist, dayStatus, sections, cutPlan, weightVerdict, fightWeek, weekReview, reviewText, WELL, missing, isComplete, isPartial, streak, grid, dayWellness, sessionLoad, wellness, load, cutSafety, toCSV, CSV_COLS };
+  const api = { morningDone, eveningDone, morningMissing, WELL3, well3Missing, HYD_COLORS, hydrationStatus, hydrationWeek, hydrationFlags, sectionInfo, sectionOf, SECTION_META, checklist, dayStatus, sections, cutPlan, weightVerdict, fightWeek, weekReview, reviewText, WELL, missing, isComplete, isPartial, streak, grid, dayWellness, sessionLoad, wellness, load, cutSafety, overtraining, loadContext, OT, toCSV, CSV_COLS };
   if (typeof module !== 'undefined') module.exports = api; else root.Insights = api;
 })(this);

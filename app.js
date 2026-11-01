@@ -1,4 +1,4 @@
-const APP_VERSION='fr-v45';
+const APP_VERSION='fr-v46';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -32,6 +32,7 @@ function belowParList(r) { const L = Scoring.belowPar(r, S.params), p = S.profil
   const why = []; if (c.level) why.push(c.msg);
   if (r.delta != null && tw > 0 && lw && +lw.weight > tw && r.delta > 0.5) why.push(`Gaining ${r.delta} lbs/wk while ${(+lw.weight - tw).toFixed(1)} lbs above target`);
   if (why.length) L.push({ key:'weight', label:'Weight', score:null, why });
+  { const o = otRisk(); if (o.level) L.push({ key:'overtraining', label:'Overtraining risk: ' + o.label, score:null, why: o.reasons }); }
   return L; }
 function belowParNote(r) { const un = Math.max(0, r.windowDays - r.daysLogged); return un ? `${un} of the last ${r.windowDays} days not logged (left out of the score, but no data to coach from).` : ''; }
 function belowParCard(r) { if (r.locked || !r.daysLogged) return ''; const L = belowParList(r), n = belowParNote(r);
@@ -57,6 +58,12 @@ function streakCard() { const st = Insights.streak(S.entries), g = Insights.grid
    <div style="text-align:right"><div class="muted">Best</div><b>${st.best}</b></div></div>
    <div class="grid" aria-label="Last 28 days">${g.map(x=>`<i class="${x.status}" title="${x.date}: ${x.status}"></i>`).join('')}</div>
    <p class="muted" style="margin:4px 0 0">Last 28 days: 🟥 full log • 🟧 partial • ⬛ none.${st.todayDone?' Today is done ✔':' Finish today to keep the streak.'}</p>${badgeRow()}</div>`; }
+// Overtraining risk card (Score page + Coach Report). Rules: Insights.overtraining.
+const otRisk = () => Insights.overtraining(S.entries, new Date());
+function otCard() { const o = otRisk(); if (!o.level) return ''; const li = a => a.map(x => `<li>${esc(x[0].toUpperCase() + x.slice(1))}</li>`).join('');
+  return `<div class="card hint ${o.level === 'high' ? 'warn' : 'caution'}" id="otCard"><h3 style="margin:0 0 4px">${o.level === 'high' ? '🔴' : '🟠'} Overtraining risk: ${o.label}</h3>
+   <p style="margin:4px 0"><b>Why:</b></p><ul style="margin:0 0 6px;padding-left:20px">${li(o.reasons)}</ul><p style="margin:4px 0"><b>What to do:</b></p><ul style="margin:0;padding-left:20px">${li(o.actions)}</ul>
+   <p class="muted" style="margin:6px 0 0">Compared with your own normal. Not a diagnosis. See Help → Overtraining risk.</p></div>`; }
 function cutWarn(ws) { const c = Insights.cutSafety(S.entries, new Date(), S.profile||{}); let h = '';
   if (c.level) h += `<div class="hint ${c.level}">⚠️ ${esc(c.msg)}</div>`;
   const p = S.profile||{}, lw = res().latestWeight; h += planBox(lw ? lw.weight : p.startWeight, p.targetWeight, p.fightDate);
@@ -93,11 +100,12 @@ function weeklySummary() { const r = res(), st = Insights.streak(S.entries), w =
   const flags = [];
   const cp = Insights.cutPlan(r.latestWeight ? r.latestWeight.weight : p.startWeight, p.targetWeight, p.fightDate), vd = Insights.weightVerdict(S.entries, p);
   if (c.level) flags.push(`Weight loss ${-c.pctPerWeek}%/wk (${c.level})`); if (cp && cp.level !== 'ok') flags.push(`Target needs ${cp.perWeek} lbs/wk (${cp.pct}%), ${cp.short} lbs short at safe pace`);
+  { const o = otRisk(); if (o.level) flags.push(o.summary); }
   if (w.dropping) flags.push('Wellness below normal'); w.flags.forEach(f => flags.push(f.text ? `${f.text} on ${f.date.slice(5)}` : `Low ${f.item} ${f.value} on ${f.date.slice(5)}`));
   Insights.hydrationFlags(S.entries, new Date(), p).forEach(f => flags.push(f));
   const notes = S.entries.filter(e => e.notes && Scoring.dayNum(e.date) >= Scoring.dayNum(today())-6).map(e => `${e.date.slice(5)}: ${e.notes}`);
   return `Fighter: ${p.name||S.fighter||'—'}${p.gym?' ('+p.gym+')':''}\nDate: ${today()}\nScore: ${r.locked?lockMsg(r):r.score+'/100 – '+r.verdict+'\n'+breakdown(r)}\n` +
-   belowParText(r) + `Streak: ${st.current} days (best ${st.best}) • Days logged (3 wks): ${r.daysLogged}\n` +
+   ((o => o.level ? `⚠️ ${o.summary}\nSuggested: ${o.actions.join('; ')}\n` : 'Overtraining risk: none\n')(otRisk())) + belowParText(r) + `Streak: ${st.current} days (best ${st.best}) • Days logged (3 wks): ${r.daysLogged}\n` +
    `Training (7 days): ${tr7()} • Wellness (7 days, 1–5): ${w.avg7==null?'—':w.avg7.toFixed(1)}\n` +
    `Weight: ${r.latestWeight?r.latestWeight.weight+' lbs':'—'} • Trend: ${r.locked?'locked':(r.delta==null?'—':r.delta+' lbs/wk '+r.trend.emoji)} • Verdict: ${vd.word}\n` +
    Insights.reviewText(Insights.weekReview(S.entries, new Date(), S.params, p)) + '\n' +
@@ -113,6 +121,7 @@ function reportData() { const r = res(), p = S.profile||{}, P = weeklyParts(), w
   const wk = S.entries.filter(e => Scoring.dayNum(e.date) > t-7), es = S.entries.slice().sort((a,b)=>a.date<b.date?-1:1).slice(-21);
   const c = Insights.cutSafety(S.entries, new Date(), p), cp = Insights.cutPlan(lw ? lw.weight : p.startWeight, p.targetWeight, p.fightDate), flags = [];
   if (c.level) flags.push(`Weight loss ${-c.pctPerWeek}%/week (${c.level})`); if (cp && cp.level !== 'ok') flags.push(`Target needs ${cp.perWeek} lbs/week (${cp.pct}%), ${cp.short} lbs short at a safe pace`);
+  { const o = otRisk(); if (o.level) flags.unshift(o.summary); }
   if (w.dropping) flags.push('Wellness below normal'); w.flags.forEach(f => flags.push(f.text ? `${f.text} on ${f.date.slice(5)}` : `Low ${f.item} (${f.value}/5) on ${f.date.slice(5)}`));
   Insights.hydrationFlags(S.entries, new Date(), p).forEach(f => flags.push(f));
   const hw = Insights.hydrationWeek(S.entries, new Date()), hc = k => hw.days.filter(x => x.status && x.status.level === k).length;
@@ -263,7 +272,7 @@ const V = {
   const dueNow = Reminders.due(S.entries.find(e=>e.date===today()), new Date(), S.reminders.morning, S.reminders.evening);
   const top = scoreHero(r);
   const rs = V._restored; V._restored = null;
-  return `${rs?`<div class="card hint" id="restoredNote">✅ Restored <b>${esc(rs.name)}</b> with ${rs.days} logged day${rs.days===1?'':'s'}. 🔔 Notifications aren't restored: turn them on again in <a href="#" data-goto="setup">Setup</a>.</div>`:''}${top}${day1Banner(false)}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning check-in not done: '+esc(Insights.morningMissing(S.entries.find(e=>e.date===today())).map(x=>x.replace(/^[^:]*: /,'')).join('; ')||'sleep, hydration, how you feel')+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: nutrition, each training session (effort + minutes), screen hours, family/friends'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${weeklyCard()}${fightCard()}${fightWeekCard()}${cheatCard()}${streakCard()}${nutCard()}
+  return `${rs?`<div class="card hint" id="restoredNote">✅ Restored <b>${esc(rs.name)}</b> with ${rs.days} logged day${rs.days===1?'':'s'}. 🔔 Notifications aren't restored: turn them on again in <a href="#" data-goto="setup">Setup</a>.</div>`:''}${top}${otCard()}${day1Banner(false)}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning check-in not done: '+esc(Insights.morningMissing(S.entries.find(e=>e.date===today())).map(x=>x.replace(/^[^:]*: /,'')).join('; ')||'sleep, hydration, how you feel')+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: nutrition, each training session (effort + minutes), screen hours, family/friends'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${weeklyCard()}${fightCard()}${fightWeekCard()}${cheatCard()}${streakCard()}${nutCard()}
   ${isWeighDay?'<div class="card hint">⚖️ It\'s a weigh-in day (Mon/Thu). Weigh in this morning, fasted, and log it.</div>':''}
   ${r.locked?`${todayCard()}<div class="card"><h3>Categories so far (${r.daysLogged} day${r.daysLogged==1?'':'s'})</h3>${catTable(r)}<p class="muted">Consistency bonus: 🔒 unlocks in ${r.unlockIn} day${r.unlockIn==1?'':'s'}.</p></div>`:`${todayCard()}
   <div class="card"><h3>Categories (last 3 weeks)</h3>${catTable(r)}
@@ -345,7 +354,7 @@ const V = {
   const r = res(), notes = S.entries.filter(e=>e.notes && Scoring.dayNum(e.date) >= Scoring.dayNum(today())-14).sort((a,b)=>a.date<b.date?1:-1);
   return `<div class="card"><h2 style="margin:0">🥊 Coach Report: FightReady Summary</h2>
   ${reportHeader(r)}<p class="muted">Report date: ${today()} • Data period: last 3 weeks (${r.daysLogged} days logged)</p></div>${r.locked?'':momCard(r)}
-  ${scoreHero(r)}${r.locked?`<div class="card"><p style="text-align:center"><b>${lockMsg(r)}</b></p>${todayRow()}</div>`:''}${belowParCard(r)}
+  ${scoreHero(r)}${r.locked?`<div class="card"><p style="text-align:center"><b>${lockMsg(r)}</b></p>${todayRow()}</div>`:''}${otCard()}${belowParCard(r)}
   <div class="card"><h3>Weight & trend</h3>${verdictLine()}<p>Latest: ${r.latestWeight?r.latestWeight.weight+' lbs ('+r.latestWeight.date+')':'—'}${+S.targetWeight?' • Target: '+esc(S.targetWeight)+' lbs':''}<br>
    7-day trend: ${r.locked?lockMsg(r):(r.delta==null?'—':r.delta+' lbs/wk')+' '+r.trend.emoji+' '+esc(r.trend.label)}</p>${cutWarn()}${weightChart()}</div>
   ${reviewCard()}${fightWeekCard()}
@@ -449,6 +458,11 @@ const V = {
   <p>• Nutrition / Family = % of logged days marked Yes.<br>• Training = average daily % of scheduled sessions completed (rest day = 100%; older days: Yes = 100).<br>• Wellness = weighted average of Energy, Mood (1→0 … 5→100), Soreness, Stress (flipped: 1→100 … 5→0), Sleep quality or watch sleep score, Motivation, Injury (None 100 / Minor 50 / Limiting 0), Illness (No 100 / Yes 0), Resting HR (100 up to +2 bpm over baseline, 0 at +10; only once a baseline exists) — weight 1 each — and Appetite (weight ½). Items not logged are left out, so they never lower the score. Needs the 4 core ratings.<br>• Sleep: 100 at 8h, −25 per hour off (6h or 10h = 50).<br>• Screen: 100 if ≤2h, −40 per extra hour (3h = 60, 4h = 20).<br>
   • Consistency bonus: +5 if ≥90% of days had Nutrition = Yes AND all scheduled sessions done, +3 if ≥75%, +1 if ≥60%. Capped at 100.<br>• <b>Momentum</b> (up to +5, on top): covers your whole camp from camp start. Each day is consistent if Nutrition was hit and all sessions were done; unlogged days count as missed. Days closer to fight night count more (up to double). 50% weighted consistency starts earning, 95% earns +4; a 🔥 streak of 14+ consistent days in a row adds +1. Total score still caps at 100.<br>• 90+ Elite (gold) • 75+ Fight Ready (green) • 60+ Solid (blue) • below 60 Off Pace (red).</p>
   <p><b>Weight trend</b> = average weight of the last 7 days minus the previous 7 days:<br>🔴 > +1.5 rapid gain • 🟠 +0.5 to +1.5 gaining • 🟡 −0.5 to +0.5 stable • 🟢 −0.5 to −1.5 good cut • 🔵 below −1.5 aggressive cut. A steady 0.75–1.5 lbs/week loss is ideal in the final 8–12 weeks.</p></div>
+  <div class="card"><h3>⚠️ Overtraining risk</h3><p>FightReady watches for signs that training is outpacing recovery. It compares you with <b>your own</b> normal, not other fighters.</p>
+   <p><b>1. Is training load high?</b> Any of: acute:chronic ratio above 1.3 (above 1.5 = big spike; needs 28 days of data); before then, this week's load 30%+ above last week (50%+ = big) or 40%+ above your average week; or the same hard load every day with no easy days (monotony above 2 with high strain).</p>
+   <p><b>2. Recovery warning signs</b>, each counting only if it shows on <b>2 or more of the last 5 days</b>: soreness high (4–5), energy, motivation, mood, appetite or sleep quality low (or well below your normal), stress high, watch sleep score well down, resting heart rate 5+ bpm above your baseline, a minor/limiting injury.</p>
+   <p><b>Levels.</b> 🟠 <b>Watch</b>: high load + 1 sign, or 2+ signs even without high load. 🔴 <b>High risk</b>: high load + 2+ signs, high load + resting HR up, or getting <b>ill</b> during or within ~10 days after a hard stretch (often a sign of being run down).</p>
+   <p>A hard week on its own with no warning signs is fine and won't alert. Needs 7+ days of logs (except illness after hard training). It shows on the Score page, Coach Report, shared report and weekly report. It's a prompt to back off and talk to your coach, not a medical diagnosis.</p></div>
   <div class="card"><h3>Your data</h3><p>Everything stays on this phone only. Nothing is uploaded. Use Setup → Export backup regularly (e.g. weekly), and before you switch phones or clear browser data. Share the Coach Report as a PDF or text.</p></div>`;
  }
 };
@@ -611,7 +625,7 @@ function shareText() { const r = res();
   if (r.locked) return `🥊 FightReady: ${S.fighter||'Fighter'} (${today()})\n${lockMsg(r)}\nDays logged so far: ${r.daysLogged}`;
   return `🥊 FightReady: ${S.fighter||'Fighter'} (${today()})${S.profile&&S.profile.gym?' • '+S.profile.gym:''}${S.profile&&Profile.countdown(S.profile.fightDate)?'\n'+Profile.countdown(S.profile.fightDate).text:''}\nScore: ${r.score}/100, ${r.verdict}${r.locked?'':'\n'+breakdown(r)}\n` +
    CATS.map(([k,l])=>`${l}: ${r.cats[k].toFixed(0)}`).join(' | ') + `\nConsistency: ${r.consistency.toFixed(0)}% (+${r.bonus})\n` +
-   `Weight: ${r.latestWeight?r.latestWeight.weight+' lbs':'—'}, trend ${r.delta==null?'—':r.delta+' lbs/wk'} ${r.trend.emoji}\nWeight verdict: ${Insights.weightVerdict(S.entries, S.profile||{}).word}\nTraining (7 days): ${tr7()}\n${Insights.reviewText(Insights.weekReview(S.entries, new Date(), S.params, S.profile||{}))}\nDays logged: ${r.daysLogged} (last 3 weeks) • Streak: ${Insights.streak(S.entries).current} days`; }
+   `Weight: ${r.latestWeight?r.latestWeight.weight+' lbs':'—'}, trend ${r.delta==null?'—':r.delta+' lbs/wk'} ${r.trend.emoji}\nWeight verdict: ${Insights.weightVerdict(S.entries, S.profile||{}).word}\nTraining (7 days): ${tr7()}\n${(o => o.level ? '⚠️ ' + o.summary + '\nSuggested: ' + o.actions.join('; ') + '\n' : '')(otRisk())}${Insights.reviewText(Insights.weekReview(S.entries, new Date(), S.params, S.profile||{}))}\nDays logged: ${r.daysLogged} (last 3 weeks) • Streak: ${Insights.streak(S.entries).current} days`; }
 
 document.addEventListener('click', async ev => {
   const t = ev.target.closest('button,a'); if (!t) return;
