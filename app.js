@@ -1,4 +1,4 @@
-const APP_VERSION='fr-v32';
+const APP_VERSION='fr-v33';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -202,6 +202,9 @@ function heroCard(o) { const v = o.score, t = tierOf(v), C = 2 * Math.PI * 70, o
 function countUp() { const n = document.querySelector('.hero-num[data-count]'); if (!n || n.dataset.count === '' || n.dataset.done) return; n.dataset.done = 1;
   const to = +n.dataset.count, t0 = performance.now(); if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const step = t => { const k = Math.min(1, (t - t0) / 700); n.textContent = Math.round(to * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); }
+// Main score hero (full or early), shared by the Score and Coach Report tabs
+function scoreHero(r) { return r.locked ? earlyCard(r) : heroCard({ score: r.daysLogged ? r.score : null, badge: r.daysLogged ? r.verdict.split(' — ')[0] : 'NO DATA YET', verdict: r.daysLogged ? r.verdict.split(' — ').slice(1).join(' — ') : 'No entries in the last 3 weeks yet.',
+    foot: `Base ${r.base.toFixed(1)} + bonus ${r.bonus} • ${r.daysLogged} days logged • ${esc(r.dataQuality.split(' — ')[0])} data` }); }
 function earlyCard(r) { const pr = Early.progress(r, S.params.unlockDays||7), v = r.daysLogged ? Math.round(r.base) : null;
   return heroCard({ score: v, badge: 'EARLY SCORE • ' + r.daysLogged + ' DAY' + (r.daysLogged == 1 ? '' : 'S'), verdict: '',
     extra: `<div class="bar hero-bar"><i style="width:${pr.pct}%"></i></div>`,
@@ -234,8 +237,7 @@ const V = {
   const r = res(), lw = r.latestWeight;
   const isWeighDay = [1,4].includes(new Date().getDay()) && !S.entries.some(e=>e.date===today() && +e.weight>0);
   const dueNow = Reminders.due(S.entries.find(e=>e.date===today()), new Date(), S.reminders.morning, S.reminders.evening);
-  const top = r.locked ? earlyCard(r) : heroCard({ score: r.daysLogged ? r.score : null, badge: r.daysLogged ? r.verdict.split(' — ')[0] : 'NO DATA YET', verdict: r.daysLogged ? r.verdict.split(' — ').slice(1).join(' — ') : 'No entries in the last 3 weeks yet.',
-    foot: `Base ${r.base.toFixed(1)} + bonus ${r.bonus} • ${r.daysLogged} days logged • ${esc(r.dataQuality.split(' — ')[0])} data` });
+  const top = scoreHero(r);
   return `${top}${day1Banner(false)}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning log not done: sleep hours, nutrition plan, first pee colour, how you feel (energy, soreness, mood, stress)'+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: each training session (effort + minutes), screen hours, family/friends, notes'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${weeklyCard()}${fightCard()}${fightWeekCard()}${cheatCard()}${streakCard()}${nutCard()}
   ${isWeighDay?'<div class="card hint">⚖️ It\'s a weigh-in day (Mon/Thu). Weigh in this morning, fasted, and log it.</div>':''}
   ${r.locked?`${todayCard()}<div class="card"><h3>Categories so far (${r.daysLogged} day${r.daysLogged==1?'':'s'})</h3>${catTable(r)}<p class="muted">Consistency bonus: 🔒 unlocks in ${r.unlockIn} day${r.unlockIn==1?'':'s'}.</p></div>`:`${todayCard()}
@@ -317,7 +319,7 @@ const V = {
   const r = res(), notes = S.entries.filter(e=>e.notes && Scoring.dayNum(e.date) >= Scoring.dayNum(today())-14).sort((a,b)=>a.date<b.date?1:-1);
   return `<div class="card"><h2 style="margin:0">🥊 Coach Report: FightReady Summary</h2>
   ${reportHeader(r)}<p class="muted">Report date: ${today()} • Data period: last 3 weeks (${r.daysLogged} days logged)</p></div>
-  ${r.locked?`<div class="card"><p style="text-align:center"><b>${lockMsg(r)}</b><br>Days logged so far: ${r.daysLogged}</p>${todayRow()}</div>`:`<div class="card"><div class="big">${r.score}</div><p style="text-align:center">${esc(r.verdict)}</p></div>`}
+  ${scoreHero(r)}${r.locked?`<div class="card"><p style="text-align:center"><b>${lockMsg(r)}</b></p>${todayRow()}</div>`:''}
   <div class="card"><h3>Weight & trend</h3>${verdictLine()}<p>Latest: ${r.latestWeight?r.latestWeight.weight+' lbs ('+r.latestWeight.date+')':'—'}${+S.targetWeight?' • Target: '+esc(S.targetWeight)+' lbs':''}<br>
    7-day trend: ${r.locked?lockMsg(r):(r.delta==null?'—':r.delta+' lbs/wk')+' '+r.trend.emoji+' '+esc(r.trend.label)}</p>${cutWarn()}${weightChart()}</div>
   ${reviewCard()}${fightWeekCard()}
@@ -519,7 +521,7 @@ function refreshSched() { const sc = V._sched; if (!sc || !$('#schedCard')) retu
 function show(v) { if (!S.profile && v !== 'help') v = 'profile';
   if (v === 'profile' && !V._sched) V._sched = JSON.parse(JSON.stringify((S.profile && S.profile.schedule) || Profile.scheduleFromWeek(S.weeks[S.weekIdx])));
   if (v !== 'profile') V._sched = null; if (v !== 'log') V._sec = null; cur = v; $('#view').innerHTML = V[v](); document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.v===(v==='profile'?'setup':v)));
-  $('#title').textContent = 'FightReady' + (S.fighter ? ' — ' + S.fighter : ''); if (v === 'profile') { refreshSched(); refreshCut(); } window.scrollTo(0,0); if (v === 'dash') countUp(); }
+  $('#title').textContent = 'FightReady' + (S.fighter ? ' — ' + S.fighter : ''); if (v === 'profile') { refreshSched(); refreshCut(); } window.scrollTo(0,0); if (v === 'dash' || v === 'report') countUp(); }
 function upsert(list) { list.forEach(e => { const i = S.entries.findIndex(x=>x.date===e.date); if (i>=0) S.entries[i]=e; else S.entries.push(e); }); S.entries.sort((a,b)=>a.date<b.date?-1:1); save(); }
 function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text],{type})); a.download = name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 1000); }
 function parseCSV(text) {
