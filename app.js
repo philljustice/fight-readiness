@@ -1,4 +1,4 @@
-const APP_VERSION='fr-v49';
+const APP_VERSION='fr-v50';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -31,6 +31,7 @@ const res = () => Scoring.compute(S.entries, new Date(), Object.assign({}, S.par
 function belowParList(r) { const L = Scoring.belowPar(r, S.params), p = S.profile || {}, c = Insights.cutSafety(S.entries, new Date(), p), tw = +(p.targetWeight || S.targetWeight), lw = r.latestWeight;
   const why = []; if (c.level) why.push(c.msg);
   if (r.delta != null && tw > 0 && lw && +lw.weight > tw && r.delta > 0.5) why.push(`Gaining ${r.delta} lbs/wk while ${(+lw.weight - tw).toFixed(1)} lbs above target`);
+  { const ws = wpStatus(); if (ws && (ws.band === 'tight' || ws.band === 'unsafe')) why.push(`Weight plan ${WeightPlan.BAND[ws.band][0]}: ${ws.text} Coach to reconsider the division.`); }
   if (why.length) L.push({ key:'weight', label:'Weight', score:null, why });
   { const o = otRisk(); if (o.level) L.push({ key:'overtraining', label:'Overtraining risk: ' + o.label, score:null, why: o.reasons }); }
   return L; }
@@ -64,15 +65,39 @@ function otCard() { const o = otRisk(); if (!o.level) return ''; const li = a =>
   return `<div class="card hint ${o.level === 'high' ? 'warn' : 'caution'}" id="otCard"><h3 style="margin:0 0 4px">${o.level === 'high' ? '🔴' : '🟠'} Overtraining risk: ${o.label}</h3>
    <p style="margin:4px 0"><b>Why:</b></p><ul style="margin:0 0 6px;padding-left:20px">${li(o.reasons)}</ul><p style="margin:4px 0"><b>What to do:</b></p><ul style="margin:0;padding-left:20px">${li(o.actions)}</ul>
    <p class="muted" style="margin:6px 0 0">Compared with your own normal. Not a diagnosis. See Help → Overtraining risk.</p></div>`; }
+// ---- Weight plan (WeightPlan, % of target model) ----
+const wpProfile = () => { const p = S.profile || {}; return Object.assign({}, p, { targetWeight: p.targetWeight || S.targetWeight }); };
+const wpStatus = (d = new Date()) => WeightPlan.status(S.entries, wpProfile(), d, { startDate: S.startDate });
+const WPCOL = { on:'#43a047', in:'#43a047', tight:'#fb8c00', unsafe:'#e53935', none:'#777' };
+const wpPill = b => `<span class="wp-pill" style="background:${WPCOL[b]||'#777'}">${esc(WeightPlan.BAND[b][0])}</span>`;
+function wpBox() { const s = wpStatus(); if (!s || !s.band || s.band === 'none') return '';
+  return `<div class="wp-box ${s.band}" id="wpBox">${wpPill(s.band)} ${esc(s.text)}${s.band==='tight'||s.band==='unsafe'?'<p class="muted" style="margin:6px 0 0">Your coach is responsible for choosing a division you can make safely. This is a prompt to talk it through.</p>':''}</div>`; }
+const STOP = ['Dizzy or light-headed when standing, or blacking out','Confused, slurred speech, unusually irritable','Heart pounding at rest, or resting HR 10+ bpm above your normal','No urine for 6+ hours, or dark brown urine','Muscle cramps that won\'t stop','Stopped sweating, chills or goosebumps in the heat','Vomiting or can\'t keep fluids down','More than your allowance still to lose with 24 h to go: take the miss, not the risk'];
+// Fight-week card (Score page, last 7 days to weigh-in): only today's steps + today's target + status.
+function fwTodayCard() { const s = wpStatus(); if (!s || s.daysToWeighIn == null || s.daysToWeighIn > 7) return ''; const k = s.daysToWeighIn, st = WeightPlan.steps(k, s.allow.water, s.allow.minor);
+  const lw = S.entries.find(e => e.date === today() && +e.weight > 0), chk = lw ? WeightPlan.dayCheck(lw.weight, s) : null;
+  return `<div class="card fwt" id="fwToday"><div class="tt-head"><span>⚖️ FIGHT WEEK • ${k===0?'WEIGH-IN DAY':k+' DAY'+(k==1?'':'S')+' TO WEIGH-IN'}</span>${wpPill(s.band)}</div>
+   <div class="fwt-tgt"><span class="muted">Today's target</span> <b>${s.planToday} lbs</b>${chk?` <span class="wck ${chk.level}">${esc(chk.level==='ok'?'✓ on target':chk.diff+' lbs over')}</span>`:' <span class="muted">• weigh in this morning</span>'}</div>
+   ${st.map(x=>`<div class="tt-row"><span>${x.icon} ${esc(x.text)}</span></div>`).join('')}
+   <p class="muted" style="margin:8px 0 0">${s.allow.water?'Water-cut steps on (guideline only, not medical advice).':'Food-based steps only.'} <a href="#" data-goto="help" data-anchor="helpStop" style="color:#E8A828">Stop signs →</a></p></div>`; }
+// Coach Report: plan, check-ins, status, division flag.
+function wpReportCard() { const s = wpStatus(); if (!s) return ''; const T = s.T, A = s.A, wi = s.weighIn, ck = [[30, A+5], [14, A+2], [5, A]];
+  const ch = wi ? ck.map(([d, pct]) => { const x = new Date(wi+'T12:00'); x.setDate(x.getDate()-d); const ds = Scoring.ymd(x), w = S.entries.filter(e => +e.weight > 0 && e.date <= ds).sort((a,b)=>a.date<b.date?1:-1)[0], lim = Math.round(T*(1+pct/100)*10)/10, past = ds <= today();
+    return `<tr><td>${d} days out (${ds.slice(5)})</td><td>≤ ${lim}</td><td>${past && w ? w.weight + (+w.weight <= lim ? ' ✅' : ' ⚠️') : '—'}</td></tr>`; }).join('') : '';
+  return `<div class="card" id="wpReport"><h3>⚖️ Weight plan</h3><p>${wpPill(s.band)} ${esc(s.text)}</p>
+   ${s.band==='tight'||s.band==='unsafe'?`<div class="hint warn" id="wpCoachFlag">🧑‍🏫 <b>Coach: reconsider the division.</b> This cut is ${esc(WeightPlan.BAND[s.band][0])}. Choosing a division the fighter can make safely is the coach's call: consider a catchweight, a later date or a class up.</div>`:''}
+   <table><tr><td>Target / weigh-in</td><td colspan="2">${T} lbs • ${esc(wi||'set fight date')}</td></tr><tr><td>Current</td><td colspan="2">${s.W} lbs${s.daysToWeighIn!=null?' • '+s.daysToWeighIn+' days to weigh-in':''}</td></tr>
+   <tr><td>Plan line</td><td colspan="2">${s.planPerWeek!=null?s.planPerWeek+' lbs/week to reach '+T+' five days before weigh-in':'—'}</td></tr>
+   <tr><td>Fight-week allowance</td><td colspan="2">${A}% = ${s.allowLbs} lbs (${esc(s.allow.notes.join('; '))})</td></tr>
+   <tr><td>Water-cut steps</td><td colspan="2">${s.allow.minor?'Off (under 18)':s.allow.water?'Opted in':'Off (food-based only)'}</td></tr></table>
+   ${ch?`<h4 style="margin:10px 0 4px">Check-ins</h4><table><tr><th>When</th><th>Limit</th><th>Actual</th></tr>${ch}</table>`:''}</div>`; }
 function cutWarn(ws) { const c = Insights.cutSafety(S.entries, new Date(), S.profile||{}); let h = '';
   if (c.level) h += `<div class="hint ${c.level}">⚠️ ${esc(c.msg)}</div>`;
-  const p = S.profile||{}, lw = res().latestWeight; h += planBox(lw ? lw.weight : p.startWeight, p.targetWeight, p.fightDate);
   return h; }
-function planBox(cur, tgt, fd) { const c = Insights.cutPlan(cur, tgt, fd); if (!c) return '';
-  if (c.level === 'ok') return `<p class="muted">🎯 Target plan: ${esc(c.msg)}</p>`;
-  return `<div class="hint ${c.level}">${c.level==='warn'?'⛔ <b>Unsafe cut plan.</b>':'⚠️ <b>Tight cut plan.</b>'} ${esc(c.msg)}</div>`; }
+function planBox(cur, tgt, fd, extra) { const c = WeightPlan.status([], Object.assign(wpProfile(), extra||{}, { startWeight: cur, targetWeight: tgt, fightDate: fd }), new Date(), {}); if (!c || !c.band || c.band === 'none') return '';
+  return `<div class="wp-box ${c.band}">${wpPill(c.band)} ${esc(c.text)}</div>`; }
 const VCOL = { green:'#43a047', orange:'#fb8c00', red:'#e53935', grey:'#777' };
-function verdictLine() { const v = Insights.weightVerdict(S.entries, S.profile||{});
+function verdictLine() { const s = wpStatus(); if (s && s.band && s.band !== 'none') return wpBox(); const v = Insights.weightVerdict(S.entries, S.profile||{});
   return `<p id="wverdict" style="margin:6px 0"><span style="display:inline-block;background:${VCOL[v.color]};color:#fff;font-weight:700;padding:3px 10px;border-radius:12px">${esc(v.word)}</span> ${esc(v.text)}</p>`; }
 function fightWeekCard() { const p = S.profile||{}, fw = Insights.fightWeek(p.fightDate); if (!fw) return ''; const minor = p.dob && Profile.age(p.dob) < 18;
   return `<div class="card" id="fightWeek"><h3>🥊 Fight week: ${fw.daysToWeighIn===0?'weigh-in day':fw.daysToWeighIn+' day'+(fw.daysToWeighIn==1?'':'s')+' to weigh-in'}</h3>
@@ -99,7 +124,7 @@ function tr7() { const es = S.entries.filter(e => Scoring.dayNum(e.date) > Scori
 function weeklySummary() { const r = res(), st = Insights.streak(S.entries), w = Insights.wellness(S.entries), c = Insights.cutSafety(S.entries, new Date(), S.profile||{}), p = S.profile||{};
   const flags = [];
   const cp = Insights.cutPlan(r.latestWeight ? r.latestWeight.weight : p.startWeight, p.targetWeight, p.fightDate), vd = Insights.weightVerdict(S.entries, p);
-  if (c.level) flags.push(`Weight loss ${-c.pctPerWeek}%/wk (${c.level})`); if (cp && cp.level !== 'ok') flags.push(`Target needs ${cp.perWeek} lbs/wk (${cp.pct}%), ${cp.short} lbs short at safe pace`);
+  if (c.level) flags.push(`Weight loss ${-c.pctPerWeek}%/wk (${c.level})`); { const ws = wpStatus(); if (ws && (ws.band === 'tight' || ws.band === 'unsafe')) flags.push(`Weight plan ${WeightPlan.BAND[ws.band][0]}: coach to reconsider division`); }
   if (w.dropping) flags.push('Wellness below normal'); w.flags.forEach(f => flags.push(f.text ? `${f.text} on ${f.date.slice(5)}` : `Low ${f.item} ${f.value} on ${f.date.slice(5)}`));
   Insights.hydrationFlags(S.entries, new Date(), p).forEach(f => flags.push(f));
   const notes = S.entries.filter(e => e.notes && Scoring.dayNum(e.date) >= Scoring.dayNum(today())-6).map(e => `${e.date.slice(5)}: ${e.notes}`);
@@ -119,7 +144,7 @@ function reportData() { const r = res(), p = S.profile||{}, P = weeklyParts(), w
   const lw = r.latestWeight, ws = Profile.weightStatus(lw && lw.weight, p.targetWeight || S.targetWeight), t = Scoring.dayNum(today());
   const wk = S.entries.filter(e => Scoring.dayNum(e.date) > t-7), es = S.entries.slice().sort((a,b)=>a.date<b.date?-1:1).slice(-21);
   const c = Insights.cutSafety(S.entries, new Date(), p), cp = Insights.cutPlan(lw ? lw.weight : p.startWeight, p.targetWeight, p.fightDate), flags = [];
-  if (c.level) flags.push(`Weight loss ${-c.pctPerWeek}%/week (${c.level})`); if (cp && cp.level !== 'ok') flags.push(`Target needs ${cp.perWeek} lbs/week (${cp.pct}%), ${cp.short} lbs short at a safe pace`);
+  if (c.level) flags.push(`Weight loss ${-c.pctPerWeek}%/week (${c.level})`); { const ws = wpStatus(); if (ws && (ws.band === 'tight' || ws.band === 'unsafe')) flags.push(`Weight plan ${WeightPlan.BAND[ws.band][0]}: coach to reconsider division`); }
   { const o = otRisk(); if (o.level) flags.unshift(o.summary); }
   if (w.dropping) flags.push('Wellness below normal'); w.flags.forEach(f => flags.push(f.text ? `${f.text} on ${f.date.slice(5)}` : `Low ${f.item} (${f.value}/5) on ${f.date.slice(5)}`));
   Insights.hydrationFlags(S.entries, new Date(), p).forEach(f => flags.push(f));
@@ -281,9 +306,9 @@ const V = {
   const r = res(), lw = r.latestWeight;
   const isWeighDay = [1,4].includes(new Date().getDay()) && !S.entries.some(e=>e.date===today() && +e.weight>0);
   const dueNow = Reminders.due(S.entries.find(e=>e.date===today()), new Date(), S.reminders.morning, S.reminders.evening);
-  const top = scoreHero(r) + todayTrainCard();
+  const top = scoreHero(r) + todayTrainCard() + fwTodayCard();
   const rs = V._restored; V._restored = null;
-  return `${rs?`<div class="card hint" id="restoredNote">✅ Restored <b>${esc(rs.name)}</b> with ${rs.days} logged day${rs.days===1?'':'s'}. 🔔 Notifications aren't restored: turn them on again in <a href="#" data-goto="setup">Setup</a>.</div>`:''}${top}${otCard()}${day1Banner(false)}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning check-in not done: '+esc(Insights.morningMissing(S.entries.find(e=>e.date===today())).map(x=>x.replace(/^[^:]*: /,'')).join('; ')||'sleep, hydration, how you feel')+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: nutrition, each training session (effort + minutes), screen hours, family/friends'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${weeklyCard()}${fightCard()}${fightWeekCard()}${cheatCard()}${streakCard()}${nutCard()}
+  return `${rs?`<div class="card hint" id="restoredNote">✅ Restored <b>${esc(rs.name)}</b> with ${rs.days} logged day${rs.days===1?'':'s'}. 🔔 Notifications aren't restored: turn them on again in <a href="#" data-goto="setup">Setup</a>.</div>`:''}${top}${otCard()}${day1Banner(false)}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning check-in not done: '+esc(Insights.morningMissing(S.entries.find(e=>e.date===today())).map(x=>x.replace(/^[^:]*: /,'')).join('; ')||'sleep, hydration, how you feel')+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: nutrition, each training session (effort + minutes), screen hours, family/friends'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${weeklyCard()}${fightCard()}${cheatCard()}${streakCard()}${nutCard()}
   ${isWeighDay?'<div class="card hint">⚖️ It\'s a weigh-in day (Mon/Thu). Weigh in this morning, fasted, and log it.</div>':''}
   ${r.locked?`${todayCard()}<div class="card"><h3>Categories so far (${r.daysLogged} day${r.daysLogged==1?'':'s'})</h3>${catTable(r)}<p class="muted">Consistency bonus: 🔒 unlocks in ${r.unlockIn} day${r.unlockIn==1?'':'s'}.</p></div>`:`${todayCard()}
   <div class="card"><h3>Categories (last 3 weeks)</h3>${catTable(r)}
@@ -318,7 +343,7 @@ const V = {
    morning: `<div class="card" id="sec_morning">${head('morning','🌅 Morning check-in')}
    ${step('sleep','Sleep last night (hours) *',0.5)}${chips('sleep',[6,7,7.5,8,8.5,9])}
    <label>Weight (lbs) ${wd?'<span style="color:#ff9800">— weigh-in day! ⚖️ Weigh in before eating.</span>':'<span class="muted">(Mon/Thu mornings)</span>'}</label>
-   <input id="f_weight" type="number" inputmode="decimal" step="0.1" value="${esc(e.weight)}">
+   <input id="f_weight" type="number" inputmode="decimal" step="0.1" value="${esc(e.weight)}"><div id="wcheck">${wcheckHtml(e.weight, d)}</div>
    ${hydPicker(e)}
    <p style="margin:14px 0 0"><b>How do you feel? *</b></p>
    ${Insights.WELL.map(([k,l,lo,hi])=>`<label>${l} <span class="muted">(${lo} … ${hi})</span></label><div class="sc" data-k="${k}">${[1,2,3,4,5].map(n=>`<button class="${+e[k]===n?'on':''}" data-val="${n}">${n}</button>`).join('')}</div>`).join('')}
@@ -368,7 +393,7 @@ const V = {
   ${scoreHero(r)}${r.locked?`<div class="card"><p style="text-align:center"><b>${lockMsg(r)}</b></p>${todayRow()}</div>`:''}${otCard()}${belowParCard(r)}
   <div class="card"><h3>Weight & trend</h3>${verdictLine()}<p>Latest: ${r.latestWeight?r.latestWeight.weight+' lbs ('+r.latestWeight.date+')':'—'}${+S.targetWeight?' • Target: '+esc(S.targetWeight)+' lbs':''}<br>
    7-day trend: ${r.locked?lockMsg(r):(r.delta==null?'—':r.delta+' lbs/wk')+' '+r.trend.emoji+' '+esc(r.trend.label)}</p>${cutWarn()}${weightChart()}</div>
-  ${reviewCard()}${fightWeekCard()}
+  ${wpReportCard()}${reviewCard()}
   <div class="card"><h3>Training</h3><p>Last 7 days: <b>${tr7()}</b></p></div>
   <div class="card"><h3>Logging</h3><p>Current streak: <b>${Insights.streak(S.entries).current} days</b> (best ${Insights.streak(S.entries).best}) • Full logs in last 28 days: <b>${Insights.grid(S.entries).filter(x=>x.status==='done').length}/28</b></p></div>
   ${wellCard(true)}${hydrationCard()}
@@ -383,6 +408,8 @@ const V = {
   const fld = (k, l, attrs='', req=false) => `<label for="p_${k}">${l}${req?' *':''}</label><input id="p_${k}" ${attrs} value="${v(k)}">${er[k]?`<p class="err">${esc(er[k])}</p>`:''}`;
   const sel = (k, l, opts) => `<label for="p_${k}">${l}</label><select id="p_${k}"><option value="">—</option>${opts.map(o=>`<option ${(V._pdraft?V._pdraft[k]:p[k])===o?'selected':''}>${o}</option>`).join('')}</select>${er[k]?`<p class="err">${esc(er[k])}</p>`:''}`;
   const num = 'type="number" inputmode="decimal" step="0.1" min="60" max="400"';
+  const dv = k => V._pdraft ? V._pdraft[k] : p[k], sel2 = (k, l, opts) => `<label for="p_${k}">${l}</label><select id="p_${k}">${opts.map(([val,lab])=>`<option value="${val}" ${(dv(k)||opts[0][0])===val?'selected':''}>${lab}</option>`).join('')}</select>`;
+  const a0 = Profile.age(dv('dob')), minorNow = a0 != null && a0 < 18;
   return `${first?'<div class="card"><h2 style="margin:0">🥊 Welcome! Sign up</h2><p class="muted">Set up your fighter profile. It stays on this phone only and is included in your backups. You can edit it later in Setup.</p></div><div class="card" id="restoreCard"><h3>♻️ Already use FightReady?</h3><p class="muted">New phone or reinstalled? Restore your backup file and skip sign-up. Your profile, logs, camp dates, settings and watch come back.</p><label class="btn alt" for="restoreFirst" style="display:block;text-align:center">📂 Restore from backup</label><input type="file" id="restoreFirst" accept=".json,application/json" style="display:none">'+(V._rerr?'<p class="err" role="alert">⚠️ '+esc(V._rerr)+'</p>':'')+'<p class="muted" style="margin-bottom:0">Notifications aren&#39;t part of the backup. Turn them on again in Setup after restoring.</p></div><div class="card hint" id="day1note">📅 <b>Your sign-up day is Day 1 of tracking.</b> After you sign up, finish today&#39;s log tonight: nutrition, each training session (with effort + minutes), sleep, how you feel (energy, soreness, mood, stress), screen time, and family/friends. You get a daily score and an early FightReady Score from your first log. The full score and weekly trends unlock after 7 days.</div>':'<div class="card"><h2 style="margin:0">Fighter profile</h2></div>'}
   ${Object.keys(er).length?'<div class="card hint">Please fix the highlighted fields.</div>':''}
   <div class="card"><h3>Fighter</h3>${fld('name','Fighter name','autocomplete="name" maxlength="60" required',true)}${fld('nickname','Nickname','maxlength="40"')}
@@ -393,6 +420,13 @@ const V = {
   <div class="card"><h3>Weight & fight</h3>${sel('weightClass','Weight class',Profile.WEIGHT_CLASSES)}
    ${fld('startWeight','Starting weight (lbs)',num+(first?'':' disabled'))}${first?'<p class="muted">Saved as your first weigh-in.</p>':''}
    ${fld('targetWeight','Target weight (lbs)',num)}<p class="muted">🥊 Fight date: <b>${esc((S.profile||{}).fightDate||'not set')}</b>. Set it with camp start in Setup → Fight camp.</p><div id="cutBox"></div></div>
+  <div class="card" id="cutCard"><h3>⚖️ Weight cut plan</h3><p class="muted">🧑‍🏫 Your coach is responsible for choosing a division you can make safely. The app spreads your cut evenly to reach target 5 days before weigh-in and checks you're in range.</p>
+   ${sel2('weighIn','When is the weigh-in?',WeightPlan.WEIGH_IN)}${sel2('cutExp','Weight-cut experience',WeightPlan.CUT_EXP)}
+   <label class="chk"><input type="checkbox" id="p_lastCutBad" ${dv('lastCutBad')?'checked':''}> My last cut went badly (felt ill, struggled, or missed weight)</label>
+   ${minorNow?'<div class="hint" id="minorNote">🛡️ <b>Under 18:</b> water-cut and sauna steps are always off. Fight week uses food-based steps only, with a 2% limit.</div>':`<label class="chk"><input type="checkbox" id="p_waterCut" ${dv('waterCut')?'checked':''}> Show water-cut steps in fight week (optional)</label>
+   <div class="hint warn" id="waterAckBox"><b>Guideline only. Not medical advice.</b> Water-cut steps (water loading, fluid reduction, sauna) carry real health risks. They're general guidelines from published sports-nutrition research, not a plan for you. Consult a qualified professional (doctor or sports dietitian) and only do them with your coach's supervision.
+   <label class="chk"><input type="checkbox" id="p_waterAck" ${dv('waterAck')?'checked':''}> I understand this is a guideline only, not medical advice, and I'll consult a qualified professional.</label></div>${er.waterAck?`<p class="err">${esc(er.waterAck)}</p>`:''}`}
+   <p class="muted">Without water-cut steps, fight week shows food-based steps only (low fibre, less salt, carbs) and daily weigh-in targets.</p></div>
   <div class="card" id="schedCard"><h3>🗓️ Training schedule</h3><p class="muted">Your usual week. The daily log asks about each session. Training score = % of scheduled sessions done (rest days count 100%).</p>
    <label>Do you train once or twice a day?</label><div class="sc" id="perDay"><button data-perday="1">Once</button><button data-perday="2">Twice</button></div>
    ${Profile.DAYS.map((dn,i)=>`<div class="sday"><label>${dn}</label><div class="sc">${['Rest','1 session','2 sessions'].map((l,n)=>`<button data-sd="${i}" data-n="${n}">${l}</button>`).join('')}</div>
@@ -456,12 +490,12 @@ const V = {
   <p><b>How you feel (Hooper-style check-in):</b> four quick 1–5 ratings modelled on the Hooper Index used by pro teams: fatigue/energy, muscle soreness, stress and mood. Energy and mood: 5 = best. Soreness and stress: higher = more (1 = none / very relaxed, 5 = very sore / very stressed); the app flips them when scoring. Sleep is logged separately as hours. It's 15% of the score.</p>
   <p><b>More morning items:</b> Sleep quality (1–5, 5 = best), Motivation / readiness to train (1–5), Appetite (1–5), Injury / pain (None / Minor / Limiting, plus where; higher = worse) and Feeling ill (No / Yes). Injury starts on None and illness on No, so most mornings they need no tap.</p>
   <p><b>Smart watch / sleep tracker:</b> pick your device at sign-up or in Setup (None, Garmin, Fitbit, Apple Watch, Oura, Whoop, Samsung Galaxy Watch, Other). With a device, the morning check-in asks for your watch's sleep score instead of the 1–5 sleep quality, plus your resting heart rate. You type both in by hand: the app does not connect to the watch. Each maker's sleep score is converted with that maker's own bands (e.g. Garmin/Fitbit Excellent 90+, Good 80–89, Fair 60–79, Poor under 60) into a 0–100 sleep quality. Resting HR builds your personal baseline (median of the last 30 days once you have 7 readings); 5+ bpm above it raises a 🚩. It has no effect on the score until the baseline exists.</p>
-  <p><b>Weight verdict:</b> the Score tab shows one line every day. 🟢 <b>On track</b> = losing at roughly the pace you need, within the safe ~1%/week. 🔴 <b>Too fast</b> = losing more than 1.5%/week. 🟠 <b>Too slow</b> = well under the pace you need. ⚪ <b>No target</b> = set a target weight in your profile.</p>
-  <p><b>Impossible-cut check:</b> with a target weight and fight date set, the app works out the weekly loss needed. Over 1%/week of bodyweight shows a caution and over 1.5% says the plan is unsafe. It shows the weight a safe pace reaches by fight day and how far short that is, so you can talk to your coach about a higher weight class or a later date.</p>
-  <p><b>Fight week:</b> in the last 7 days before your fight date (used as weigh-in day) the Score tab and Report show a day-by-day card covering taper, water, salt and carbs. It's general, conservative guidance based on the ISSN 2025 combat-sports position stand, not medical advice. Follow your coach and dietitian. No saunas, diuretics or fluid restriction for minors.</p>
+  <p><b>Weight plan:</b> the app spreads the gap between your weight and target evenly so you reach target 5 days before weigh-in, losing about 1% of body weight a week (0.75% under 18). The last 5 days are your fight-week allowance, a % of target set by weigh-in timing, age, and cut experience (2–6%; 3% max without water-cut steps; 2% under 18). Status: 🟢 <b>On track</b> (on the plan line), 🟢 <b>In range</b> (a normal fight-week cut covers the rest), 🟠 <b>Tight</b> (talk to your coach this week), 🔴 <b>Unsafe</b> (can't be made safely; talk about a catchweight, a later date or a class up). Be honest with your weigh-ins: the plan only keeps you safe if it knows where you really are.</p>
+  <p><b>🧑‍🏫 Choosing the division is the coach's job.</b> The coach is responsible for picking a division the fighter can make safely. The Coach Report flags a Tight or Unsafe plan so the coach can reconsider.</p>
+  <p><b>Fight week:</b> in the last 7 days before weigh-in, the Score tab shows a card right under Today's training with just that day's steps, today's target weight and your status. The morning weigh-in in Log compares your weight to the day's target. Water-cut steps only show if you opted in (Setup → Edit profile); they're never shown to under-18s.</p>
+  ${fwHelp()}
   <p><b>Weekly review:</b> the Coach Report, weekly email and share text include an automatic "What went well / What was missed / Focus for next week" from your last 7 days (best and worst categories, missed sessions, 🚩 flags, weight verdict).</p>
   <p><b>Wellness & load:</b> poor wellness ratings get a 🚩 flag for your coach (1–2 for energy, mood, sleep quality, motivation and appetite; 4–5 for soreness and stress), and a drop below your normal is highlighted. Session load = RPE × minutes summed over all sessions (two-a-days add up). It's shown on the Score tab and Coach Report and doesn't change the score.</p>
-  <p><b>Safe weight cut:</b> the app warns if you lose more than 1%/week of bodyweight (caution) or 1.5%/week (warning), or if your target and fight date would need a faster pace. Sports-nutrition guidance for combat sports is a gradual ~0.5–1 kg (1–2 lbs) per week. Never cut by skipping meals or dehydrating without coach supervision.</p>
   <p><b>Weekly report (testing phase):</b> every Sunday (and on the first open after, until it's sent) the Score screen shows a <i>Send weekly report to ${Weekly.CONFIG.ADMIN_NAME}</i> card. Tap <i>🖼️ Send report with charts</i>: the app makes a one-page report image (score, category bars, daily score, weight vs target, sleep and training load charts, flags) and opens the share sheet. Pick Mail: the report is attached and the text starts with the subject (your name + report dates, e.g. "Pablo – FightReady weekly report – Oct 19 to Oct 25, 2026") and To (${Weekly.CONFIG.ADMIN_EMAIL}). If Mail leaves the To or Subject blank, copy them from the first lines. To send the full log as a file, use <i>Share full log file (CSV)</i>. You can send anytime from Setup or the Report screen. A calendar reminder fires Sundays at 6 PM.</p>
   <p><b>💧 Hydration:</b> in the Morning check-in, tap the colour closest to your first pee of the day (pale straw to dark amber). 🟢 pale = hydrated, 🟡 mid-yellow = drink more, 🔴 dark = dehydrated. It's a quick guide, not a medical test, and it doesn't change your score. It's required for each new day. The Score screen shows your last 7 mornings, and 2 or more dark mornings in a week shows a flag. In fight week do not cut water to make weight, and minors (under 18) should never dehydrate.</p>
   <p><b>Notes:</b> injuries, illness, soreness, bad sleep causes, low energy. These show up on the Coach Report.</p></div>
@@ -602,8 +636,17 @@ let _stTimer = null, _stSent = '';
 function statusNow() { return Object.assign({ date: today() }, Insights.dayStatus(S.entries.find(e => e.date === today()))); }
 function sendStatusNow() { clearTimeout(_stTimer); if (!S.push) return; const st = statusNow(), key = JSON.stringify(st); if (key === _stSent) return; _stSent = key; Push.setDayStatus(st).catch(() => { _stSent = ''; }); }
 function scheduleStatus() { if (!S.push) return; clearTimeout(_stTimer); _stTimer = setTimeout(sendStatusNow, 3000); }
+function wcheckHtml(w, d = today()) { const s = wpStatus(new Date(d+'T09:00')), c = s && WeightPlan.dayCheck(w, s); if (!s || !(s.planToday > 0)) return '';
+  if (!c) return `<p class="muted" style="margin:4px 0 0">🎯 Today's target: <b>${s.planToday} lbs</b></p>`;
+  return `<p class="wck ${c.level}" style="margin:4px 0 0">${c.level==='ok'?'✅':c.level==='close'?'🟠':'⚠️'} ${esc(c.text)} ${wpPill(s.band)}</p>`; }
+function fwHelp() { const days = [7,6,5,4,3,2,1,0];
+  return `<div class="card" id="helpFW" style="margin:8px 0"><h3>🥊 Fight-week outline (7 days)</h3><p class="muted">Guideline only, not medical advice. Consult a qualified professional and follow your coach. Days are counted to the weigh-in.</p>
+   ${days.map(k=>{ const f = WeightPlan.FOOD[k]; return `<div class="fwday"><b>${k===0?'Weigh-in day':'Day −'+k}</b><br>🏋️ ${esc(f[0])}<br>🍚 ${esc(f[1])}${WeightPlan.WATER[k]?'<br>💧 <i>Water-cut steps (opt-in, adults only):</i> '+esc(WeightPlan.WATER[k]):''}</div>`; }).join('')}
+   <p class="muted">After weigh-in: oral rehydration 1–1.5 L/hour (sodium 50–90 mmol/L), then easy carbs up to 60 g/hour, low fibre. Aim to regain the whole cut before the fight.</p></div>
+   <div class="card" id="helpStop" style="margin:8px 0"><h3>🛑 Stop signs</h3><p>Stop the cut, drink an oral rehydration solution and tell your coach if any of these happen. <b>Call 911 for fainting, confusion, chest pain or a seizure.</b></p><ul>${STOP.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`; }
 function refreshCut() { const b = $('#cutBox'); if (!b) return; const lw = res().latestWeight, sw = $('#p_startWeight');
-  b.innerHTML = planBox(lw ? lw.weight : sw && sw.value, $('#p_targetWeight').value, (S.profile||{}).fightDate||''); }
+  b.innerHTML = planBox(lw ? lw.weight : sw && sw.value, $('#p_targetWeight').value, (S.profile||{}).fightDate||'', wpDraft()); }
+const wpDraft = () => { const g = id => { const el = $('#p_'+id); return el ? (el.type === 'checkbox' ? el.checked : el.value) : undefined; }; const o = {}; ['dob','weighIn','cutExp','lastCutBad','waterCut'].forEach(k => { const v = g(k); if (v !== undefined) o[k] = v; }); return o; };
 function refreshSched() { const sc = V._sched; if (!sc || !$('#schedCard')) return;
   document.querySelectorAll('#perDay button').forEach(b => b.classList.toggle('on', +b.dataset.perday === sc.perDay));
   sc.days.forEach((d,i) => { document.querySelectorAll(`[data-sd="${i}"]`).forEach(b => b.classList.toggle('on', +b.dataset.n === d.n));
@@ -644,7 +687,7 @@ document.addEventListener('click', async ev => {
   if (t.id === 'secDone' || t.dataset.back) return closeSection();
   if (t.dataset.v === 'log' && cur === 'log' && V._sec) return closeSection();
   if (t.dataset.v) return show(t.dataset.v);
-  if (t.dataset.goto) { ev.preventDefault(); V._date = null; return show(t.dataset.goto); }
+  if (t.dataset.goto) { ev.preventDefault(); V._date = null; show(t.dataset.goto); if (t.dataset.anchor) { const a = document.getElementById(t.dataset.anchor); if (a) a.scrollIntoView({block:'start'}); } return; }
   if (t.closest('.yn') && t.closest('.yn').dataset.k === 'sess') { const i = +t.closest('.yn').dataset.i, on = t.dataset.val==='1'; V._e.sessions[i].done = on;
     t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t)); $('#sx_'+i).style.display = on ? '' : 'none'; autosave(); return; }
   if (t.dataset.nmode) { V._nm = t.dataset.nmode; document.querySelectorAll('#nutMode button').forEach(b => { const on = b === t; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
@@ -698,10 +741,14 @@ document.addEventListener('click', async ev => {
       else if (navigator.clipboard) { await navigator.clipboard.writeText(txt); alert('Summary copied to clipboard.'); } else alert(txt); return; }
     case 'saveProfile': { const keys = ['name','nickname','dob','discipline','gym','coach','coachContact','weightClass','startWeight','targetWeight','fightDate','emName','emPhone','medical','device'];
       const first = !S.profile, d = {}; keys.forEach(k => { const el = $('#p_'+k); d[k] = el ? el.value.trim() : ''; });
+      ['weighIn','cutExp'].forEach(k => { const el = $('#p_'+k); d[k] = el ? el.value : ''; });
+      ['lastCutBad','waterCut','waterAck'].forEach(k => { const el = $('#p_'+k); d[k] = !!(el && el.checked); });
+      { const a = Profile.age(d.dob); if (a != null && a < 18) { d.waterCut = false; d.waterAck = false; } }
+      if (!d.waterCut) d.waterAck = false; else if (d.waterAck) d.waterAckAt = (S.profile && S.profile.waterAck && S.profile.waterAckAt) || new Date().toISOString();
       d.fightDate = (S.profile && S.profile.fightDate) || '';
       if (!first) d.startWeight = S.profile.startWeight || '';
       if (!Weekly.CONFIG.SHOW_COACH_CONTACT) d.coachContact = (S.profile && S.profile.coachContact) || ''; // hidden in testing: keep existing value
-      const errs = Profile.validate(d); if (Object.keys(errs).length) { V._perr = errs; V._pdraft = d; show('profile'); const f = document.querySelector('.err'); if (f) f.previousElementSibling.focus(); return; }
+      const errs = Profile.validate(d); if (d.waterCut && !d.waterAck) errs.waterAck = 'Tick the box to confirm you understand, or turn water-cut steps off.'; if (Object.keys(errs).length) { V._perr = errs; V._pdraft = d; show('profile'); const f = document.querySelector('.err'); if (f) f.previousElementSibling.focus(); return; }
       d.schedule = JSON.parse(JSON.stringify(V._sched));
       V._perr = V._pdraft = null; S.profile = d; const wk0 = mondayOf(new Date()); S.weeks.forEach(w => { if (w.start >= wk0 || S.weeks.length === 1) Profile.applyToWeek(d.schedule, w); }); S.fighter = d.name; S.coach = d.coach; S.targetWeight = d.targetWeight;
       if (first) { if (!S.startDate) S.startDate = today();
@@ -721,8 +768,9 @@ document.addEventListener('click', async ev => {
 });
 const LOGF = ['f_kcal','f_protein','f_carbs','f_fat','f_sleep','f_screen','f_weight','f_notes','f_xlabel','f_xrpe','f_xmin','f_sleepDev','f_rhr','f_injArea'];
 document.addEventListener('input', ev => { const t = ev.target, w = S.weeks[S.weekIdx];
+  if (t.id === 'f_weight' && $('#wcheck')) $('#wcheck').innerHTML = wcheckHtml(t.value, V._date || today());
   if (cur === 'log' && (LOGF.includes(t.id) || t.dataset.srpe != null || t.dataset.smin != null)) return void autosave();
-  if (['p_startWeight','p_targetWeight','p_fightDate'].includes(t.id)) refreshCut();
+  if (['p_startWeight','p_targetWeight','p_fightDate','p_dob'].includes(t.id)) refreshCut();
   if (t.dataset.sl && V._sched) { const [i,j] = t.dataset.sl.split('-').map(Number); V._sched.days[i].labels[j] = t.value; return; }
   if (t.dataset.d !== undefined && t.dataset.k) { w.days[+t.dataset.d][t.dataset.k] = t.value; save(); }
   else if (t.id && t.id.startsWith('w_')) { w[t.id.slice(2)] = t.value; save(); }

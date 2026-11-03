@@ -158,8 +158,8 @@
     const last = avg(inRange(ws, t, 7, 0).map(e => +e.weight)), prev = avg(ws.filter(e => { const n = dayNum(e.date); return n >= t-14 && n < t-7; }).map(e => +e.weight));
     const out = { pctPerWeek: null, level: null, msg: null, pace: null };
     if (last && prev) { const pct = Math.round((last - prev) / prev * 1000) / 10; out.pctPerWeek = pct;
-      if (pct < -1.5) { out.level = 'warn'; out.msg = `Losing ${-pct}% of bodyweight per week. That's faster than the safe range (about 0.5–1%/week). Talk to your coach: eat enough protein and carbs, and don't skip meals or dehydrate.`; }
-      else if (pct < -1) { out.level = 'caution'; out.msg = `Losing ${-pct}%/week. That's at the top of the safe range. Watch energy, sleep and soreness.`; } }
+      if (pct < -1.5) { out.level = 'warn'; out.msg = `Losing fast (${-pct}% this week). Eat enough carbs and protein so you keep your strength. The water part comes in fight week, not now.`; }
+      else if (pct < -1) { out.level = 'caution'; out.msg = `Losing ${-pct}% this week, the top of the steady range. Keep an eye on energy, sleep and soreness.`; } }
     const cur = ws.sort((a,b)=>a.date<b.date?-1:1).slice(-1)[0], tgt = +profile.targetWeight;
     if (cur && tgt > 0 && profile.fightDate) { const days = dayNum(profile.fightDate) - t, toGo = +cur.weight - tgt;
       if (days > 0 && toGo > 0) { const perWk = toGo / (days/7), pct = perWk / +cur.weight * 100;
