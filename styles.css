@@ -137,3 +137,8 @@ nav button span{white-space:nowrap;overflow:hidden;text-overflow:clip;letter-spa
 @media print{.bpar{border-color:#B0101A!important}.bp-item b{color:#B0101A!important}.bp-ok{color:#2e7d32!important}}
 .opt{display:flex;gap:8px}.opt button{flex:1;padding:14px 6px;font-size:1rem;border-radius:10px;border:2px solid #444;background:#222;color:#eee}
 .opt button.on{background:#E8A828;border-color:#E8A828;color:#000;font-weight:700}
+
+.tt{padding:12px 14px}.tt-head{display:flex;justify-content:space-between;align-items:center;font-weight:800;letter-spacing:.08em;font-size:.8rem;color:#E8A828;margin-bottom:6px}
+.tt-head .muted{letter-spacing:0;font-weight:600}.tt-focus{font-weight:700;margin:0 0 6px}
+.tt-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 10px;margin-top:6px;border:1px solid #333;border-radius:10px;background:#161616}
+.tt-row.done{background:#13321b;border-color:#2e7d32}.tt-st{font-size:.8rem;font-weight:700;color:#aaa;white-space:nowrap}.tt-st.ok{color:#81c784}.tt-st.no{color:#ef9a9a}

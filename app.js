@@ -1,4 +1,4 @@
-const APP_VERSION='fr-v48';
+const APP_VERSION='fr-v49';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -235,6 +235,18 @@ function momCard(r) { const m = r.momentum || {}; return `<div class="card"><h3>
   <div class="row"><span>🔥 Current streak</span><b>${m.streak} days → +${m.sPts.toFixed(1)}</b></div>
   <div class="row"><span>Consistent camp days</span><b>${m.consistentDays} of ${m.campDays}</b></div>
   <p class="muted" style="margin:6px 0 0">Every day since camp start (${esc(S.startDate||'—')}) counts, unlogged days count as missed. Days closer to fight night count up to double.</p></div>`; }
+// Today's training (Score page, under the ring): today's scheduled sessions with done status; Rest day if none.
+function todayTraining(d = today()) { const e = S.entries.find(x => x.date === d), wk = S.weeks.find(w => w.start === mondayOf(new Date(d + 'T12:00'))), wd = wk && wk.days[Profile.dow(d)];
+  let ss = e && Array.isArray(e.sessions) ? e.sessions : (Profile.sessionsFor(S.profile && S.profile.schedule, d) || []);
+  if (!ss.length && !(S.profile && S.profile.schedule) && wd) ss = [wd.s1, wd.s2, wd.s3].filter(x => String(x||'').trim()).map(label => ({ label, done:null }));
+  const focus = wd && wd.focus ? wd.focus : '', hrs = wd && +wd.hrs > 0 ? wd.hrs : '', extra = e && e.extra && e.extra.label ? e.extra : null;
+  return { rest: !ss.length, focus, hrs, extra, sessions: ss.map((x, i) => ({ label: x.label || 'Session ' + (i+1), done: x.done, mins: x.mins })) }; }
+function todayTrainCard() { const t = todayTraining(), st = x => x.done === true ? '<span class="tt-st ok">✓ Done</span>' : x.done === false ? '<span class="tt-st no">✗ Missed</span>' : '<span class="tt-st">To do</span>';
+  const nd = t.sessions.filter(x => x.done === true).length;
+  return `<div class="card tt" id="todayTrain"><div class="tt-head"><span>🥊 TODAY'S TRAINING</span><span class="muted">${t.rest ? '' : nd + '/' + t.sessions.length + ' done'}${t.hrs ? ' • ' + esc(t.hrs) + 'h planned' : ''}</span></div>
+   ${t.focus && !t.rest ? `<div class="tt-focus">${esc(t.focus)}</div>` : ''}
+   ${t.rest ? `<div class="tt-row"><span>😴 Rest day${t.focus && /rest|recovery/i.test(t.focus) ? ': ' + esc(t.focus) : ''}</span></div>` : t.sessions.map(x => `<div class="tt-row${x.done === true ? ' done' : ''}"><span>${esc(x.label)}${+x.mins > 0 ? ' <span class="muted">• ' + esc(x.mins) + ' min</span>' : ''}</span>${st(x)}</div>`).join('')}
+   ${t.extra ? `<div class="tt-row done"><span>${esc(t.extra.label)} <span class="muted">(extra)</span></span><span class="tt-st ok">✓ Done</span></div>` : ''}</div>`; }
 function scoreHero(r) { return r.locked ? earlyCard(r) : heroCard({ score: r.daysLogged ? r.score : null, badge: r.daysLogged ? r.verdict.split(' — ')[0] : 'NO DATA YET', verdict: r.daysLogged ? r.verdict.split(' — ').slice(1).join(' — ') : 'No entries in the last 3 weeks yet.',
     extra: momLine(r), foot: `Base ${r.base.toFixed(1)} + consistency ${r.bonus} + momentum ${r.momentum.points} • ${r.daysLogged} days logged • ${esc(r.dataQuality.split(' — ')[0])} data` }); }
 function earlyCard(r) { const pr = Early.progress(r, S.params.unlockDays||7), v = r.daysLogged ? Math.round(r.base) : null;
@@ -269,7 +281,7 @@ const V = {
   const r = res(), lw = r.latestWeight;
   const isWeighDay = [1,4].includes(new Date().getDay()) && !S.entries.some(e=>e.date===today() && +e.weight>0);
   const dueNow = Reminders.due(S.entries.find(e=>e.date===today()), new Date(), S.reminders.morning, S.reminders.evening);
-  const top = scoreHero(r);
+  const top = scoreHero(r) + todayTrainCard();
   const rs = V._restored; V._restored = null;
   return `${rs?`<div class="card hint" id="restoredNote">✅ Restored <b>${esc(rs.name)}</b> with ${rs.days} logged day${rs.days===1?'':'s'}. 🔔 Notifications aren't restored: turn them on again in <a href="#" data-goto="setup">Setup</a>.</div>`:''}${top}${otCard()}${day1Banner(false)}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning check-in not done: '+esc(Insights.morningMissing(S.entries.find(e=>e.date===today())).map(x=>x.replace(/^[^:]*: /,'')).join('; ')||'sleep, hydration, how you feel')+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: nutrition, each training session (effort + minutes), screen hours, family/friends'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${weeklyCard()}${fightCard()}${fightWeekCard()}${cheatCard()}${streakCard()}${nutCard()}
   ${isWeighDay?'<div class="card hint">⚖️ It\'s a weigh-in day (Mon/Thu). Weigh in this morning, fasted, and log it.</div>':''}
