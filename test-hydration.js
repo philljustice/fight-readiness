@@ -44,6 +44,10 @@ assert.ok(rows[2].endsWith(',N,6,Dehydrated') || rows[2].endsWith(',Y,6,Dehydrat
 // wiring
 const app = fs.readFileSync(__dirname+'/app.js','utf8'), rep = fs.readFileSync(__dirname+'/report.js','utf8'), sw = fs.readFileSync(__dirname+'/sw.js','utf8');
 assert.ok(app.includes('hydPicker(e)') && app.includes('hydrationCard()') && app.includes('hydration: { days:') && app.includes('hydrationFlags'));
-assert.ok(rep.includes('d.hydration')); assert.ok(sw.includes("'fr-v51'"));
+assert.ok(rep.includes('d.hydration')); assert.ok(sw.includes("'fr-v52'"));
 assert.ok(!/<button[^>]*class="[^"]*"[^>]*data-hyd[^>]*>[^<]+</.test(app.match(/function hydPicker[\s\S]*?\n function|function hydPicker[\s\S]{0,900}/)[0]), 'swatches carry no visible text');
 console.log('All hydration tests passed');
+// v52: Help wellness wording matches v39/v40 scales
+{ const src = require('fs').readFileSync(__dirname + '/app.js', 'utf8');
+  assert.ok(!/5 = no (soreness|stress)/.test(src), 'no stale "5 = no soreness/stress"');
+  assert.ok(/Soreness \(5 = very sore\)/.test(src) && /Stress \(5 = very stressed\)/.test(src)); }
