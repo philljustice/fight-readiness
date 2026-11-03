@@ -1,4 +1,4 @@
-const APP_VERSION='fr-v52';
+const APP_VERSION='fr-v53';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -67,7 +67,7 @@ function otCard() { const o = otRisk(); if (!o.level) return ''; const li = a =>
    <p class="muted" style="margin:6px 0 0">Compared with your own normal. Not a diagnosis. See Help → Overtraining risk.</p></div>`; }
 // ---- Weight plan (WeightPlan, % of target model) ----
 const wpProfile = () => { const p = S.profile || {}; return Object.assign({}, p, { targetWeight: p.targetWeight || S.targetWeight }); };
-const wpStatus = (d = new Date()) => WeightPlan.status(S.entries, wpProfile(), d, { startDate: S.startDate });
+const wpStatus = (d = new Date(), ents = S.entries) => WeightPlan.status(ents, wpProfile(), d, { startDate: S.startDate });
 const WPCOL = { on:'#43a047', in:'#43a047', tight:'#fb8c00', unsafe:'#e53935', none:'#777' };
 const wpPill = b => `<span class="wp-pill" style="background:${WPCOL[b]||'#777'}">${esc(WeightPlan.BAND[b][0])}</span>`;
 function wpBox() { const s = wpStatus(); if (!s || !s.band || s.band === 'none') return '';
@@ -638,8 +638,10 @@ let _stTimer = null, _stSent = '';
 function statusNow() { return Object.assign({ date: today() }, Insights.dayStatus(S.entries.find(e => e.date === today()))); }
 function sendStatusNow() { clearTimeout(_stTimer); if (!S.push) return; const st = statusNow(), key = JSON.stringify(st); if (key === _stSent) return; _stSent = key; Push.setDayStatus(st).catch(() => { _stSent = ''; }); }
 function scheduleStatus() { if (!S.push) return; clearTimeout(_stTimer); _stTimer = setTimeout(sendStatusNow, 3000); }
-function wcheckHtml(w, d = today()) { const s = wpStatus(new Date(d+'T09:00')), c = s && WeightPlan.dayCheck(w, s); if (!s || !(s.planToday > 0)) return '';
-  if (+w > 0 && s.daysToWeighIn > WeightPlan.LEAD && WeightPlan.waterAffected(S.entries.filter(x => x.date !== d).concat(V._e && (V._date || today()) === d ? [Object.assign({}, S.entries.find(x => x.date === d), V._e, { date: d })] : S.entries.filter(x => x.date === d)), d)) return `<p class="wck close" id="waterAff" style="margin:4px 0 0">💧 Water-affected weigh-in. ${esc(WeightPlan.WATER_NOTE)}${s.usedWeight?` <span class="muted">Your plan uses ${s.usedWeight.weight} lbs (${s.usedWeight.date.slice(5)}).</span>`:''}</p>`;
+function wcheckHtml(w, d = today()) { // uses the unsaved draft (typed weight + tapped pee colour) so the pill matches the Score page once saved
+  const ents = WeightPlan.withDraft(S.entries, d, V._e && (V._date || today()) === d ? Object.assign({}, V._e, +w > 0 ? { weight: w } : {}) : (+w > 0 ? { weight: w } : null));
+  const s = wpStatus(new Date(d+'T09:00'), ents), c = s && WeightPlan.dayCheck(w, s); if (!s || !(s.planToday > 0)) return '';
+  if (+w > 0 && s.daysToWeighIn > WeightPlan.LEAD && WeightPlan.waterAffected(ents, d)) return `<p class="wck close" id="waterAff" style="margin:4px 0 0">💧 Water-affected weigh-in. ${esc(WeightPlan.WATER_NOTE)}${s.usedWeight?` <span class="muted">Your plan uses ${s.usedWeight.weight} lbs (${s.usedWeight.date.slice(5)}).</span>`:''}</p>`;
   if (!c) return `<p class="muted" style="margin:4px 0 0">🎯 Today's target: <b>${s.planToday} lbs</b></p>`;
   return `<p class="wck ${c.level}" style="margin:4px 0 0">${c.level==='ok'?'✅':c.level==='close'?'🟠':'⚠️'} ${esc(c.text)} ${wpPill(s.band)}</p>`; }
 function fwHelp() { const days = [7,6,5,4,3,2,1,0];

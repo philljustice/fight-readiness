@@ -15,6 +15,8 @@
   // A weigh-in is water-affected if that morning was dark, or 2+ of the last 3 mornings (that day and the 2 before) were dark.
   function waterAffected(entries, date) { const by = {}; entries.forEach(e => { by[e.date] = e; }); if (dark(by[date])) return true;
     let n = 0; for (let i = 0; i < 3; i++) { const x = new Date(date+'T12:00'); x.setDate(x.getDate()-i); if (dark(by[ymd(x)])) n++; } return n >= 2; }
+  // Entries with an unsaved draft for date d merged over the saved one (draft fields win).
+  const withDraft = (entries, d, draft) => !draft ? entries : entries.filter(e => e.date !== d).concat([Object.assign({}, entries.find(e => e.date === d), draft, { date: d })]);
   const WATER_NOTE = 'Hydrate and re-weigh; this drop is likely water, not real loss.';
   // Personal fight-week allowance A (% of target)
   function allowance(p = {}, today = new Date()) {
@@ -106,6 +108,6 @@
   const DRINK = 'Drink normally (pale-yellow urine).';
   function steps(k, water, minor) { const f = FOOD[k]; if (!f) return null; const s = [{ icon:'🏋️', text:f[0] }, { icon:'🍚', text:f[1] }];
     s.push({ icon:'💧', text: k <= 0 ? 'Rehydrate after weigh-in.' : (water && !minor && WATER[k]) ? WATER[k] : DRINK }); return s; }
-  const api = { hyd, dark, waterAffected, WATER_NOTE, hydAlert, WEIGH_IN, CUT_EXP, LEAD, BAND, allowance, weighInDate, weekTarget, status, dayCheck, steps, FOOD, WATER, age };
+  const api = { withDraft, hyd, dark, waterAffected, WATER_NOTE, hydAlert, WEIGH_IN, CUT_EXP, LEAD, BAND, allowance, weighInDate, weekTarget, status, dayCheck, steps, FOOD, WATER, age };
   if (typeof module !== 'undefined') module.exports = api; else root.WeightPlan = api;
 })(this);

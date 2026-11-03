@@ -59,3 +59,11 @@ let rh = W.hydAlert({hydration:5}, 0, true, false); assert.ok(rh.rehydrate && rh
 P.fightDate = fd(0); s = W.status([H(0,188,5)], P, today); assert.equal(s.daysToWeighIn, -1); assert.ok(s.postWeighIn); assert.equal(s.planToday, null);
 assert.equal(W.status([H(0,188,5)], Object.assign({}, P, {fightDate: fd(-1)}), today), null);
 console.log('weightplan hydration ok');
+// v53 regression: draft pee colour (dark -> pale, same weight) must give the same status as saved pale data
+{ P = {dob:adult, weighIn:'day-before', cutExp:'experienced', waterCut:true, targetWeight:180, fightDate:fd(42)};
+  const saved = [H(-6,191,2), H(-3,190.6,2), H(0,186,7)];              // last autosave still dark
+  const draft = W.withDraft(saved, fd(0), {hydration:2});
+  const ref = W.status([H(-6,191,2), H(-3,190.6,2), H(0,186,2)], P, today);
+  assert.equal(W.status(draft, P, today).band, ref.band); assert.equal(W.status(draft, P, today).W, 186); assert.ok(!W.waterAffected(draft, fd(0)));
+  assert.equal(W.status(saved, P, today).W, 190.6); assert.equal(saved[2].hydration, 7, 'withDraft does not mutate'); }
+console.log('withDraft ok');
