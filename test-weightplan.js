@@ -35,3 +35,27 @@ assert.ok(!/Water|sauna/i.test(W.steps(1, true, true).map(x=>x.text).join(' ')))
 // message wording never says "not safe" style for in-range
 P = {dob:adult, weighIn:'day-before', cutExp:'experienced', waterCut:true, targetWeight:180, fightDate:fd(43)}; s = W.status([e(0,190)], P, today); assert.ok(!/unsafe/i.test(s.text));
 console.log('weightplan ok');
+// ---- v51 hydration ----
+const H = (n, w, h) => ({ date: fd(n), weight: w, hydration: h });
+assert.equal(W.waterAffected([H(0,190,6)], fd(0)), true);
+assert.equal(W.waterAffected([H(-2,0,7), H(-1,0,6), H(0,190,4)], fd(0)), true);   // 2 of last 3 dark
+assert.equal(W.waterAffected([H(-2,0,7), H(-1,0,2), H(0,190,4)], fd(0)), false);
+// chronic: dark morning drop not credited; uses last hydrated weight
+P = {dob:adult, weighIn:'day-before', cutExp:'experienced', waterCut:true, targetWeight:180, fightDate:fd(43)};
+s = W.status([H(-3,186,2), H(0,181,7)], P, today); assert.ok(s.waterAffected); assert.equal(s.usedWeight.weight, 186); assert.equal(s.W, 186); assert.ok(s.text.startsWith(W.WATER_NOTE));
+s = W.status([H(0,179,7)], P, today); assert.notEqual(s.band, 'on', 'no hydrated weight: never On track');
+s = W.status([H(0,179,2)], P, today); assert.equal(s.band, 'on'); assert.ok(!s.waterAffected);
+// fight-week alerts
+assert.equal(W.hydAlert({hydration:7}, 4, true, false).level, 'stop');        // drying out during loading
+assert.equal(W.hydAlert({hydration:7}, 2, true, false), null);                // planned restriction day
+assert.equal(W.hydAlert({hydration:6}, 3, false, false).level, 'warn');       // not opted in
+assert.ok(/drink normally/i.test(W.hydAlert({hydration:6}, 1, false, false).text));
+assert.equal(W.hydAlert({hydration:5}, 4, true, false), null);
+assert.equal(W.hydAlert({hydration:6}, null, false, true).level, 'warn');      // minor any time
+assert.equal(W.hydAlert({hydration:6}, 1, true, true).level, 'warn');          // minor in fight week, even "opted in"
+assert.equal(W.hydAlert({hydration:2}, 30, false, false), null);
+let rh = W.hydAlert({hydration:5}, 0, true, false); assert.ok(rh.rehydrate && rh.level === 'warn'); assert.equal(W.hydAlert({hydration:2}, -1, true, false).level, 'ok');
+// fight day (after day-before weigh-in) still has a status, no target
+P.fightDate = fd(0); s = W.status([H(0,188,5)], P, today); assert.equal(s.daysToWeighIn, -1); assert.ok(s.postWeighIn); assert.equal(s.planToday, null);
+assert.equal(W.status([H(0,188,5)], Object.assign({}, P, {fightDate: fd(-1)}), today), null);
+console.log('weightplan hydration ok');

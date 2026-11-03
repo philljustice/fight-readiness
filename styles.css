@@ -147,3 +147,4 @@ nav button span{white-space:nowrap;overflow:hidden;text-overflow:clip;letter-spa
 .wp-box{margin:6px 0;padding:10px 12px;border:1px solid #333;border-radius:10px;background:#161616}.wp-box.tight{border-color:#fb8c00}.wp-box.unsafe{border-color:#e53935}
 .fwt-tgt{margin:2px 0 4px;font-size:1.05rem}.wck{font-weight:700}.wck.ok{color:#81c784}.wck.close{color:#ffb74d}.wck.over{color:#ef9a9a}
 label.chk{display:flex;gap:8px;align-items:flex-start;margin:10px 0;font-weight:500}label.chk input{width:auto;margin-top:3px}
+.hyd-alert{margin:6px 0;padding:9px 11px;border-radius:10px;font-weight:600;background:#3a2a10;border:1px solid #fb8c00}.hyd-alert.stop{background:#4a1414;border-color:#e53935}.hyd-alert.ok{background:#13321b;border-color:#2e7d32}.hyd-alert.info{background:#161616;border-color:#333}

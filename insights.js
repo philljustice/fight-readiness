@@ -187,14 +187,14 @@
     const ws = entries.filter(e => num(e.weight) && +e.weight > 0).sort((a,b)=>a.date<b.date?-1:1), cur = ws.length ? +ws[ws.length-1].weight : null;
     if (cur == null) return { word:'No data', color:'grey', text:'Log a weigh-in.' };
     const c = cutSafety(entries, today, profile), plan = cutPlan(cur, tgt, profile.fightDate, today), lossPct = c.pctPerWeek == null ? null : -c.pctPerWeek;
-    if (lossPct != null && lossPct > 1.5) return { word:'Too fast', color:'red', text:`Losing ${lossPct}%/week. Slow down: eat enough and do not dehydrate.` };
+    if (lossPct != null && lossPct > 1.5) return { word:'Too fast', color:'red', text:`Losing ${lossPct}%/week. Eat enough carbs and protein to keep your strength; any water cut belongs in fight week (opt-in), not now.` };
     if (cur <= tgt) return { word:'On track', color:'green', text:`At or under target (${tgt} lbs). Hold steady.` };
     if (lossPct == null) return { word:'On track?', color:'grey', text:`${Math.round((cur-tgt)*10)/10} lbs to go. Need 2 weeks of weigh-ins to judge pace.` };
     const need = plan ? Math.min(plan.pct, 1) : 0.5; // required pace, capped at the safe 1%/week
     if (lossPct + 0.15 < need * 0.8) return { word:'Too slow', color:'orange', text:`Losing ${Math.max(lossPct,0)}%/week; you need about ${Math.round(need*10)/10}%/week${plan?' to make '+tgt+' safely':''}.` };
     return { word:'On track', color:'green', text:`Losing ${lossPct}%/week${plan?`, need ${plan.pct}%/week`:''}.` };
   }
-  // Fight-week plan: general, conservative guidance (ISSN 2025 position stand). No dehydration protocol.
+  // LEGACY (not shown since fr-v50): conservative food-only fight-week table kept for tests/back-compat. Live fight-week steps: weightplan.js (water steps opt-in, never for under-18s).
   const FW = [
     [7,'Train normally but start the taper: keep intensity, cut volume ~20–30%.','Drink normally (pale-yellow urine).','Normal salt.','Normal carbs (not below ~3 g/kg/day), protein 1.2–2 g/kg.'],
     [6,'Technical work + short hard rounds; no new skills.','Drink normally.','Normal salt.','Normal carbs; keep protein high.'],
@@ -251,12 +251,11 @@
     const got = days.filter(x => x.v != null);
     return { days, logged:got.length, dehydrated:got.filter(x => x.v >= 6).length, low:got.filter(x => x.v >= 4).length, latest: got.length ? got[got.length-1] : null };
   }
-  // Flags: 2+ dehydrated mornings in the last 7 days; gentle fight-week note (no water-cut, minors never dehydrate).
+  // Flags: 2+ dehydrated mornings in the last 7 days. Fight-week hydration alerts live in WeightPlan.hydAlert (opt-in aware).
   function hydrationFlags(entries, today = new Date(), profile = {}, fightWeekOn = null) {
     const h = hydrationWeek(entries, today), out = [];
     if (h.dehydrated >= 2) out.push(`Dehydrated ${h.dehydrated} of the last 7 mornings (dark first pee). Drink more through the day and tell your coach.`);
     const fw = fightWeekOn != null ? fightWeekOn : !!fightWeek(profile.fightDate, today);
-    if (fw && h.latest && h.latest.v >= 4) out.push('Fight week: do not water-cut or restrict fluids to make weight. Minors (under 18) should never dehydrate. Follow your coach and dietitian.');
     return out; }
   const csvCell = v => { const s = v == null ? '' : v === true ? 'Y' : v === false ? 'N' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; };
   const CSV_COLS = ['Date','Nutrition','Training','Sleep_Hours','Screen_Hours','Family_Friends','Weight','Notes','Energy','Soreness','Mood','Stress','Wellness_Score','Sessions_Scheduled','Sessions_Done','Training_Pct','S1_Label','S1_Done','S1_RPE','S1_Min','S2_Label','S2_Done','S2_RPE','S2_Min','Extra_Label','Extra_RPE','Extra_Min','Session_Load','Complete','Hydration_Colour','Hydration_Status','Nutrition_Mode','Calories','Protein_g','Carbs_g','Fat_g','Nutrition_Score','Wellness_Scale','Sleep_Quality','Sleep_Device','Device_Sleep_Score','Motivation','Appetite','Injury','Injury_Area','Ill','Resting_HR'];

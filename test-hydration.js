@@ -31,12 +31,12 @@ assert.equal(h.days[5].v, null); assert.equal(h.days[6].v, 8); assert.equal(h.la
 let fl = I.hydrationFlags(es, today, {}); assert.equal(fl.length, 1); assert.ok(/3 of the last 7 mornings/.test(fl[0]));
 assert.deepEqual(I.hydrationFlags([v2(d(0),{hydration:8}), v2(d(1),{hydration:2})], today, {}), [], 'one dehydrated morning is not flagged');
 assert.deepEqual(I.hydrationFlags([], today, {}), []);
-// fight week note (no water-cut, minors)
+// fight week: no blanket 'never water-cut' note any more (v51)
 const fw = {fightDate: S.ymd(new Date(2026,10,8))};
-fl = I.hydrationFlags([v2(d(0),{hydration:5})], today, fw); assert.equal(fl.length, 1); assert.ok(/water-cut/.test(fl[0]) && /Minors \(under 18\)/.test(fl[0]));
+fl = I.hydrationFlags([v2(d(0),{hydration:5})], today, fw); assert.deepEqual(fl, [], 'fight-week hydration alerts moved to WeightPlan.hydAlert (opt-in aware)');
 assert.deepEqual(I.hydrationFlags([v2(d(0),{hydration:2})], today, fw), [], 'well hydrated in fight week: no nagging');
 assert.deepEqual(I.hydrationFlags([v2(d(0),{hydration:5})], today, {fightDate: S.ymd(new Date(2026,11,20))}), [], 'not fight week');
-assert.equal(I.hydrationFlags(es, today, fw).length, 2);
+assert.equal(I.hydrationFlags(es, today, fw).length, 1); // v51: only the 2+ dark mornings flag; fight-week alert comes from WeightPlan
 // CSV: appended columns, old columns unchanged
 assert.deepEqual(I.CSV_COLS.slice(-19,-16), ['Complete','Hydration_Colour','Hydration_Status']);
 const rows = I.toCSV([v2(d(0),{hydration:6}), v2('2026-10-27',{})]).trim().split('\r\n').map(r => r.split(',').slice(0,-16).join(','));
@@ -44,6 +44,6 @@ assert.ok(rows[2].endsWith(',N,6,Dehydrated') || rows[2].endsWith(',Y,6,Dehydrat
 // wiring
 const app = fs.readFileSync(__dirname+'/app.js','utf8'), rep = fs.readFileSync(__dirname+'/report.js','utf8'), sw = fs.readFileSync(__dirname+'/sw.js','utf8');
 assert.ok(app.includes('hydPicker(e)') && app.includes('hydrationCard()') && app.includes('hydration: { days:') && app.includes('hydrationFlags'));
-assert.ok(rep.includes('d.hydration')); assert.ok(sw.includes("'fr-v50'"));
+assert.ok(rep.includes('d.hydration')); assert.ok(sw.includes("'fr-v51'"));
 assert.ok(!/<button[^>]*class="[^"]*"[^>]*data-hyd[^>]*>[^<]+</.test(app.match(/function hydPicker[\s\S]*?\n function|function hydPicker[\s\S]{0,900}/)[0]), 'swatches carry no visible text');
 console.log('All hydration tests passed');
