@@ -6,11 +6,21 @@
     ['dash','#todayTrain',"Today’s training",'See the sessions planned for today and how many you’ve completed. Your schedule sets this list.'],
     ['log','#tiles','A little each morning and evening','Morning: sleep, pee colour and how you feel. Evening: nutrition, training, screen time and family. Completed tiles turn green with ✓ LOGGED. Everything saves as you go.'],
     ['plan','#view > .card:nth-child(2)','Your week, laid out','Schedule shows your planned sessions. Change your regular training week in Setup → Edit profile & training schedule.'],
-    ['report','#view > .card','Keep your coach in the loop','Coach Report brings your trends and check-ins together. Review it, then use the share controls when you’re ready. This tour sends nothing.'],
+    ['report','#coachReportTitle','Keep your coach in the loop','Coach Report brings your trends and check-ins together. Review it, then use the share controls when you’re ready. This tour sends nothing.'],
     ['setup','#exportBtn','Make this phone yours','Setup holds your profile, reminders and watch choice. Export a backup regularly: your logs live on this phone. Restore a backup when you change phones.'],
     ['help','#replayTutorial','Help is always here','Find explanations and safety guidance here. Tap Replay tutorial any time for another quick look around.']
   ];
   const shouldStart = (profile, state, blocked) => !!profile && state === 'pending' && !blocked;
+  // Reserve a visible target strip above a bottom-docked tooltip when neither side fits.
+  function layout(v, r, height) {
+    const pad=12, gap=16, available=v.h-2*pad;
+    const reserve=r ? Math.min(r.height || r.bottom-r.top, Math.max(32,available*.3)) : 0;
+    const h=Math.min(height, Math.max(40,available-(r?reserve+gap:0)));
+    if(r && r.bottom+gap+h <= v.y+v.h-pad) return {top:r.bottom+gap,height:h,scroll:0};
+    if(r && r.top-gap-h >= v.y+pad) return {top:r.top-gap-h,height:h,scroll:0};
+    const top=v.y+v.h-pad-h;
+    return {top,height:h,scroll:r ? r.top-(top-gap-reserve) : 0};
+  }
   function create(api) {
     let active = false, index = 0, layer, ring, panel, target, origin, originTab, originScroll, inert = [];
     const vv = () => { const v = window.visualViewport;
@@ -22,10 +32,12 @@
       if (!active) return;
       const v = vv(), pad = 12, r = target && target.isConnected ? target.getBoundingClientRect() : null;
       panel.style.width = Math.max(0, Math.min(360,v.w-24))+'px'; panel.style.maxHeight = Math.max(80,v.h-24)+'px';
-      const h = panel.getBoundingClientRect().height, x = v.x+Math.max(pad,Math.min(v.w-panel.offsetWidth-pad,r ? r.left-v.x : pad));
-      let y = r ? r.bottom+12 : v.y+pad;
-      if (y+h > v.y+v.h-pad) y = r && r.top-h-12 >= v.y+pad ? r.top-h-12 : v.y+v.h-h-pad;
-      panel.style.left=x+'px'; panel.style.top=Math.max(v.y+pad,y)+'px';
+      const fit=layout(v,r,panel.getBoundingClientRect().height);
+      panel.style.maxHeight=fit.height+'px';
+      const x=v.x+Math.max(pad,Math.min(v.w-panel.offsetWidth-pad,r?r.left-v.x:pad));
+      panel.style.left=x+'px'; panel.style.top=fit.top+'px';
+      // Scrolling the document moves the highlighted content into the reserved strip.
+      if(r && Math.abs(fit.scroll)>1) { window.scrollBy(0,fit.scroll); }
       ring.hidden = !r;
       if (r) { const left=Math.max(v.x+4,r.left-4), top=Math.max(v.y+4,r.top-4), right=Math.min(v.x+v.w-4,r.right+4), bottom=Math.min(v.y+v.h-4,r.bottom+4);
         Object.assign(ring.style,{left:left+'px',top:top+'px',width:Math.max(0,right-left)+'px',height:Math.max(0,bottom-top)+'px'}); }
@@ -43,8 +55,9 @@
       active=false; api.mark(state); layer.remove(); inert.forEach(([el,was])=>{el.inert=was;}); inert=[];
       window.removeEventListener('resize',position); window.removeEventListener('scroll',position);
       if (window.visualViewport) { visualViewport.removeEventListener('resize',position); visualViewport.removeEventListener('scroll',position); }
-      api.navigate(originTab); window.scrollTo(0,originScroll);
-      const focus = origin && origin.isConnected && origin !== document.body ? origin : document.querySelector(origin && origin.id ? '#'+origin.id : '#tabs [data-v="'+originTab+'"]');
+      const destination=state==='completed'?'dash':originTab;
+      api.navigate(destination); window.scrollTo(0,state==='completed'?0:originScroll);
+      const focus = state==='completed' ? document.querySelector('#tabs [data-v="dash"]') : origin && origin.isConnected && origin !== document.body ? origin : document.querySelector(origin && origin.id ? '#'+origin.id : '#tabs [data-v="'+originTab+'"]');
       if (focus && focus.focus) focus.focus({preventScroll:true});
     }
     async function start(manual) {
@@ -68,5 +81,5 @@
     }
     return {start, get active(){return active;}};
   }
-  const api={STEPS,shouldStart,create}; if(typeof module!=='undefined'&&module.exports)module.exports=api; else root.FRTutorial=api;
+  const api={STEPS,shouldStart,layout,create}; if(typeof module!=='undefined'&&module.exports)module.exports=api; else root.FRTutorial=api;
 })(typeof window!=='undefined'?window:globalThis);

@@ -23,7 +23,7 @@ const background=[new El(),new El(),new El()];background[0].inert=true;
 const body=new El(), target=new El(), origin=new El();origin.id='replayTutorial';
 global.document={body,activeElement:origin,createElement:()=>new El(),querySelectorAll:()=>background,querySelector:()=>target};
 global.innerWidth=390;global.innerHeight=844;global.requestAnimationFrame=f=>f();
-global.window={scrollY:20,scrollTo(){},addEventListener(){},removeEventListener(){}};
+global.window={scrollY:20,scrollBy(){},scrollTo(){},addEventListener(){},removeEventListener(){}};
 async function run(){
  let state,profile={},blocked=false,tab='help',readyResolve;
  const calls=[], marks=[], model={profile:{name:'A'},entries:[{weight:186,hydration:2}],weeks:[{days:[]}]}, before=JSON.stringify({profile:{name:'A'},entries:[{weight:186,hydration:2}],weeks:[{days:[]}]});
@@ -41,12 +41,13 @@ async function run(){
  const last=panel.buttons[2];last.focus();let prevented=false;
  layer.listeners.keydown({key:'Tab',shiftKey:false,preventDefault(){prevented=true;}});assert.ok(prevented);assert.equal(document.activeElement,panel.buttons[0]);
  for(let i=0;i<6;i++)click('next');assert.equal(calls.at(-1),'help');click('next');
- assert.equal(tour.active,false);assert.equal(state,'completed');assert.equal(background[0].inert,true);assert.equal(background[1].inert,false);assert.equal(document.activeElement,origin,'focus restored');
+ assert.equal(tour.active,false);assert.equal(state,'completed');assert.equal(background[0].inert,true);assert.equal(background[1].inert,false);assert.equal(calls.at(-1),'dash','Finish returns Score');assert.equal(document.activeElement,target,'Score tab gets focus');
  api.ready=()=>Promise.resolve();await tour.start(false);assert.equal(tour.active,false,'completion suppresses repeat');
  await tour.start(true);assert.equal(tour.active,true,'manual replay allowed');layer=body.children.at(-1);
  layer.listeners.keydown({key:'Escape',preventDefault(){},stopPropagation(){}});assert.equal(state,'skipped');assert.equal(tour.active,false);
  await tour.start(false);assert.equal(tour.active,false,'skip suppresses repeat');
  const {tutorial:ignored,...healthAndProfile}=model;assert.equal(JSON.stringify(healthAndProfile),before,'tour state only; no profile, log or schedule changes');
+ assert.equal(calls.at(-1),'dash','Skip restores replay origin');
  const app=fs.readFileSync('app.js','utf8'),html=fs.readFileSync('index.html','utf8'),sw=fs.readFileSync('sw.js','utf8');
  assert.ok(app.includes("if (first) S.tutorial = 'pending'"));assert.ok(app.includes("S.tutorial = 'restored'"));
  assert.ok(app.includes('window.__frSplashDone'));assert.ok(app.includes('case \'replayTutorial\''));
@@ -55,3 +56,14 @@ async function run(){
  console.log('Tutorial: lifecycle, replay, navigation, splash gate, controls, focus, persistence and integration pass');
 }
 run().catch(e=>{console.error(e);process.exitCode=1;});
+
+// Zoomed/narrow view: reserve a target strip rather than covering the heading.
+{ const v={x:0,y:0,w:512,h:340}, r={top:90,bottom:180,height:90};
+ const fit=Tour.layout(v,r,280);
+ assert.ok(fit.top>=12 && fit.top+fit.height<=v.h-12);
+ assert.ok(r.bottom-fit.scroll<=fit.top-16,'target is above tooltip after scrolling');
+ assert.ok(fit.height<280,'tooltip scrolls internally when space is tight');
+ assert.equal(Tour.STEPS[4][1],'#coachReportTitle','spotlight the concise report heading');
+ const roomy=Tour.layout({x:0,y:0,w:390,h:844},{top:60,bottom:120,height:60},260);
+ assert.equal(roomy.scroll,0);assert.equal(roomy.top,136);
+}

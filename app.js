@@ -1,4 +1,4 @@
-const APP_VERSION='fr-v54';
+const APP_VERSION='fr-v55';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -390,7 +390,7 @@ const V = {
  },
  report() {
   const r = res(), notes = S.entries.filter(e=>e.notes && Scoring.dayNum(e.date) >= Scoring.dayNum(today())-14).sort((a,b)=>a.date<b.date?1:-1);
-  return `<div class="card"><h2 style="margin:0">🥊 Coach Report: FightReady Summary</h2>
+  return `<div class="card"><h2 id="coachReportTitle" style="margin:0">🥊 Coach Report: FightReady Summary</h2>
   ${reportHeader(r)}<p class="muted">Report date: ${today()} • Data period: last 3 weeks (${r.daysLogged} days logged)</p></div>${r.locked?'':momCard(r)}
   ${scoreHero(r)}${r.locked?`<div class="card"><p style="text-align:center"><b>${lockMsg(r)}</b></p>${todayRow()}</div>`:''}${otCard()}${belowParCard(r)}
   <div class="card"><h3>Weight & trend</h3>${verdictLine()}<p>Latest: ${r.latestWeight?r.latestWeight.weight+' lbs ('+r.latestWeight.date+')':'—'}${+S.targetWeight?' • Target: '+esc(S.targetWeight)+' lbs':''}<br>
