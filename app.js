@@ -1,4 +1,4 @@
-const APP_VERSION='fr-v53';
+const APP_VERSION='fr-v54';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -479,7 +479,7 @@ const V = {
   <div class="card"><button class="btn alt" id="updBtn">🔄 Check for update</button><p class="muted" style="text-align:center;font-size:12px">Version ${APP_VERSION}</p></div>`;
  },
  help() {
-  return `<div class="card"><h3>How to use</h3>
+  return `<div class="card"><h2>New here?</h2><p>A quick, read-only look around FightReady. No entries are changed.</p><button class="btn" id="replayTutorial" ${S.profile?'':'disabled'}>▶ Replay tutorial</button>${S.profile?'':'<p class="muted">Create or restore your profile first.</p>'}</div><div class="card"><h3>How to use</h3>
   <p><b>Install:</b> open the link in Safari (iPhone: Share → Add to Home Screen) or Chrome (Android: menu → Install app). Works offline after first load.</p>
   <p><b>First week:</b> from your first log you see a daily score, an early FightReady Score (same weights, based on the days logged so far), badges and mini charts. The full 21-day score, weight trend and consistency bonus unlock 7 days after you finish Setup. Only days since then count.</p>
   <p><b>Day 1:</b> your sign-up day is Day 1. Finish that day's log that night to get your first score.</p>
@@ -745,6 +745,7 @@ document.addEventListener('click', async ev => {
     case 'shareBtn': { const txt = shareText();
       if (navigator.share) { try { await navigator.share({ title:'FightReady Report', text:txt }); } catch (e) {} }
       else if (navigator.clipboard) { await navigator.clipboard.writeText(txt); alert('Summary copied to clipboard.'); } else alert(txt); return; }
+    case 'replayTutorial': return tutorial.start(true);
     case 'saveProfile': { const keys = ['name','nickname','dob','discipline','gym','coach','coachContact','weightClass','startWeight','targetWeight','fightDate','emName','emPhone','medical','device'];
       const first = !S.profile, d = {}; keys.forEach(k => { const el = $('#p_'+k); d[k] = el ? el.value.trim() : ''; });
       ['weighIn','cutExp'].forEach(k => { const el = $('#p_'+k); d[k] = el ? el.value : ''; });
@@ -759,7 +760,8 @@ document.addEventListener('click', async ev => {
       V._perr = V._pdraft = null; S.profile = d; const wk0 = mondayOf(new Date()); S.weeks.forEach(w => { if (w.start >= wk0 || S.weeks.length === 1) Profile.applyToWeek(d.schedule, w); }); S.fighter = d.name; S.coach = d.coach; S.targetWeight = d.targetWeight;
       if (first) { if (!S.startDate) S.startDate = today();
         if (+d.startWeight > 0 && !S.entries.some(e=>+e.weight>0)) upsert([{ date:today(), v:2, sessions:Profile.sessionsFor(d.schedule, today()), nutrition:null, training:null, family:null, sleep:'', screen:'', weight:+d.startWeight, notes:'' }]); }
-      save(); V._date = null; return show(first ? 'log' : 'setup'); }
+      if (first) S.tutorial = 'pending';
+       save(); V._date = null; show(first ? 'log' : 'setup'); if (first) tutorial.start(false); return; }
     case 'saveDevice': { const v = $('#c_device').value; S.profile = Object.assign({}, S.profile||{}, { device: v }); const te = S.entries.find(x => x.date === today()); if (te) te.sleepDevice = v; save(); alert('Saved ✔'); return show('setup'); }
     case 'saveCamp': { const s = $('#c_start').value, fd = $('#c_fight').value; if (!s) return alert('Enter a camp start date.'); if (fd && fd <= s) return alert('Fight date must be after camp start.');
       S.startDate = s; S.profile = Object.assign({}, S.profile||{}, { fightDate: fd }); save(); alert('Saved ✔'); return show('setup'); }
@@ -790,12 +792,12 @@ document.addEventListener('change', async ev => { const t = ev.target;
   if (t.id === 'f_date') { V._date = t.value; return show('log'); }
   if (t.id === 'restoreFirst' && t.files[0]) { const f = t.files[0], text = await f.text(); t.value = '';
     try { const ns = Profile.fromBackup(text, load(), Scoring); if (!ns.profile.schedule) ns.profile.schedule = Profile.scheduleFromWeek(ns.weeks[ns.weekIdx||0]);
-      S = ns; save(); V._rerr = null; V._perr = null; V._pdraft = null; V._restored = { name: S.profile.name, days: S.entries.length }; show('dash'); }
+      S = ns; S.tutorial = 'restored'; save(); V._rerr = null; V._perr = null; V._pdraft = null; V._restored = { name: S.profile.name, days: S.entries.length }; show('dash'); }
     catch (e) { V._rerr = e.message; show('profile'); } return; }
   if (t.id === 'importFile' && t.files[0]) { const text = await t.files[0].text();
     try { if (/\.json$/i.test(t.files[0].name) || text.trim().startsWith('{')) { const d = JSON.parse(text); if (!Array.isArray(d.entries)) throw new Error('Not a FightReady backup');
         if (!confirm(`Restore backup for "${d.fighter||'fighter'}" with ${d.entries.length} days? This replaces data on this phone.`)) return;
-        const wasPush = S.push; S = Profile.fromBackup(text, load(), Scoring); if (S.profile && !S.profile.schedule) S.profile.schedule = Profile.scheduleFromWeek(S.weeks[S.weekIdx||0]); save(); alert('Restored ✔' + (wasPush ? '' : '\n\n🔔 Notifications aren\'t restored: turn them on again in Setup.')); }
+        const wasPush = S.push; S = Profile.fromBackup(text, load(), Scoring); if (S.profile && !S.profile.schedule) S.profile.schedule = Profile.scheduleFromWeek(S.weeks[S.weekIdx||0]); S.tutorial = 'restored'; save(); alert('Restored ✔' + (wasPush ? '' : '\n\n🔔 Notifications aren\'t restored: turn them on again in Setup.')); }
       else { const rows = parseCSV(text); upsert(rows); alert(`Imported ${rows.length} days ✔`); }
       show('dash'); } catch (e) { alert('Import failed: ' + e.message); } }
 });
@@ -819,7 +821,7 @@ function addToCalendar() {
 let lastNotified = {};
 function reminderTick() {
   const d = Reminders.due(S.entries.find(e=>e.date===today()), new Date(), S.reminders.morning, S.reminders.evening);
-  if (cur === 'dash' && d.length !== document.querySelectorAll('#view .hint a[data-goto]').length) show('dash');
+  if (!tutorial.active && cur === 'dash' && d.length !== document.querySelectorAll('#view .hint a[data-goto]').length) show('dash');
   if (S.notify && 'Notification' in window && Notification.permission === 'granted') d.forEach(k => { const key = today()+k; let ln = {}; try { ln = JSON.parse(localStorage.getItem('fr_notified')||'{}'); } catch (e) {} if (!lastNotified[key] && !ln[key]) { lastNotified[key] = 1; ln = { [key]: 1, ...Object.fromEntries(Object.entries(ln).filter(([x]) => x.slice(0,10) === today())) }; try { localStorage.setItem('fr_notified', JSON.stringify(ln)); } catch (e) {}
     try { new Notification('FightReady', { body: k==='morning' ? 'Morning check-in: sleep, hydration and how you feel' : 'Evening log: training, screen, family, notes', icon:'icons/icon-192.png' }); } catch (e) {} } });
 }
@@ -842,3 +844,13 @@ if (!S.profile && S.fighter) S.profile = { name:S.fighter, coach:S.coach||'', ta
 { const q = new URLSearchParams(location.search).get('tab'); show(['dash','log','plan','report','setup','help'].includes(q) ? q : 'dash'); }
 if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.tab) { V._date = null; V._sec = null; show(e.data.tab); } });
 if (S.push) Push.update(S.reminders, (S.profile&&S.profile.name)||S.fighter).then(sendStatusNow).catch(()=>{});
+
+// Only new sign-ups queue an automatic tour. Existing installs and restores stay uninterrupted.
+const tutorial = FRTutorial.create({
+  profile: () => S.profile, state: () => S.tutorial,
+  mark: state => { S.tutorial = state; save(); }, tab: () => cur,
+  blocked: () => cur === 'profile' || !!document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]'),
+  ready: () => new Promise(resolve => { const wait = () => (window.__frSplashDone || Promise.resolve()).then(resolve); if(document.readyState==='complete') wait(); else window.addEventListener('load',wait,{once:true}); }),
+  navigate: tab => { V._date = null; V._sec = null; show(tab); }
+});
+window.addEventListener('load', () => tutorial.start(false), {once:true});

@@ -121,3 +121,8 @@ New morning items: Sleep quality (1–5, 5 = best), Motivation / readiness to tr
 | Other | generic 0–100 | identity | — |
 
 CSV adds optional columns `Sleep_Quality, Sleep_Device, Device_Sleep_Score, Motivation, Appetite, Injury, Injury_Area, Ill, Resting_HR`. Older CSVs without them import unchanged. JSON backups carry the fields as-is.
+
+## Quick tutorial (fr-v54)
+New profile creation queues a seven-step, read-only guided tour after the splash has finished. Existing installs do not auto-start it; restoring a backup marks it restored rather than queuing onboarding. Help has a prominent **Replay tutorial** button (enabled after a profile exists). Steps: Score/readiness → Today's training → Log/morning and evening, green completed tiles → Schedule → Coach Report → Setup/backup/watch → Help/replay.
+
+Skip or Escape closes it; Back/Next and Finish navigate the tour. A refresh during the tour does not reopen it. `S.tutorial` records pending/skipped/completed/restored with the local profile/install; it is included in JSON backups. The spotlight scrolls to each target; its dialog stays within the visual viewport, has keyboard focus containment/restoration, an inert background, step count and no animations (including for reduced motion). No logs, schedules, scores or health rules are edited. Unit/static verification: `node test-tutorial.js`; phone-browser visual verification should check short/landscape screens, zoom, screen-reader announcements and safe-area placement.
