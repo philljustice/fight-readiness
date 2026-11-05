@@ -93,5 +93,13 @@
  function daily(p,style){const i=(Math.max(1,p.day||1)-1)%7;
   const comment=p.hold? (i===1||i===4?'Your people are in your corner. A quiet call or visit is enough.':'No deadline to hit. Following your clinician’s plan is progress.'):COMMENTS[i];
   return {comment,idea:style==='break'?null:p.hold?'Rest or a quiet conversation, only if your care plan allows. No physical activity suggestion.':IDEAS[i],social:i===1||i===4};}
- const api={dateOK,addDays,migrate,sync,entryMode,campEntries,maintenanceReport,pushMetadata,reminderAllowed,isCleared,restricted,addHold,clearHolds,schedule,cancel,extend,phase,summary,questions,choices,CARE,daily};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.Recovery=api;
+ function day1Welcome(p){
+  if(!p||p.mode!=='recovery'||p.day!==1)return null;
+  return {
+   title:'Camp complete',
+   congrats:'You put the work into camp. Take a moment to recognise that.',
+   intro:'The next few days are for rest and recovery. Stay connected with the people who backed you. Activity is optional and only if appropriate for how you feel and any medical restrictions. Morning and evening logs and the optional review stay available, but nothing here earns points or streaks.'
+  };
+ }
+ const api={dateOK,addDays,migrate,sync,entryMode,campEntries,maintenanceReport,pushMetadata,reminderAllowed,isCleared,restricted,addHold,clearHolds,schedule,cancel,extend,phase,summary,questions,choices,CARE,daily,day1Welcome};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.Recovery=api;
 })(typeof window==='undefined'?globalThis:window);
