@@ -1,4 +1,4 @@
-const APP_VERSION='fr-v56';
+const APP_VERSION='fr-v57';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -21,12 +21,13 @@ function migrate(S) {
   if (S.params && S.params.wWellness == null) Object.assign(S.params, { wNutrition:25, wTraining:25, wSleep:15, wWellness:15, wScreen:10, wFamily:10 }); // v2: Wellness enters the score
   if (!S.entries || !S.entries.length) S.wellScale = Scoring.WELL_SCALE; else if (Scoring.migrateWellScale(S)) { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} } // soreness/stress now 5 = worst
   if (S.profile && !S.profile.schedule) S.profile.schedule = Profile.scheduleFromWeek(S.weeks[S.weekIdx||0]);
-  return S; }
+  return Recovery.migrate(S, Scoring.ymd(new Date())); }
+try { if(!localStorage.getItem('fightReady.beforeRecovery.v56') && localStorage.getItem(KEY))localStorage.setItem('fightReady.beforeRecovery.v56',localStorage.getItem(KEY)); } catch(e) { console.warn('Pre-migration safety copy unavailable; export a JSON backup.'); }
 let S = migrate(load()); S.reminders = Object.assign({morning:'07:00', evening:'21:00', untilDone:true}, S.reminders);
 const save = () => localStorage.setItem(KEY, JSON.stringify(S));
 const $ = s => document.querySelector(s), esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const today = () => Scoring.ymd(new Date());
-const res = () => Scoring.compute(S.entries, new Date(), Object.assign({}, S.params, {startDate:S.startDate||null, fightDate:(S.profile||{}).fightDate||null}));
+const res = () => Scoring.compute(Recovery.campEntries(S, today()), new Date(), Object.assign({}, S.params, {startDate:S.startDate||null, fightDate:(S.profile||{}).fightDate||null}));
 // Below par (Coach Report): categories under Scoring.PAR in the 3-week window plus weight, with the reasons.
 function belowParList(r) { const L = Scoring.belowPar(r, S.params), p = S.profile || {}, c = Insights.cutSafety(S.entries, new Date(), p), tw = +(p.targetWeight || S.targetWeight), lw = r.latestWeight;
   const why = []; if (c.level) why.push(c.msg);
@@ -320,13 +321,13 @@ const V = {
   ${r.locked?`<p>7-day trend: ${lockMsg(r)}</p>`:`<p>7-day trend: <b>${r.delta==null?'—':(r.delta>0?'+':'')+r.delta+' lbs/wk'}</b></p><p>${r.trend.emoji} ${esc(r.trend.label)}</p>`}${cutWarn()}${weightChart()}</div>${miniCharts()}${hydrationCard()}${wellCard(false)}`;
  },
  log() {
-  const d = V._date || today(), ex = S.entries.find(x=>x.date===d), e = blankOr(ex, d);
+  const d = V._date || today(), optional = Recovery.entryMode(S,d) !== 'camp', ex = S.entries.find(x=>x.date===d), e = blankOr(ex, d);
   const legacy = ex && !Array.isArray(ex.sessions) && ex.v !== 2;
   const opt10 = (v) => `<option value="">—</option>${[1,2,3,4,5,6,7,8,9,10].map(n=>`<option ${+v===n?'selected':''}>${n}</option>`).join('')}`;
   const yn = (k,l) => `<label>${l}</label><div class="yn" data-k="${k}"><button class="y ${e[k]===true?'on':''}" data-val="1">✅ Yes</button><button class="n ${e[k]===false?'on':''}" data-val="0">❌ No</button></div>`;
   const step = (k,l,st) => `<label>${l}</label><div class="step"><button data-step="${k}" data-d="-${st}">−</button><input id="f_${k}" type="number" inputmode="decimal" step="${st}" min="0" max="24" value="${esc(e[k])}"><button data-step="${k}" data-d="${st}">+</button></div>`;
   const chips = (k, vals) => `<div class="chips">${vals.map(v=>`<button data-chip="${k}" data-val="${v}" class="${+e[k]===v&&e[k]!==''?'on':''}">${v}h</button>`).join('')}</div>`;
-  const wd = [1,4].includes(new Date(d+'T12:00').getDay()), st = Insights.sections(e), nDone = Object.values(st).filter(Boolean).length, left = missingToday(e);
+  const wd = !optional && [1,4].includes(new Date(d+'T12:00').getDay()), st = Insights.sections(e), nDone = Object.values(st).filter(Boolean).length, left = missingToday(e);
   const head = (key, title) => `<div class="row" style="margin:0 0 4px"><h3 style="margin:0">${title}</h3><span class="secok ${st[key]?'on':''}" id="ok_${key}">${st[key]?'✓ Done':'…'}</span></div>`;
   const sessCard = () => legacy ? `${yn('training','Training session completed?')}` :
     (e.sessions.length ? e.sessions.map((x,i)=>{ const ok = ex && ex.sessions && ex.sessions[i] && ex.sessions[i].done != null && (ex.sessions[i].done === false || (ex.sessions[i].rpe > 0 && ex.sessions[i].mins > 0));
@@ -344,21 +345,23 @@ const V = {
   const cards = {
    morning: `<div class="card" id="sec_morning">${head('morning','🌅 Morning check-in')}
    ${step('sleep','Sleep last night (hours) *',0.5)}${chips('sleep',[6,7,7.5,8,8.5,9])}
-   <label>Weight (lbs) ${wd?'<span style="color:#ff9800">— weigh-in day! ⚖️ Weigh in before eating.</span>':'<span class="muted">(Mon/Thu mornings)</span>'}</label>
+   <label>Weight (lbs) ${optional?'<span class="muted">(optional; no target)</span>':wd?'<span style="color:#ff9800">— weigh-in day! ⚖️ Weigh in before eating.</span>':'<span class="muted">(Mon/Thu mornings)</span>'}</label>
    <input id="f_weight" type="number" inputmode="decimal" step="0.1" value="${esc(e.weight)}"><div id="wcheck">${wcheckHtml(e.weight, d)}</div>
    ${hydPicker(e)}
    <p style="margin:14px 0 0"><b>How do you feel? *</b></p>
    ${Insights.WELL.map(([k,l,lo,hi])=>`<label>${l} <span class="muted">(${lo} … ${hi})</span></label><div class="sc" data-k="${k}">${[1,2,3,4,5].map(n=>`<button class="${+e[k]===n?'on':''}" data-val="${n}">${n}</button>`).join('')}</div>`).join('')}
    ${well3Html(e)}
    </div>`,
-   nutrition: `<div class="card" id="sec_nutrition">${head('nutrition','🍽️ Nutrition')}${nutLogHtml(e)}</div>`,
-   training: `<div class="card" id="sec_training">${head('training','🥊 Training')}${sessCard()}</div>`,
+   nutrition: `<div class="card" id="sec_nutrition">${head('nutrition','🍽️ Nutrition')}${optional?'<p>Normal meals, no targets or tracking required. Use evening notes for anything you want to record.</p>':nutLogHtml(e)}</div>`,
+   training: `<div class="card" id="sec_training">${head('training','🥊 Training')}${optional?optionalTrainingHtml(e):sessCard()}</div>`,
    evening: `<div class="card" id="sec_evening">${head('evening','🌙 Evening')}
    ${step('screen','Recreational screen time (hours) *',0.5)}${chips('screen',[0,1,2,3,4])}
    ${yn('family','Quality time with family/friends? *')}
    <label>Notes (injuries, illness, soreness, energy, mood)</label><textarea id="f_notes" rows="3">${esc(e.notes)}</textarea>
    </div>` };
+  if(optional)Object.keys(cards).forEach(k=>cards[k]=cards[k].replace(/ \*/g,' (optional)').replace(/✓ Done/g,'Saved').replace(/— weigh-in day!.*?before eating\./g,''));
   if (V._sec && cards[V._sec]) return sectionView(V._sec, cards[V._sec], d, e);
+  if(optional)return optionalLogMenu(d,e,ex);
   const info = Insights.sectionInfo(e), nDoneM = info.filter(x => x.done).length, all = nDoneM === info.length, dl = Early.daily(e, S.params);
   return `${d===today()?day1Banner(true):''}<div class="card" id="menuTop"><div class="row" style="margin:0"><div style="flex:1;min-width:0"><p id="progress" style="margin:0;font-weight:700;font-size:1.1rem">${all?'✅ ':''}${nDoneM} of ${info.length} sections done</p>
    <p class="muted" id="stillToLog" style="margin:4px 0 0">${left.length?'Still to log: '+left.join(', '):'All done for this day 🎉'}</p></div>
@@ -546,7 +549,8 @@ function well3Summary() { const t = Scoring.dayNum(today()), wk = S.entries.filt
   if (inj) out.push(`Injury ${inj}d`); if (ill) out.push(`Ill ${ill}d`); if (hr.length) out.push(`Resting HR ${hr[hr.length-1].rhr} bpm`);
   return out.length ? '<br>' + out.map(esc).join(' • ') : ''; }
 function blankOr(ex, d) { const e = JSON.parse(JSON.stringify(ex || {date:d, v:2, nutrition:null, training:null, family:null, sleep:'', screen:'', weight:'', notes:''}));
-  if (!(ex && !Array.isArray(ex.sessions) && ex.v !== 2) && !Array.isArray(e.sessions)) { e.sessions = Profile.sessionsFor(S.profile && S.profile.schedule, d) || []; e.v = 2; }
+  if (!(ex && !Array.isArray(ex.sessions) && ex.v !== 2) && !Array.isArray(e.sessions)) { e.sessions = Recovery.entryMode(S,d)==='camp' ? Profile.sessionsFor(S.profile && S.profile.schedule, d) || [] : []; e.v = 2; }
+  if(!ex)e.context={mode:Recovery.entryMode(S,d),boutId:Recovery.phase(S.recovery,d).next?.id||Recovery.phase(S.recovery,d).past?.id||null};
   if (e.sleepDevice == null) e.sleepDevice = devOf();
   if (d >= Scoring.WELL3_FROM && e.v >= 2) { if (e.injury == null) e.injury = 'none'; if (e.ill == null) e.ill = false; }
   return e; }
@@ -603,9 +607,11 @@ function readDraft() { const u = V._e; if (!u) return null;
   return b; }
 function autosave() { const b = readDraft(); if (!b) return null;
   if (!S.entries.some(x => x.date === b.date) && !hasData(b)) return b;
+  if(b.date===today() && (b.injury && b.injury!=='none' || b.ill)){ const source='log:'+b.date+':'+(b.injury||'none')+':'+!!b.ill; if(!S.recovery.holds.some(h=>h.source===source))Recovery.addHold(S.recovery,today(),'Injury / illness reported in check-in; follow appropriate care advice',source); b.context=Object.assign({},b.context,{mode:'recovery'}); }
   upsert([b]); refreshProgress(b); if (b.date === today()) scheduleStatus(); return b; }
 function refreshProgress(b) { const ns = $('#nutScore'); if (ns) ns.innerHTML = nutScoreHtml(b); const st = Insights.sections(b), n = Object.values(st).filter(Boolean).length, left = Insights.missing(b);
   Object.keys(st).forEach(k => { const el = $('#ok_' + k); if (el) { el.classList.toggle('on', !!st[k]); el.textContent = st[k] ? '✓ Done' : '…'; } });
+  if(Recovery.entryMode(S,b.date)!=='camp')return;
   const pr = $('#progress'); if (pr) pr.textContent = (n === 4 ? '✅ ' : '') + n + ' of 4 sections done';
   const sl = $('#stillToLog'); if (sl) sl.textContent = left.length ? 'Still to log: ' + left.join(', ') : 'All done for this day 🎉';
   (b.sessions || []).forEach((x, i) => { const q = $('#sessq_' + i); if (!q) return; const ok = x.done === false || (x.done === true && +x.rpe > 0 && +x.mins > 0), m = q.querySelector('.secok');
@@ -623,6 +629,7 @@ function jumpTo(key) { const el = fieldFor(key); if (!el) return; const det = el
   el.scrollIntoView({ behavior:'smooth', block:'center' }); const box = el.closest('.yn,.sc,.hyd,.step,.row') || el; box.classList.add('flash'); setTimeout(() => box.classList.remove('flash'), 2200);
   if (el.focus && /INPUT|SELECT|TEXTAREA/.test(el.tagName)) setTimeout(() => el.focus({ preventScroll:true }), 400); }
 function saveDay() { const b = autosave(); if (!b) return; const date = b.date;
+  if(Recovery.entryMode(S,date)!=='camp'){const box=$('#saveResult');if(box)box.innerHTML='<div class="hint ok">Saved what you chose to log. Nothing else is required.</div>';return;}
   const items = Insights.checklist(b).slice(), bad = (id, lo, hi) => { const el = $(id); return el && el.value !== '' && !(+el.value >= lo && +el.value <= hi); };
   if (bad('#f_weight', 60, 400)) items.push({ key:'weight', label:'Weight: should be between 60 and 400 lbs' });
   if (bad('#f_sleep', 0, 24) && !items.some(x => x.key === 'sleep')) items.push({ key:'sleep', label:'Sleep: enter hours between 0 and 24' });
@@ -636,20 +643,20 @@ function saveDay() { const b = autosave(); if (!b) return; const date = b.date;
 // Tell the reminder server only whether today's log is complete (plus how many items are open). Never any log data.
 let _stTimer = null, _stSent = '';
 function statusNow() { return Object.assign({ date: today() }, Insights.dayStatus(S.entries.find(e => e.date === today()))); }
-function sendStatusNow() { clearTimeout(_stTimer); if (!S.push) return; const st = statusNow(), key = JSON.stringify(st); if (key === _stSent) return; _stSent = key; Push.setDayStatus(st).catch(() => { _stSent = ''; }); }
-function scheduleStatus() { if (!S.push) return; clearTimeout(_stTimer); _stTimer = setTimeout(sendStatusNow, 3000); }
-function wcheckHtml(w, d = today()) { // uses the unsaved draft (typed weight + tapped pee colour) so the pill matches the Score page once saved
+function sendStatusNow() { clearTimeout(_stTimer); if (Recovery.phase(S.recovery,today()).mode!=='camp' || !S.push) return; const st = statusNow(), key = JSON.stringify(st); if (key === _stSent) return; _stSent = key; Push.setDayStatus(st).catch(() => { _stSent = ''; }); }
+function scheduleStatus() { if (Recovery.phase(S.recovery,today()).mode!=='camp' || !S.push) return; clearTimeout(_stTimer); _stTimer = setTimeout(sendStatusNow, 3000); }
+function wcheckHtml(w, d = today()) { if(Recovery.entryMode(S,d)!=='camp')return ''; // uses the unsaved draft (typed weight + tapped pee colour) so the pill matches the Score page once saved
   const ents = WeightPlan.withDraft(S.entries, d, V._e && (V._date || today()) === d ? Object.assign({}, V._e, +w > 0 ? { weight: w } : {}) : (+w > 0 ? { weight: w } : null));
   const s = wpStatus(new Date(d+'T09:00'), ents), c = s && WeightPlan.dayCheck(w, s); if (!s || !(s.planToday > 0)) return '';
   if (+w > 0 && s.daysToWeighIn > WeightPlan.LEAD && WeightPlan.waterAffected(ents, d)) return `<p class="wck close" id="waterAff" style="margin:4px 0 0">💧 Water-affected weigh-in. ${esc(WeightPlan.WATER_NOTE)}${s.usedWeight?` <span class="muted">Your plan uses ${s.usedWeight.weight} lbs (${s.usedWeight.date.slice(5)}).</span>`:''}</p>`;
   if (!c) return `<p class="muted" style="margin:4px 0 0">🎯 Today's target: <b>${s.planToday} lbs</b></p>`;
   return `<p class="wck ${c.level}" style="margin:4px 0 0">${c.level==='ok'?'✅':c.level==='close'?'🟠':'⚠️'} ${esc(c.text)} ${wpPill(s.band)}</p>`; }
-function fwHelp() { const days = [7,6,5,4,3,2,1,0];
+function fwHelp() { if(Recovery.phase(S.recovery,today()).mode!=='camp')return '<div class="card"><h3>Cut tools are off</h3><p>Recovery and Maintenance never prescribe cutting, dehydration, depletion or diet targets.</p></div>'; const days = [7,6,5,4,3,2,1,0];
   return `<div class="card" id="helpFW" style="margin:8px 0"><h3>🥊 Fight-week outline (7 days)</h3><p class="muted">Guideline only, not medical advice. Consult a qualified professional and follow your coach. Days are counted to the weigh-in.</p>
    ${days.map(k=>{ const f = WeightPlan.FOOD[k]; return `<div class="fwday"><b>${k===0?'Weigh-in day':'Day −'+k}</b><br>🏋️ ${esc(f[0])}<br>🍚 ${esc(f[1])}${WeightPlan.WATER[k]?'<br>💧 <i>Water-cut steps (opt-in, adults only):</i> '+esc(WeightPlan.WATER[k]):''}</div>`; }).join('')}
    <p class="muted">After weigh-in: oral rehydration 1–1.5 L/hour (sodium 50–90 mmol/L), then easy carbs up to 60 g/hour, low fibre. Aim to regain the whole cut before the fight.</p></div>
    <div class="card" id="helpStop" style="margin:8px 0"><h3>🛑 Stop signs</h3><p>Stop the cut, drink an oral rehydration solution and tell your coach if any of these happen. <b>Call 911 for fainting, confusion, chest pain or a seizure.</b></p><ul>${STOP.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`; }
-function refreshCut() { const b = $('#cutBox'); if (!b) return; const lw = res().latestWeight, sw = $('#p_startWeight');
+function refreshCut() { if(Recovery.phase(S.recovery,today()).mode!=='camp')return; const b = $('#cutBox'); if (!b) return; const lw = res().latestWeight, sw = $('#p_startWeight');
   b.innerHTML = planBox(lw ? lw.weight : sw && sw.value, $('#p_targetWeight').value, (S.profile||{}).fightDate||'', wpDraft()); }
 const wpDraft = () => { const g = id => { const el = $('#p_'+id); return el ? (el.type === 'checkbox' ? el.checked : el.value) : undefined; }; const o = {}; ['dob','weighIn','cutExp','lastCutBad','waterCut'].forEach(k => { const v = g(k); if (v !== undefined) o[k] = v; }); return o; };
 function refreshSched() { const sc = V._sched; if (!sc || !$('#schedCard')) return;
@@ -680,7 +687,7 @@ function parseCSV(text) {
     if (g('xl') || g('xr')) o.extra = { label:g('xl')||'Extra session', rpe:numv(g('xr')), mins:numv(g('xm')) };
     return o; });
 }
-function shareText() { const r = res();
+function shareText() { if(Recovery.phase(S.recovery,today()).mode!=='camp')return RC.reportText(); const r = res();
   if (r.locked) return `🥊 FightReady: ${S.fighter||'Fighter'} (${today()})\n${lockMsg(r)}\nDays logged so far: ${r.daysLogged}`;
   return `🥊 FightReady: ${S.fighter||'Fighter'} (${today()})${S.profile&&S.profile.gym?' • '+S.profile.gym:''}${S.profile&&Profile.countdown(S.profile.fightDate)?'\n'+Profile.countdown(S.profile.fightDate).text:''}\nScore: ${r.score}/100, ${r.verdict}${r.locked?'':'\n'+breakdown(r)}\n` +
    CATS.map(([k,l])=>`${l}: ${r.cats[k].toFixed(0)}`).join(' | ') + `\nConsistency: ${r.consistency.toFixed(0)}% (+${r.bonus})\n` +
@@ -733,7 +740,7 @@ document.addEventListener('click', async ev => {
     case 'wkDel': if (S.weeks.length>1 && confirm('Delete this week?')) { S.weeks.splice(S.weekIdx,1); S.weekIdx=Math.max(0,S.weekIdx-1); save(); show('plan'); } else if (S.weeks.length===1) alert('Keep at least one week.'); return;
     case 'icsBtn': return addToCalendar();
     case 'icsShare': return shareICS();
-    case 'pushOn': { const b = t; b.disabled = true; b.textContent = 'Turning on…';
+    case 'pushOn': { if(Recovery.phase(S.recovery,today()).mode!=='camp')return alert('Camp notifications are unavailable in Recovery and Maintenance. Daily comments are in-app only.'); const b = t; b.disabled = true; b.textContent = 'Turning on…';
       try { await Push.enable(S.reminders, (S.profile&&S.profile.name)||S.fighter); S.push = true; S.notify = true; save(); sendStatusNow(); alert('🔔 Notifications are on. You\'ll get your morning and evening check-ins, follow-ups if today\'s log isn\'t finished, the Mon/Thu weigh-in, and the Sunday 6 PM report reminder, even when the app is closed.'); }
       catch (e) { alert(e.message==='denied' ? 'Notifications were blocked. To allow them: iPhone Settings → Notifications → FightReady. Calendar reminders below still work.' : 'Could not turn on notifications (' + e.message + '). Check your connection and try again, or use the calendar reminders.'); }
       return show('setup'); }
@@ -760,7 +767,7 @@ document.addEventListener('click', async ev => {
       V._perr = V._pdraft = null; S.profile = d; const wk0 = mondayOf(new Date()); S.weeks.forEach(w => { if (w.start >= wk0 || S.weeks.length === 1) Profile.applyToWeek(d.schedule, w); }); S.fighter = d.name; S.coach = d.coach; S.targetWeight = d.targetWeight;
       if (first) { if (!S.startDate) S.startDate = today();
         if (+d.startWeight > 0 && !S.entries.some(e=>+e.weight>0)) upsert([{ date:today(), v:2, sessions:Profile.sessionsFor(d.schedule, today()), nutrition:null, training:null, family:null, sleep:'', screen:'', weight:+d.startWeight, notes:'' }]); }
-      if (first) S.tutorial = 'pending';
+      if (first) { S.tutorial = 'pending'; if(d.fightDate && !S.recovery.bouts.length)S.recovery.bouts.push({id:'signup-'+Date.now(),fightDate:d.fightDate,recoveryDays:7,status:'scheduled',campStart:today()}); }
        save(); V._date = null; show(first ? 'log' : 'setup'); if (first) tutorial.start(false); return; }
     case 'saveDevice': { const v = $('#c_device').value; S.profile = Object.assign({}, S.profile||{}, { device: v }); const te = S.entries.find(x => x.date === today()); if (te) te.sleepDevice = v; save(); alert('Saved ✔'); return show('setup'); }
     case 'saveCamp': { const s = $('#c_start').value, fd = $('#c_fight').value; if (!s) return alert('Enter a camp start date.'); if (fd && fd <= s) return alert('Fight date must be after camp start.');
@@ -770,8 +777,8 @@ document.addEventListener('click', async ev => {
       const sum = CATS.reduce((s,c)=>s+(+np[c[2]]||0),0); if (Math.abs(sum-100) > 1e-9) return alert(`Category weights must add up to 100 (now ${sum}). Not saved.`);
       S.params = np; save(); alert('Saved ✔'); return show('dash'); }
     case 'resetParams': S.params = Object.assign({}, Scoring.DEFAULT_PARAMS); save(); return show('setup');
-    case 'exportBtn': return download(`FightReady-backup-${(S.fighter||'fighter').replace(/\W+/g,'-')}-${today()}.json`, JSON.stringify(Object.assign({app:'fight-readiness',version:1,exported:new Date().toISOString()}, S), null, 1), 'application/json');
-    case 'wipeBtn': if (confirm('Erase ALL data on this phone? Export a backup first!') && confirm('Really erase?')) { localStorage.removeItem(KEY); S = load(); show('setup'); } return;
+    case 'exportBtn': return download(`FightReady-backup-${(S.fighter||'fighter').replace(/\W+/g,'-')}-${today()}.json`, JSON.stringify(Object.assign({app:'fight-readiness',version:3,exported:new Date().toISOString()}, S), null, 1), 'application/json');
+    case 'wipeBtn': if (confirm('Erase ALL data on this phone? Export a backup first!') && confirm('Really erase?')) { localStorage.removeItem(KEY); S = migrate(load()); show('setup'); } return;
   }
 });
 const LOGF = ['f_kcal','f_protein','f_carbs','f_fat','f_sleep','f_screen','f_weight','f_notes','f_xlabel','f_xrpe','f_xmin','f_sleepDev','f_rhr','f_injArea'];
@@ -785,19 +792,19 @@ document.addEventListener('input', ev => { const t = ev.target, w = S.weeks[S.we
 });
 document.addEventListener('change', async ev => { const t = ev.target;
   if (cur === 'log' && (LOGF.includes(t.id) || t.dataset.srpe != null || t.dataset.smin != null)) return void autosave();
-  if (t.id === 'r_untilDone') { S.reminders.untilDone = t.checked; save(); if (S.push) Push.update(S.reminders, (S.profile&&S.profile.name)||S.fighter).catch(()=>{}); return; }
-  if (t.id === 'r_morning' || t.id === 'r_evening') { if (t.value) { S.reminders[t.id.slice(2)] = t.value; save(); if (S.push) Push.update(S.reminders, (S.profile&&S.profile.name)||S.fighter).catch(()=>{}); $('#calLink').href = calURL(); $('#calSub').href = calURL().replace(/^https?:/,'webcal:'); } return; }
+  if (t.id === 'r_untilDone') { S.reminders.untilDone = t.checked; save(); if (S.push && Recovery.phase(S.recovery,today()).mode==='camp') Push.update(S.reminders, (S.profile&&S.profile.name)||S.fighter).catch(()=>{}); return; }
+  if (t.id === 'r_morning' || t.id === 'r_evening') { if (t.value) { S.reminders[t.id.slice(2)] = t.value; save(); if (S.push && Recovery.phase(S.recovery,today()).mode==='camp') Push.update(S.reminders, (S.profile&&S.profile.name)||S.fighter).catch(()=>{}); $('#calLink').href = calURL(); $('#calSub').href = calURL().replace(/^https?:/,'webcal:'); } return; }
   if (t.id === 'wkSel') { S.weekIdx = +t.value; save(); return show('plan'); }
   if (t.id === 'w_start') return show('plan');
   if (t.id === 'f_date') { V._date = t.value; return show('log'); }
   if (t.id === 'restoreFirst' && t.files[0]) { const f = t.files[0], text = await f.text(); t.value = '';
-    try { const ns = Profile.fromBackup(text, load(), Scoring); if (!ns.profile.schedule) ns.profile.schedule = Profile.scheduleFromWeek(ns.weeks[ns.weekIdx||0]);
+    try { const ns = Recovery.migrate(Profile.fromBackup(text, load(), Scoring),today()); if (!ns.profile.schedule) ns.profile.schedule = Profile.scheduleFromWeek(ns.weeks[ns.weekIdx||0]);
       S = ns; S.tutorial = 'restored'; save(); V._rerr = null; V._perr = null; V._pdraft = null; V._restored = { name: S.profile.name, days: S.entries.length }; show('dash'); }
     catch (e) { V._rerr = e.message; show('profile'); } return; }
   if (t.id === 'importFile' && t.files[0]) { const text = await t.files[0].text();
     try { if (/\.json$/i.test(t.files[0].name) || text.trim().startsWith('{')) { const d = JSON.parse(text); if (!Array.isArray(d.entries)) throw new Error('Not a FightReady backup');
         if (!confirm(`Restore backup for "${d.fighter||'fighter'}" with ${d.entries.length} days? This replaces data on this phone.`)) return;
-        const wasPush = S.push; S = Profile.fromBackup(text, load(), Scoring); if (S.profile && !S.profile.schedule) S.profile.schedule = Profile.scheduleFromWeek(S.weeks[S.weekIdx||0]); S.tutorial = 'restored'; save(); alert('Restored ✔' + (wasPush ? '' : '\n\n🔔 Notifications aren\'t restored: turn them on again in Setup.')); }
+        const wasPush = S.push; S = Recovery.migrate(Profile.fromBackup(text, load(), Scoring),today()); if (S.profile && !S.profile.schedule) S.profile.schedule = Profile.scheduleFromWeek(S.weeks[S.weekIdx||0]); S.tutorial = 'restored'; save(); alert('Restored ✔' + (wasPush ? '' : '\n\n🔔 Notifications aren\'t restored: turn them on again in Setup.')); }
       else { const rows = parseCSV(text); upsert(rows); alert(`Imported ${rows.length} days ✔`); }
       show('dash'); } catch (e) { alert('Import failed: ' + e.message); } }
 });
@@ -819,7 +826,7 @@ function addToCalendar() {
   download(name, ics, 'text/calendar;charset=utf-8');
 }
 let lastNotified = {};
-function reminderTick() {
+function reminderTick() { if(Recovery.phase(S.recovery,today()).mode!=='camp')return;
   const d = Reminders.due(S.entries.find(e=>e.date===today()), new Date(), S.reminders.morning, S.reminders.evening);
   if (!tutorial.active && cur === 'dash' && d.length !== document.querySelectorAll('#view .hint a[data-goto]').length) show('dash');
   if (S.notify && 'Notification' in window && Notification.permission === 'granted') d.forEach(k => { const key = today()+k; let ln = {}; try { ln = JSON.parse(localStorage.getItem('fr_notified')||'{}'); } catch (e) {} if (!lastNotified[key] && !ln[key]) { lastNotified[key] = 1; ln = { [key]: 1, ...Object.fromEntries(Object.entries(ln).filter(([x]) => x.slice(0,10) === today())) }; try { localStorage.setItem('fr_notified', JSON.stringify(ln)); } catch (e) {}
@@ -841,9 +848,10 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   window.addEventListener('load', () => Promise.race([window.__frSplashDone || Promise.resolve(), new Promise(r => setTimeout(r, 12000))]).then(regSW));
 }
 if (!S.profile && S.fighter) S.profile = { name:S.fighter, coach:S.coach||'', targetWeight:S.targetWeight||'', startWeight:'' }; // migrate older installs
+RC.install();
 { const q = new URLSearchParams(location.search).get('tab'); show(['dash','log','plan','report','setup','help'].includes(q) ? q : 'dash'); }
 if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.tab) { V._date = null; V._sec = null; show(e.data.tab); } });
-if (S.push) Push.update(S.reminders, (S.profile&&S.profile.name)||S.fighter).then(sendStatusNow).catch(()=>{});
+if (S.push && Recovery.phase(S.recovery,today()).mode==='camp') Push.update(S.reminders, (S.profile&&S.profile.name)||S.fighter).then(sendStatusNow).catch(()=>{});
 
 // Only new sign-ups queue an automatic tour. Existing installs and restores stay uninterrupted.
 const tutorial = FRTutorial.create({
@@ -854,3 +862,12 @@ const tutorial = FRTutorial.create({
   navigate: tab => { V._date = null; V._sec = null; show(tab); }
 });
 window.addEventListener('load', () => tutorial.start(false), {once:true});
+
+// Recovery/Maintenance reuse the regular morning/evening controls, without camp completeness pressure.
+function optionalTrainingHtml(e) { return `<p>Optional record only. Rest is valid. No score bonus for returning early or going harder; professional restrictions always apply.</p>${(e.sessions||[]).length?'<p>Previously logged/planned sessions are preserved in this entry. Record any additional chosen activity below.</p>':''}<details open><summary>Activity or training you chose to do</summary><label>What did you do?</label><input id="f_xlabel" value="${esc(e.extra?.label||'')}" placeholder="e.g. easy technique, or leave blank for rest"><div class="row"><div><label>Effort (RPE 1–10)</label><select id="f_xrpe"><option value="">—</option>${Array.from({length:10},(_,i)=>`<option ${+e.extra?.rpe===i+1?'selected':''}>${i+1}</option>`).join('')}</select></div><div><label>Minutes</label><input id="f_xmin" type="number" min="1" max="600" value="${esc(e.extra?.mins||'')}"></div></div></details>`; }
+function optionalLogMenu(d,e,ex) {
+ const meta=Insights.SECTION_META;
+ const fields={morning:['sleep','hydration','energy','soreness','stress','mood','sleepq','motivation','appetite','rhr'],nutrition:[],training:['extra'],evening:['screen','family','notes']};
+ const saved=k=>fields[k].some(f=>e[f]!==undefined&&e[f]!==null&&e[f]!==''&&(f!=='extra'||e.extra?.label));
+ return `<div class="card"><h2>${Recovery.entryMode(S,d)==='recovery'?'Recovery':'Maintenance'} · optional log</h2><p>Choose any fields you want. Nothing is missing or overdue; no score or streak penalty. Existing camp days stay in history.</p><label>Date<input id="f_date" type="date" value="${d}" max="${today()}"></label></div><div id="tiles" role="list">${meta.map(([k,t])=>`<button class="tile ${saved(k)?'done':''}" data-sec="${k}" role="listitem"><b>${esc(t)}</b><span>${saved(k)?'✓ Saved items':'Optional'}</span></button>`).join('')}</div><div class="card"><button class="btn" id="saveDay">Save chosen entries</button><div id="saveResult" aria-live="polite"></div>${ex?'<button class="btn alt" id="delLog">Delete this day</button>':''}</div><div class="card"><h3>Log history</h3>${S.entries.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,21).map(x=>`<p><a href="#" data-edit="${x.date}">${esc(x.date)}</a> · ${esc(x.context?.mode||'camp history')} · ${esc(x.notes||'')}</p>`).join('')||'<p>No entries yet.</p>'}</div>`;
+}

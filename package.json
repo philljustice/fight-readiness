@@ -1,0 +1,10 @@
+{
+  "name": "fightready-release-checks",
+  "private": true,
+  "scripts": {
+    "test": "for f in test-*.js; do node \"$f\" || exit 1; done"
+  },
+  "devDependencies": {
+    "linkedom": "0.18.12"
+  }
+}

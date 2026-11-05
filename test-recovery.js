@@ -1,0 +1,15 @@
+const assert=require('assert'),R=require('./recovery');
+const state={bouts:[{id:'one',fightDate:'2026-11-01',status:'scheduled',recoveryDays:7}],holds:[]};
+assert.equal(R.phase(state,'2026-11-01').mode,'camp');
+assert.equal(R.phase(state,'2026-11-02').day,1);assert.equal(R.phase(state,'2026-11-08').mode,'recovery');assert.equal(R.phase(state,'2026-11-09').mode,'maintenance');
+state.holds.push({cleared:false});assert.equal(R.phase(state,'2027-01-01').mode,'recovery');
+assert.equal(R.daily(R.phase(state,'2027-01-01'),'gentle').idea.includes('No physical'),true);
+assert.equal(R.daily(R.phase(state,'2027-01-01'),'break').idea,null);
+state.bouts.push({id:'next',fightDate:'2026-11-06',status:'scheduled'});assert.equal(R.phase(state,'2026-11-05').mode,'recovery','next camp cannot bypass rest');
+state.holds[0].cleared=true;state.bouts[1].fightDate='2026-11-20';assert.equal(R.phase(state,'2026-11-09').mode,'camp');
+state.bouts[0].extendUntil='2026-11-15';assert.equal(R.phase(state,'2026-11-12').mode,'recovery');
+assert.equal(R.phase({bouts:[],holds:[]},'2026-11-05').mode,'maintenance');
+assert.equal(R.phase({bouts:[{fightDate:'2026-11-01',status:'cancelled'}]},'2026-11-05').mode,'maintenance');
+const draft=R.summary({answers:{cardio:'No',pacing:'Skip'},notes:{'Optional notes':'sample'}},'MMA');assert.ok(draft.includes('No'));assert.ok(!draft.includes('pace yourself'));assert.ok(!draft.includes('striking'));
+for(const day of [2,5,9,12])assert.ok(R.daily({day},'gentle').social);
+console.log('Recovery lifecycle, safety holds, defer tone, answer-only summary, social cadence pass');

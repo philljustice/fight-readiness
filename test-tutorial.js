@@ -49,7 +49,7 @@ async function run(){
  const {tutorial:ignored,...healthAndProfile}=model;assert.equal(JSON.stringify(healthAndProfile),before,'tour state only; no profile, log or schedule changes');
  assert.equal(calls.at(-1),'dash','Skip restores replay origin');
  const app=fs.readFileSync('app.js','utf8'),html=fs.readFileSync('index.html','utf8'),sw=fs.readFileSync('sw.js','utf8');
- assert.ok(app.includes("if (first) S.tutorial = 'pending'"));assert.ok(app.includes("S.tutorial = 'restored'"));
+ assert.ok(/if \(first\) \{ S.tutorial = 'pending'/.test(app));assert.ok(app.includes("S.tutorial = 'restored'"));
  assert.ok(app.includes('window.__frSplashDone'));assert.ok(app.includes('case \'replayTutorial\''));
  assert.ok(html.includes('src="tutorial.js"'));assert.ok(sw.includes("'tutorial.js'"));
  assert.ok(!/autosave\(|upsert\(|fetch\(|localStorage/.test(fs.readFileSync('tutorial.js','utf8')),'tour only calls adapter for tutorial state');

@@ -1,0 +1,33 @@
+const assert=require('assert'),R=require('./recovery'),S=require('./scoring'),P=require('./profile'),fs=require('fs');
+function state(){const x={profile:{name:'UNIT'},entries:[],params:{...S.DEFAULT_PARAMS},weeks:[],startDate:'2026-10-01'};return R.migrate(x,'2026-11-01');}
+const x=state();let r=x.recovery;
+let b=R.schedule(r,'2026-11-01',{fightDate:'2026-11-07',weighInDate:'2026-11-06',recoveryDays:7}).bout;
+assert.equal(R.phase(r,'2026-11-07').mode,'camp');assert.equal(R.phase(r,'2026-11-08').day,1);assert.equal(R.phase(r,'2026-11-14').mode,'recovery');assert.equal(R.phase(r,'2026-11-15').mode,'maintenance');
+// Calendar-day arithmetic avoids DST's 25-hour day and midnight boundary traps.
+assert.equal(R.addDays('2026-11-01',1),'2026-11-02');assert.equal(R.addDays('2026-03-08',1),'2026-03-09');
+const {execFileSync}=require('child_process');for(const tz of ['America/New_York','UTC','Pacific/Auckland'])assert.equal(execFileSync(process.execPath,['-e',`const R=require('./recovery');process.stdout.write(R.addDays('2026-11-01',1));`],{env:{...process.env,TZ:tz}}).toString(),'2026-11-02');
+R.extend(r,'2026-11-10',b.id,'2026-11-20');assert.equal(R.phase(r,'2026-11-20').mode,'recovery');assert.throws(()=>R.extend(r,'2026-11-10',b.id,'2026-11-15'));
+R.addHold(r,'2026-11-08','Head impact concern','unit');assert.equal(R.phase(r,'2027-01-01').mode,'recovery');assert.throws(()=>R.clearHolds(r,'2026-11-10',{authority:'Coach',note:'Looks okay',confirmed:true}));assert.throws(()=>R.clearHolds(r,'2026-11-10',{authority:'Clinician',note:'',confirmed:true}));
+R.clearHolds(r,'2026-11-21',{authority:'Clinician',note:'UNIT clearance reference',confirmed:true});assert.equal(R.phase(r,'2026-11-20').hold,true);assert.equal(R.phase(r,'2026-11-21').mode,'maintenance');
+const next=R.schedule(r,'2026-11-10',{fightDate:'2026-11-19',recoveryDays:7}).bout;assert.equal(R.phase(r,'2026-11-18').mode,'recovery');
+R.cancel(r,'2026-11-10',next.id,'postponed');assert.equal(R.phase(r,'2026-11-21').mode,'maintenance');
+const future=R.schedule(r,'2026-11-21',{fightDate:'2026-12-05'}).bout;assert.equal(R.schedule(r,'2026-11-21',{id:future.id,fightDate:'2026-12-12'}).fresh,false);R.cancel(r,'2026-11-21',future.id,'cancelled');assert.equal(R.phase(r,'2026-11-22').mode,'maintenance');
+assert.throws(()=>R.schedule(r,'2026-11-21',{fightDate:'2026-11-20'}));assert.throws(()=>R.schedule(r,'2026-11-21',{fightDate:'2026-12-01',weighInDate:'2026-12-02'}));assert.equal(R.dateOK('2026-02-30'),false);
+const y=state();const es=[{date:'2026-10-01',weight:190,v:2,notes:'UNIT camp history'}];y.entries=structuredClone(es);y.profile.fightDate='';R.migrate(y,'2026-11-01');assert.deepEqual(y.entries,es);assert.equal(R.phase(y.recovery,'2026-11-01').mode,'maintenance');
+const old={fighter:'UNIT old',entries:es,profile:{name:'UNIT old',fightDate:'2026-10-30'},weeks:[],params:{...S.DEFAULT_PARAMS}};R.migrate(old,'2026-11-01');R.sync(old,'2026-11-01');assert.equal(old.recovery.camps.length,1);old.entries[0].notes='edited later';assert.equal(old.recovery.camps[0].entries[0].notes,'UNIT camp history');R.sync(old,'2026-11-02');assert.equal(old.recovery.camps.length,1);
+const restored=R.migrate(P.fromBackup(JSON.stringify(old),{},S),'2026-11-02');assert.equal(restored.recovery.camps.length,1);assert.throws(()=>R.migrate({...y,schemaVersion:99},'2026-11-01'));
+const z=state();z.recovery.goalsConfirmed=true;z.recovery.maintenance={sessions:2,checkins:3};z.recovery.band={low:180,high:190,approved:true};
+z.entries=[1,2,3].map(i=>({date:'2026-11-0'+i,context:{mode:'maintenance'},energy:3,mood:3,soreness:2,stress:2,hydration:2,weight:191,sessions:[]}));
+let m=R.maintenanceReport(z,'2026-11-07');assert.equal(m.score,50);assert.equal(m.direction,'above');assert.ok(m.nudges.length);const before=m.score;
+z.entries.forEach(e=>{e.stress=5;e.soreness=5;e.mood=1;});assert.equal(R.maintenanceReport(z,'2026-11-07').score,before,'honest worse symptoms never lower process score');
+z.entries[0].injury='limiting';assert.equal(R.maintenanceReport(z,'2026-11-07').nudges.length,0);delete z.entries[0].injury;
+z.entries[0].hydration=7;assert.equal(R.maintenanceReport(z,'2026-11-07').direction,null,'dark weigh-in excluded');
+z.entries.forEach(e=>{e.sessions=[{done:true,mins:30,rpe:3}];});const normal=R.maintenanceReport(z,'2026-11-07').score;z.entries.forEach(e=>e.sessions.push({done:true,mins:120,rpe:10}));assert.equal(R.maintenanceReport(z,'2026-11-07').score,normal,'no extra load reward');
+R.addHold(z.recovery,'2026-11-04','UNIT restriction','unit');assert.equal(R.maintenanceReport(z,'2026-11-07').nudges.length,0);
+assert.equal(R.summary({answers:{}},'MMA').split('\n').length,1);assert.ok(!R.summary({answers:{cardio:'Skip',pacing:'Not sure'}},'MMA').includes('cardio'));assert.ok(R.summary({answers:{pacing:'Not sure'}},'MMA').includes('Not sure'));
+r.reminders={optIn:true,quietStart:'21:00',quietEnd:'08:00'};assert.equal(R.reminderAllowed(r,'2026-11-01','23:00'),false);assert.equal(R.reminderAllowed(r,'2026-11-01','09:00'),true);r.reminders.snoozeUntil='2026-11-02';assert.equal(R.reminderAllowed(r,'2026-11-01','09:00'),false);r.reminders.optIn=false;assert.equal(R.reminderAllowed(r,'2026-11-04','09:00'),false);
+const ui=fs.readFileSync('recovery-ui.js','utf8'),css=fs.readFileSync('styles.css','utf8');assert.ok(!/[👑♛♕]/u.test(ui));assert.ok(ui.includes('brand/splash/crown.webp'));assert.ok(ui.includes('prefers-reduced-motion'));assert.ok(ui.includes('result.fresh&&!result.bout.celebrated'));assert.ok(css.includes('safe-area-inset-top'));assert.ok(css.includes('.fight-celebration .still'));
+console.log('Release regressions: lifecycle/DST/timezones, migration/history, clearance authority, reschedule/cancel/extend, process score direction, no load/weight incentives, holds, drafts, opt-in/quiet/snooze, animation/crown pass');
+const holdHistory=state();R.addHold(holdHistory.recovery,'2026-11-05','UNIT','test');assert.equal(R.phase(holdHistory.recovery,'2026-11-04').hold,false,'future restriction cannot rewrite historical phase');
+assert.equal(R.entryMode(holdHistory,'2026-11-05'),'recovery');
+const recoveryLogs=state();recoveryLogs.recovery.bouts=[{id:'unit',fightDate:'2026-11-01',status:'scheduled',recoveryDays:7}];recoveryLogs.entries=[{date:'2026-11-03',context:{mode:'recovery'},mood:2,stress:5,sessions:[]}];const rr=R.maintenanceReport(recoveryLogs,'2026-11-04');assert.equal(rr.checkins,1);assert.equal(rr.score,null);assert.equal(rr.band,null);assert.ok(rr.flags.length);

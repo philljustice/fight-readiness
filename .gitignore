@@ -4,3 +4,5 @@
 !cal/*.ics
 *backup*.json
 node_modules/
+
+node_modules/

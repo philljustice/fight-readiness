@@ -132,3 +132,12 @@ Coach Report spotlights its concise heading rather than the entire summary card.
 
 ### iPhone tutorial bounds (fr-v56)
 All steps use stable bottom docking inside the intersection of visualViewport and the layout viewport safe area. Safe-area lengths are measured as computed padding on an invisible probe. Tooltips keep 12px safe margins, limit their actual content height and scroll internally for larger text/short screens. Scroll no longer switches the tooltip above a tall target. Font readiness, ResizeObserver and viewport resize/scroll trigger reflow. Geometry regressions include iPhone 393×852 with 59px top/34px bottom insets, short landscape, offset visual viewports, large text and tall score targets. Actual iPhone visual verification remains separate from these Node tests.
+
+## Recovery and Maintenance candidate (fr-v57, NOT released)
+The next-day lifecycle, optional ordinary log tiles, version-3 backup migration, archived camp snapshots, care-first athlete review, professional restriction records, Maintenance process score, hydrated-band discussions, in-app reminder preferences and branded fight-date confirmation are implemented on the isolated candidate branch. See RELEASE-READINESS.md for release gates. Production is frozen at fr-v56 until the authorized Monday release and all blockers are cleared.
+
+Install dev-only test tooling with `npm ci`; `npm test` runs all `node test-*.js` files. Linkedom is a DOM-unit test dependency only, not a runtime dependency. No browser automation is part of this test suite. No sample scenario routes or preview clock are loaded by the production index.
+
+Existing daily log fields remain the data source in all phases. Recovery logging is optional, has no daily score/missing checklist and never rewards early training. Maintenance uses a separate rolling 7-day process score (chosen check-ins + coach-agreed frequency), not symptom ratings, intensity or weight. Weight-band discussion requires three hydrated readings and coach agreement. Restrictions suppress physical nudges and never clear by elapsed time or coach-only action.
+
+Scheduler weigh-in date is recorded separately; the unchanged camp weight model still uses the profile's weigh-in timing choice. Recovery/maintenance cut tools are hidden. Historical camp snapshots retain their original parameters/logs. JSON backup carries lifecycle state and drafts; the first migration also attempts a local v56 safety copy. Export a JSON backup before upgrading.
