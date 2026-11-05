@@ -20,3 +20,5 @@ assert.equal(I.cutPlan(186,180,adult.fightDate,date,explicit.weighInDate).days,2
 assert.ok(I.cutSafety(ents,date,explicit).pace.perWeek>I.cutSafety(ents,date,adult).pace.perWeek);
 assert.ok(I.cutPlan(186,180,adult.fightDate,date,explicit.weighInDate).msg.includes('by weigh-in'));
 assert.deepEqual(I.cutSafety(ents,date,{...adult,weighInDate:'bad'}),I.cutSafety(ents,date,adult));
+
+S.recovery.holds[0].clearance.date='2026-11-15';assert.equal(R.phase(S.recovery,'2026-11-14').hold,true,'restored future clearance cannot lift a hold early');assert.equal(R.phase(S.recovery,'2026-11-15').hold,false);

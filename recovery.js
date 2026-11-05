@@ -16,12 +16,12 @@
   delete r.previewDate; // production never trusts fixture clocks from a restored file
   S.recovery=r;S.schemaVersion=3;return S;
  }
- function isCleared(h){return h.cleared===true&&['Clinician','Commission'].includes(h.clearance?.authority)&&dateOK(h.clearance?.date)&&!!String(h.clearance?.note||'').trim();}
+ function isCleared(h,today){return h.cleared===true&&['Clinician','Commission'].includes(h.clearance?.authority)&&dateOK(h.clearance?.date)&&(!today||h.clearance.date<=today)&&!!String(h.clearance?.note||'').trim();}
  function restricted(r,today){return (r.holds||[]).some(h=>(!h.date||h.date<=today)&&(!isCleared(h) || h.clearance.date>today));}
  function addHold(r,today,reason,source){const h={id:'hold-'+Date.now()+'-'+r.holds.length,date:today,reason,source,cleared:false};r.holds.push(h);return h;}
  function clearHolds(r,today,{authority,note,confirmed}){
   if(!confirmed||!['Clinician','Commission'].includes(authority)||!String(note||'').trim())throw new Error('Record qualified clinician or commission clearance, not a coach override.');
-  r.holds.filter(h=>!isCleared(h)).forEach(h=>{h.cleared=true;h.clearance={date:today,authority,note:String(note).trim()};});
+  r.holds.filter(h=>!isCleared(h,today)).forEach(h=>{h.cleared=true;h.clearance={date:today,authority,note:String(note).trim()};});
  }
  function schedule(r,today,input){
   const {fightDate,weighInDate='',recoveryDays=7,opponent='',id}=input;
