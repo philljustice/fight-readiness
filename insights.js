@@ -153,6 +153,7 @@
   }
   // Weight-cut safety. ISSN (2025) combat-sports position stand: aim ~0.5-1 kg/week of gradual loss.
   // We flag loss faster than 1%/week as caution and >1.5%/week as warning.
+  function modelEventDate(profile) { const d=profile.weighInDate; return /^\d{4}-\d{2}-\d{2}$/.test(d||'') && d<=profile.fightDate && Number.isFinite(Date.parse(d+'T12:00')) && ymd(new Date(d+'T12:00'))===d ? d : profile.fightDate; }
   function cutSafety(entries, today = new Date(), profile = {}) {
     const t = dayNum(ymd(today)), ws = entries.filter(e => num(e.weight) && +e.weight > 0);
     const last = avg(inRange(ws, t, 7, 0).map(e => +e.weight)), prev = avg(ws.filter(e => { const n = dayNum(e.date); return n >= t-14 && n < t-7; }).map(e => +e.weight));
@@ -161,15 +162,16 @@
       if (pct < -1.5) { out.level = 'warn'; out.msg = `Losing fast (${-pct}% this week). Eat enough carbs and protein so you keep your strength. The water part comes in fight week, not now.`; }
       else if (pct < -1) { out.level = 'caution'; out.msg = `Losing ${-pct}% this week, the top of the steady range. Keep an eye on energy, sleep and soreness.`; } }
     const cur = ws.sort((a,b)=>a.date<b.date?-1:1).slice(-1)[0], tgt = +profile.targetWeight;
-    if (cur && tgt > 0 && profile.fightDate) { const days = dayNum(profile.fightDate) - t, toGo = +cur.weight - tgt;
+    if (cur && tgt > 0 && modelEventDate(profile)) { const days = dayNum(modelEventDate(profile)) - t, toGo = +cur.weight - tgt;
       if (days > 0 && toGo > 0) { const perWk = toGo / (days/7), pct = perWk / +cur.weight * 100;
         out.pace = { perWeek: Math.round(perWk*10)/10, pct: Math.round(pct*10)/10, level: pct > 1.5 ? 'warn' : pct > 1 ? 'caution' : 'ok' }; } }
     return out;
   }
   // Impossible-cut check. Safe pace = 1%/week of current weight (caution above 1%, warning above 1.5%).
-  function cutPlan(current, target, fightDate, today = new Date()) {
+  function cutPlan(current, target, fightDate, today = new Date(), weighInDate = null) {
+    const eventDate = modelEventDate({fightDate,weighInDate});
     current = +current; target = +target; if (!(current > 0) || !(target > 0) || !fightDate) return null;
-    const days = dayNum(fightDate) - dayNum(ymd(today)); if (days < 0) return null;
+    const days = dayNum(eventDate) - dayNum(ymd(today)); if (days < 0) return null;
     const toGo = Math.round((current - target)*10)/10, r1 = v => Math.round(v*10)/10;
     if (toGo <= 0) return { level:'ok', toGo, perWeek:0, pct:0, days, msg:`At or under target (${target} lbs).` };
     const weeks = Math.max(days, 1) / 7, perWeek = toGo / weeks, pct = perWeek / current * 100;
@@ -177,7 +179,7 @@
     const reach = r1(Math.max(safe, target)), short = r1(Math.max(0, reach - target));
     const level = pct > 1.5 ? 'warn' : pct > 1 ? 'caution' : 'ok';
     const msg = level === 'ok' ? `Needs ${r1(perWeek)} lbs/week (${r1(pct)}%/week). That's within the safe range.` :
-      `You'd need ${r1(perWeek)} lbs/week (${r1(pct)}% of bodyweight). A safe pace (~1%/week) reaches about ${reach} lbs by fight day, ${short} lbs short of ${target}. ` +
+      `You'd need ${r1(perWeek)} lbs/week (${r1(pct)}% of bodyweight). A safe pace (~1%/week) reaches about ${reach} lbs by ${weighInDate && eventDate===weighInDate?'weigh-in':'fight day'}, ${short} lbs short of ${target}. ` +
       (level === 'warn' ? 'This plan is not safe. Talk to your coach about a higher weight class or a later fight date.' : 'This is at the edge of safe. Consider a higher weight class or a later date, and watch energy and soreness.');
     return { level, toGo, perWeek:r1(perWeek), pct:r1(pct), days, reach, short, msg };
   }
@@ -186,7 +188,7 @@
     const tgt = +profile.targetWeight; if (!(tgt > 0)) return { word:'No target', color:'grey', text:'Set a target weight in your profile.' };
     const ws = entries.filter(e => num(e.weight) && +e.weight > 0).sort((a,b)=>a.date<b.date?-1:1), cur = ws.length ? +ws[ws.length-1].weight : null;
     if (cur == null) return { word:'No data', color:'grey', text:'Log a weigh-in.' };
-    const c = cutSafety(entries, today, profile), plan = cutPlan(cur, tgt, profile.fightDate, today), lossPct = c.pctPerWeek == null ? null : -c.pctPerWeek;
+    const c = cutSafety(entries, today, profile), plan = cutPlan(cur, tgt, profile.fightDate, today, profile.weighInDate), lossPct = c.pctPerWeek == null ? null : -c.pctPerWeek;
     if (lossPct != null && lossPct > 1.5) return { word:'Too fast', color:'red', text:`Losing ${lossPct}%/week. Eat enough carbs and protein to keep your strength; any water cut belongs in fight week (opt-in), not now.` };
     if (cur <= tgt) return { word:'On track', color:'green', text:`At or under target (${tgt} lbs). Hold steady.` };
     if (lossPct == null) return { word:'On track?', color:'grey', text:`${Math.round((cur-tgt)*10)/10} lbs to go. Need 2 weeks of weigh-ins to judge pace.` };

@@ -29,7 +29,7 @@ const $ = s => document.querySelector(s), esc = v => String(v ?? '').replace(/[&
 const today = () => Scoring.ymd(new Date());
 const res = () => Scoring.compute(Recovery.campEntries(S, today()), new Date(), Object.assign({}, S.params, {startDate:S.startDate||null, fightDate:(S.profile||{}).fightDate||null}));
 // Below par (Coach Report): categories under Scoring.PAR in the 3-week window plus weight, with the reasons.
-function belowParList(r) { const L = Scoring.belowPar(r, S.params), p = S.profile || {}, c = Insights.cutSafety(S.entries, new Date(), p), tw = +(p.targetWeight || S.targetWeight), lw = r.latestWeight;
+function belowParList(r) { const L = Scoring.belowPar(r, S.params), p = S.profile || {}, c = Insights.cutSafety(S.entries, new Date(), wpProfile()), tw = +(p.targetWeight || S.targetWeight), lw = r.latestWeight;
   const why = []; if (c.level) why.push(c.msg);
   if (r.delta != null && tw > 0 && lw && +lw.weight > tw && r.delta > 0.5) why.push(`Gaining ${r.delta} lbs/wk while ${(+lw.weight - tw).toFixed(1)} lbs above target`);
   { const ws = wpStatus(); if (ws && (ws.band === 'tight' || ws.band === 'unsafe')) why.push(`Weight plan ${WeightPlan.BAND[ws.band][0]}: ${ws.text} Coach to reconsider the division.`); }
@@ -67,7 +67,7 @@ function otCard() { const o = otRisk(); if (!o.level) return ''; const li = a =>
    <p style="margin:4px 0"><b>Why:</b></p><ul style="margin:0 0 6px;padding-left:20px">${li(o.reasons)}</ul><p style="margin:4px 0"><b>What to do:</b></p><ul style="margin:0;padding-left:20px">${li(o.actions)}</ul>
    <p class="muted" style="margin:6px 0 0">Compared with your own normal. Not a diagnosis. See Help → Overtraining risk.</p></div>`; }
 // ---- Weight plan (WeightPlan, % of target model) ----
-const wpProfile = () => { const p = S.profile || {}; return Object.assign({}, p, { targetWeight: p.targetWeight || S.targetWeight }); };
+const wpProfile = () => { const p = S.profile || {}, bout = S.recovery?.bouts.find(b=>b.status==='scheduled'&&b.fightDate===p.fightDate); return Object.assign({}, p, { targetWeight: p.targetWeight || S.targetWeight }, bout?.weighInDate ? {weighInDate:bout.weighInDate} : {}); };
 const wpStatus = (d = new Date(), ents = S.entries) => WeightPlan.status(ents, wpProfile(), d, { startDate: S.startDate });
 const WPCOL = { on:'#43a047', in:'#43a047', tight:'#fb8c00', unsafe:'#e53935', none:'#777' };
 const wpPill = b => `<span class="wp-pill" style="background:${WPCOL[b]||'#777'}">${esc(WeightPlan.BAND[b][0])}</span>`;
@@ -77,9 +77,9 @@ const STOP = ['Dizzy or light-headed when standing, or blacking out','Confused, 
 function minorHydCard() { const s = wpStatus(), a = WeightPlan.allowance(wpProfile()); if (!a.minor || (s && s.daysToWeighIn != null && s.daysToWeighIn <= 7)) return ''; const ha = WeightPlan.hydAlert(S.entries.find(e => e.date === today()), null, false, true);
   return ha ? `<div class="card hyd-alert warn" id="minorHyd">⚠️ ${esc(ha.text)}</div>` : ''; }
 // Fight-week card (Score page, last 7 days to weigh-in): only today's steps + today's target + status.
-function fwTodayCard() { const s = wpStatus(); if (!s || s.daysToWeighIn == null || s.daysToWeighIn > 7) return ''; const k = s.daysToWeighIn, st = WeightPlan.steps(Math.max(-1, k), s.allow.water, s.allow.minor), ha = WeightPlan.hydAlert(S.entries.find(e => e.date === today()), k, s.allow.water, s.allow.minor);
+function fwTodayCard() { const s = wpStatus(); if (!s || s.daysToWeighIn == null || s.daysToWeighIn > 7) return ''; const k = s.daysToWeighIn, st = k<0 && today() < (S.profile?.fightDate||'') ? [{icon:'💧',text:'After weigh-in: rehydrate and refuel. Check with your qualified support team before the fight.'}] : WeightPlan.steps(Math.max(-1, k), s.allow.water, s.allow.minor), ha = WeightPlan.hydAlert(S.entries.find(e => e.date === today()), k, s.allow.water, s.allow.minor);
   const lw = S.entries.find(e => e.date === today() && +e.weight > 0), chk = lw ? WeightPlan.dayCheck(lw.weight, s) : null;
-  return `<div class="card fwt" id="fwToday"><div class="tt-head"><span>⚖️ FIGHT WEEK • ${k<0?'FIGHT DAY':k===0?'WEIGH-IN DAY':k+' DAY'+(k==1?'':'S')+' TO WEIGH-IN'}</span>${wpPill(s.band)}</div>
+  return `<div class="card fwt" id="fwToday"><div class="tt-head"><span>⚖️ FIGHT WEEK • ${k<0?(today()===(S.profile?.fightDate||'')?'FIGHT DAY':'AFTER WEIGH-IN'):k===0?'WEIGH-IN DAY':k+' DAY'+(k==1?'':'S')+' TO WEIGH-IN'}</span>${wpPill(s.band)}</div>
    ${ha?`<div class="hyd-alert ${ha.level}" id="fwHyd">${ha.stop?'🛑':ha.rehydrate?'💧':'⚠️'} ${esc(ha.text)}${ha.stop?' <a href="#" data-goto="help" data-anchor="helpStop" style="color:#ffcc80">Stop signs →</a>':''}</div>`:''}
    ${s.planToday>0?`<div class="fwt-tgt"><span class="muted">Today's target</span> <b>${s.planToday} lbs</b>${chk?` <span class="wck ${chk.level}">${esc(chk.level==='ok'?'✓ on target':chk.diff+' lbs over')}</span>`:' <span class="muted">• weigh in this morning</span>'}</div>`:''}
    ${st.map(x=>`<div class="tt-row"><span>${x.icon} ${esc(x.text)}</span></div>`).join('')}
@@ -92,22 +92,22 @@ function wpReportCard() { const s = wpStatus(); if (!s) return ''; const T = s.T
   const recent = S.entries.filter(e => +e.weight > 0 && Scoring.dayNum(e.date) > Scoring.dayNum(today()) - 21).sort((a,b)=>a.date<b.date?1:-1).slice(0,6);
   return `<div class="card" id="wpReport"><h3>⚖️ Weight plan</h3><p>${wpPill(s.band)} ${esc(s.text)}</p>
    ${s.band==='tight'||s.band==='unsafe'?`<div class="hint warn" id="wpCoachFlag">🧑‍🏫 <b>Coach: reconsider the division.</b> This cut is ${esc(WeightPlan.BAND[s.band][0])}. Choosing a division the fighter can make safely is the coach's call: consider a catchweight, a later date or a class up.</div>`:''}
-   <table><tr><td>Target / weigh-in</td><td colspan="2">${T} lbs • ${esc(wi||'set fight date')}</td></tr><tr><td>Current</td><td colspan="2">${s.W} lbs${s.daysToWeighIn!=null?' • '+s.daysToWeighIn+' days to weigh-in':''}</td></tr>
+   <table><tr><td>Target / weigh-in</td><td colspan="2">${T} lbs • ${esc(wi||'set fight date')}</td></tr><tr><td>Current</td><td colspan="2">${s.W} lbs${s.daysToWeighIn!=null?' • '+(s.daysToWeighIn<0?Math.abs(s.daysToWeighIn)+' days after weigh-in':s.daysToWeighIn+' days to weigh-in'):''}</td></tr>
    <tr><td>Plan line</td><td colspan="2">${s.planPerWeek!=null?s.planPerWeek+' lbs/week to reach '+T+' five days before weigh-in':'—'}</td></tr>
    <tr><td>Fight-week allowance</td><td colspan="2">${A}% = ${s.allowLbs} lbs (${esc(s.allow.notes.join('; '))})</td></tr>
    <tr><td>Water-cut steps</td><td colspan="2">${s.allow.minor?'Off (under 18)':s.allow.water?'Opted in':'Off (food-based only)'}</td></tr></table>
    ${ch?`<h4 style="margin:10px 0 4px">Check-ins</h4><table><tr><th>When</th><th>Limit</th><th>Actual</th><th>Pee colour</th></tr>${ch}</table>`:''}
    ${recent.length?`<h4 style="margin:10px 0 4px">Recent weigh-ins & hydration</h4><table><tr><th>Date</th><th>Weight</th><th>Pee colour</th></tr>${recent.map(e=>{ const hv = WeightPlan.hyd(e), wa = WeightPlan.waterAffected(S.entries, e.date); return `<tr${wa?' class="wa"':''}><td>${e.date.slice(5)}</td><td>${e.weight}</td><td>${hv?hydTag(hv):'—'}${wa?' 💧 water-affected':''}</td></tr>`; }).join('')}</table>${s.waterAffected?`<p class="muted" id="wpWaterNote">💧 Latest weigh-in (${s.waterAffected.date.slice(5)}) was water-affected${s.usedWeight?`; plan uses ${s.usedWeight.weight} lbs from ${s.usedWeight.date.slice(5)}`:''}.</p>`:''}`:''}</div>`; }
 const hydTag = v => { const h = Insights.hydrationStatus(v); return h ? `${h.emoji} ${v}` : '—'; };
-function cutWarn(ws) { const c = Insights.cutSafety(S.entries, new Date(), S.profile||{}); let h = '';
+function cutWarn(ws) { const c = Insights.cutSafety(S.entries, new Date(), wpProfile()); let h = '';
   if (c.level) h += `<div class="hint ${c.level}">⚠️ ${esc(c.msg)}</div>`;
   return h; }
 function planBox(cur, tgt, fd, extra) { const c = WeightPlan.status([], Object.assign(wpProfile(), extra||{}, { startWeight: cur, targetWeight: tgt, fightDate: fd }), new Date(), {}); if (!c || !c.band || c.band === 'none') return '';
   return `<div class="wp-box ${c.band}">${wpPill(c.band)} ${esc(c.text)}</div>`; }
 const VCOL = { green:'#43a047', orange:'#fb8c00', red:'#e53935', grey:'#777' };
-function verdictLine() { const s = wpStatus(); if (s && s.band && s.band !== 'none') return wpBox(); const v = Insights.weightVerdict(S.entries, S.profile||{});
+function verdictLine() { const s = wpStatus(); if (s && s.band && s.band !== 'none') return wpBox(); const v = Insights.weightVerdict(S.entries, wpProfile());
   return `<p id="wverdict" style="margin:6px 0"><span style="display:inline-block;background:${VCOL[v.color]};color:#fff;font-weight:700;padding:3px 10px;border-radius:12px">${esc(v.word)}</span> ${esc(v.text)}</p>`; }
-function reviewCard() { const rv = Insights.weekReview(S.entries, new Date(), S.params, S.profile||{}); const li = a => a.map(x=>`<li>${esc(x)}</li>`).join('');
+function reviewCard() { const rv = Insights.weekReview(S.entries, new Date(), S.params, wpProfile()); const li = a => a.map(x=>`<li>${esc(x)}</li>`).join('');
   return `<div class="card" id="review"><h3>📋 Weekly review (last 7 days)</h3><p><b>✅ What went well</b></p><ul>${li(rv.well)}</ul><p><b>❌ What was missed</b></p><ul>${rv.missed.length?li(rv.missed):'<li>Nothing major</li>'}</ul><p><b>🎯 Focus for next week</b></p><ul>${li(rv.focus)}</ul></div>`; }
 function wellCard(report) { const w = Insights.wellness(S.entries), L = Insights.load(S.entries);
   if (!w.days && !L.sessions && !report) return '';
@@ -124,9 +124,9 @@ function loadBars(wk) { const mx = Math.max(...wk, 1);
 function tr7() { const es = S.entries.filter(e => Scoring.dayNum(e.date) > Scoring.dayNum(today())-7); let sch = 0, done = 0, extra = 0;
   es.forEach(e => { if (Array.isArray(e.sessions)) { sch += e.sessions.length; done += e.sessions.filter(x=>x.done===true).length; } else if (e.training != null) { sch++; if (e.training) done++; } if (e.extra && e.extra.label) extra++; });
   return `${done}/${sch} scheduled sessions done${extra?` + ${extra} extra`:''} • load ${Insights.load(S.entries).week} AU`; }
-function weeklySummary() { const r = res(), st = Insights.streak(S.entries), w = Insights.wellness(S.entries), c = Insights.cutSafety(S.entries, new Date(), S.profile||{}), p = S.profile||{};
+function weeklySummary() { const r = res(), st = Insights.streak(S.entries), w = Insights.wellness(S.entries), c = Insights.cutSafety(S.entries, new Date(), wpProfile()), p = S.profile||{};
   const flags = [];
-  const cp = Insights.cutPlan(r.latestWeight ? r.latestWeight.weight : p.startWeight, p.targetWeight, p.fightDate), vd = Insights.weightVerdict(S.entries, p);
+  const cp = Insights.cutPlan(r.latestWeight ? r.latestWeight.weight : p.startWeight, p.targetWeight, p.fightDate, new Date(), wpProfile().weighInDate), vd = Insights.weightVerdict(S.entries, wpProfile());
   if (c.level) flags.push(`Weight loss ${-c.pctPerWeek}%/wk (${c.level})`); { const ws = wpStatus(); if (ws && (ws.band === 'tight' || ws.band === 'unsafe')) flags.push(`Weight plan ${WeightPlan.BAND[ws.band][0]}: coach to reconsider division`); if (ws && ws.waterAffected) flags.push(`Weigh-in ${ws.waterAffected.date.slice(5)} water-affected (dark pee)`); const ha = ws && WeightPlan.hydAlert(S.entries.find(e => e.date === today()), ws.daysToWeighIn, ws.allow.water, ws.allow.minor); if (ha && !ha.rehydrate) flags.push(ha.text); }
   if (w.dropping) flags.push('Wellness below normal'); w.flags.forEach(f => flags.push(f.text ? `${f.text} on ${f.date.slice(5)}` : `Low ${f.item} ${f.value} on ${f.date.slice(5)}`));
   Insights.hydrationFlags(S.entries, new Date(), p).forEach(f => flags.push(f));
@@ -146,7 +146,7 @@ const markWeekly = wk => { S.weeklySent = Object.assign({}, S.weeklySent, {[wk]:
 function reportData() { const r = res(), p = S.profile||{}, P = weeklyParts(), w = Insights.wellness(S.entries), L = Insights.load(S.entries), cd = Profile.countdown(p.fightDate);
   const lw = r.latestWeight, ws = Profile.weightStatus(lw && lw.weight, p.targetWeight || S.targetWeight), t = Scoring.dayNum(today());
   const wk = S.entries.filter(e => Scoring.dayNum(e.date) > t-7), es = S.entries.slice().sort((a,b)=>a.date<b.date?-1:1).slice(-21);
-  const c = Insights.cutSafety(S.entries, new Date(), p), cp = Insights.cutPlan(lw ? lw.weight : p.startWeight, p.targetWeight, p.fightDate), flags = [];
+  const c = Insights.cutSafety(S.entries, new Date(), wpProfile()), cp = Insights.cutPlan(lw ? lw.weight : p.startWeight, p.targetWeight, p.fightDate, new Date(), wpProfile().weighInDate), flags = [];
   if (c.level) flags.push(`Weight loss ${-c.pctPerWeek}%/week (${c.level})`); { const ws = wpStatus(); if (ws && (ws.band === 'tight' || ws.band === 'unsafe')) flags.push(`Weight plan ${WeightPlan.BAND[ws.band][0]}: coach to reconsider division`); }
   { const o = otRisk(); if (o.level) flags.unshift(o.summary); }
   if (w.dropping) flags.push('Wellness below normal'); w.flags.forEach(f => flags.push(f.text ? `${f.text} on ${f.date.slice(5)}` : `Low ${f.item} (${f.value}/5) on ${f.date.slice(5)}`));
@@ -607,7 +607,7 @@ function readDraft() { const u = V._e; if (!u) return null;
   return b; }
 function autosave() { const b = readDraft(); if (!b) return null;
   if (!S.entries.some(x => x.date === b.date) && !hasData(b)) return b;
-  if(b.date===today() && (b.injury && b.injury!=='none' || b.ill)){ const source='log:'+b.date+':'+(b.injury||'none')+':'+!!b.ill; if(!S.recovery.holds.some(h=>h.source===source))Recovery.addHold(S.recovery,today(),'Injury / illness reported in check-in; follow appropriate care advice',source); b.context=Object.assign({},b.context,{mode:'recovery'}); }
+  if(b.date===today() && (b.injury && b.injury!=='none' || b.ill)){ const source='log:'+b.date+':'+(b.injury||'none')+':'+!!b.ill; if(!S.recovery.holds.some(h=>h.source===source))Recovery.addHold(S.recovery,today(),'Injury / illness reported in check-in; follow appropriate care advice',source); b.context=Object.assign({},b.context,{mode:'recovery'}); if(S.push)Push.update(S.reminders,(S.profile&&S.profile.name)||S.fighter,Recovery.pushMetadata(S,today())).catch(()=>{}); }
   upsert([b]); refreshProgress(b); if (b.date === today()) scheduleStatus(); return b; }
 function refreshProgress(b) { const ns = $('#nutScore'); if (ns) ns.innerHTML = nutScoreHtml(b); const st = Insights.sections(b), n = Object.values(st).filter(Boolean).length, left = Insights.missing(b);
   Object.keys(st).forEach(k => { const el = $('#ok_' + k); if (el) { el.classList.toggle('on', !!st[k]); el.textContent = st[k] ? '✓ Done' : '…'; } });
@@ -691,7 +691,7 @@ function shareText() { if(Recovery.phase(S.recovery,today()).mode!=='camp')retur
   if (r.locked) return `🥊 FightReady: ${S.fighter||'Fighter'} (${today()})\n${lockMsg(r)}\nDays logged so far: ${r.daysLogged}`;
   return `🥊 FightReady: ${S.fighter||'Fighter'} (${today()})${S.profile&&S.profile.gym?' • '+S.profile.gym:''}${S.profile&&Profile.countdown(S.profile.fightDate)?'\n'+Profile.countdown(S.profile.fightDate).text:''}\nScore: ${r.score}/100, ${r.verdict}${r.locked?'':'\n'+breakdown(r)}\n` +
    CATS.map(([k,l])=>`${l}: ${r.cats[k].toFixed(0)}`).join(' | ') + `\nConsistency: ${r.consistency.toFixed(0)}% (+${r.bonus})\n` +
-   `Weight: ${r.latestWeight?r.latestWeight.weight+' lbs':'—'}, trend ${r.delta==null?'—':r.delta+' lbs/wk'} ${r.trend.emoji}\nWeight verdict: ${Insights.weightVerdict(S.entries, S.profile||{}).word}\nTraining (7 days): ${tr7()}\n${(o => o.level ? '⚠️ ' + o.summary + '\nSuggested: ' + o.actions.join('; ') + '\n' : '')(otRisk())}${Insights.reviewText(Insights.weekReview(S.entries, new Date(), S.params, S.profile||{}))}\nDays logged: ${r.daysLogged} (last 3 weeks) • Streak: ${Insights.streak(S.entries).current} days`; }
+   `Weight: ${r.latestWeight?r.latestWeight.weight+' lbs':'—'}, trend ${r.delta==null?'—':r.delta+' lbs/wk'} ${r.trend.emoji}\nWeight verdict: ${Insights.weightVerdict(S.entries, wpProfile()).word}\nTraining (7 days): ${tr7()}\n${(o => o.level ? '⚠️ ' + o.summary + '\nSuggested: ' + o.actions.join('; ') + '\n' : '')(otRisk())}${Insights.reviewText(Insights.weekReview(S.entries, new Date(), S.params, wpProfile()))}\nDays logged: ${r.daysLogged} (last 3 weeks) • Streak: ${Insights.streak(S.entries).current} days`; }
 
 document.addEventListener('click', async ev => {
   const t = ev.target.closest('button,a'); if (!t) return;
@@ -741,7 +741,7 @@ document.addEventListener('click', async ev => {
     case 'icsBtn': return addToCalendar();
     case 'icsShare': return shareICS();
     case 'pushOn': { if(Recovery.phase(S.recovery,today()).mode!=='camp')return alert('Camp notifications are unavailable in Recovery and Maintenance. Daily comments are in-app only.'); const b = t; b.disabled = true; b.textContent = 'Turning on…';
-      try { await Push.enable(S.reminders, (S.profile&&S.profile.name)||S.fighter); S.push = true; S.notify = true; save(); sendStatusNow(); alert('🔔 Notifications are on. You\'ll get your morning and evening check-ins, follow-ups if today\'s log isn\'t finished, the Mon/Thu weigh-in, and the Sunday 6 PM report reminder, even when the app is closed.'); }
+      try { await Push.enable(S.reminders, (S.profile&&S.profile.name)||S.fighter, {...Recovery.pushMetadata(S,today()),campOptIn:true}); S.push = true; S.notify = true; save(); sendStatusNow(); alert('🔔 Notifications are on. You\'ll get your morning and evening check-ins, follow-ups if today\'s log isn\'t finished, the Mon/Thu weigh-in, and the Sunday 6 PM report reminder, even when the app is closed.'); }
       catch (e) { alert(e.message==='denied' ? 'Notifications were blocked. To allow them: iPhone Settings → Notifications → FightReady. Calendar reminders below still work.' : 'Could not turn on notifications (' + e.message + '). Check your connection and try again, or use the calendar reminders.'); }
       return show('setup'); }
     case 'pushOff': await Push.disable(); S.push = false; save(); alert('Notifications are off.'); return show('setup');
@@ -792,19 +792,19 @@ document.addEventListener('input', ev => { const t = ev.target, w = S.weeks[S.we
 });
 document.addEventListener('change', async ev => { const t = ev.target;
   if (cur === 'log' && (LOGF.includes(t.id) || t.dataset.srpe != null || t.dataset.smin != null)) return void autosave();
-  if (t.id === 'r_untilDone') { S.reminders.untilDone = t.checked; save(); if (S.push && Recovery.phase(S.recovery,today()).mode==='camp') Push.update(S.reminders, (S.profile&&S.profile.name)||S.fighter).catch(()=>{}); return; }
-  if (t.id === 'r_morning' || t.id === 'r_evening') { if (t.value) { S.reminders[t.id.slice(2)] = t.value; save(); if (S.push && Recovery.phase(S.recovery,today()).mode==='camp') Push.update(S.reminders, (S.profile&&S.profile.name)||S.fighter).catch(()=>{}); $('#calLink').href = calURL(); $('#calSub').href = calURL().replace(/^https?:/,'webcal:'); } return; }
+  if (t.id === 'r_untilDone') { S.reminders.untilDone = t.checked; save(); if (S.push) Push.update(S.reminders, (S.profile&&S.profile.name)||S.fighter, Recovery.pushMetadata(S,today())).catch(()=>{}); return; }
+  if (t.id === 'r_morning' || t.id === 'r_evening') { if (t.value) { S.reminders[t.id.slice(2)] = t.value; save(); if (S.push) Push.update(S.reminders, (S.profile&&S.profile.name)||S.fighter, Recovery.pushMetadata(S,today())).catch(()=>{}); $('#calLink').href = calURL(); $('#calSub').href = calURL().replace(/^https?:/,'webcal:'); } return; }
   if (t.id === 'wkSel') { S.weekIdx = +t.value; save(); return show('plan'); }
   if (t.id === 'w_start') return show('plan');
   if (t.id === 'f_date') { V._date = t.value; return show('log'); }
   if (t.id === 'restoreFirst' && t.files[0]) { const f = t.files[0], text = await f.text(); t.value = '';
     try { const ns = Recovery.migrate(Profile.fromBackup(text, load(), Scoring),today()); if (!ns.profile.schedule) ns.profile.schedule = Profile.scheduleFromWeek(ns.weeks[ns.weekIdx||0]);
-      S = ns; S.tutorial = 'restored'; save(); V._rerr = null; V._perr = null; V._pdraft = null; V._restored = { name: S.profile.name, days: S.entries.length }; show('dash'); }
+      S = ns; S.tutorial = 'restored'; save(); Push.update(S.reminders,(S.profile&&S.profile.name)||S.fighter,Recovery.pushMetadata(S,today())).catch(()=>{}); V._rerr = null; V._perr = null; V._pdraft = null; V._restored = { name: S.profile.name, days: S.entries.length }; show('dash'); }
     catch (e) { V._rerr = e.message; show('profile'); } return; }
   if (t.id === 'importFile' && t.files[0]) { const text = await t.files[0].text();
     try { if (/\.json$/i.test(t.files[0].name) || text.trim().startsWith('{')) { const d = JSON.parse(text); if (!Array.isArray(d.entries)) throw new Error('Not a FightReady backup');
         if (!confirm(`Restore backup for "${d.fighter||'fighter'}" with ${d.entries.length} days? This replaces data on this phone.`)) return;
-        const wasPush = S.push; S = Recovery.migrate(Profile.fromBackup(text, load(), Scoring),today()); if (S.profile && !S.profile.schedule) S.profile.schedule = Profile.scheduleFromWeek(S.weeks[S.weekIdx||0]); S.tutorial = 'restored'; save(); alert('Restored ✔' + (wasPush ? '' : '\n\n🔔 Notifications aren\'t restored: turn them on again in Setup.')); }
+        S = Recovery.migrate(Profile.fromBackup(text, load(), Scoring),today()); if (S.profile && !S.profile.schedule) S.profile.schedule = Profile.scheduleFromWeek(S.weeks[S.weekIdx||0]); S.tutorial = 'restored'; save(); Push.update(S.reminders,(S.profile&&S.profile.name)||S.fighter,Recovery.pushMetadata(S,today())).catch(()=>{}); alert('Restored ✔\n\n🔔 Notifications aren\'t restored: turn them on again in Setup.'); }
       else { const rows = parseCSV(text); upsert(rows); alert(`Imported ${rows.length} days ✔`); }
       show('dash'); } catch (e) { alert('Import failed: ' + e.message); } }
 });
@@ -813,7 +813,7 @@ function pushBox() { const st = Push.status();
   if (st === 'ios-install') return '<div class="hint">🔔 <b>Want notifications?</b> On iPhone they only work from the Home Screen app. In Safari tap Share → <b>Add to Home Screen</b>, open FightReady from the new icon, then come back to Setup and tap <i>Turn on notifications</i>. (Needs iOS 16.4 or newer.)</div>';
   if (st === 'unsupported') return '<p class="muted">🔔 This browser can\'t receive notifications. Use the calendar reminders below.</p>';
   if (S.push && typeof Notification !== 'undefined' && Notification.permission === 'granted') return '<p>🔔 <b>Notifications are on.</b> Changing the times above updates them automatically.</p><button class="btn alt" id="pushTest">Send a test notification</button><button class="btn alt" id="pushOff">Turn off notifications</button>';
-  return '<button class="btn" id="pushOn">🔔 Turn on notifications</button><p class="muted">Recommended. Sends your morning and evening check-ins, follow-ups until today\'s log is done, the Mon/Thu weigh-in, and the Sunday 6 PM weekly-report reminder, even when the app is closed. Only your reminder times, time zone, first name and whether today\'s log is finished (yes/no) are sent to the reminder server; your logs stay on this phone.</p>'; }
+  return '<button class="btn" id="pushOn">🔔 Turn on notifications</button><p class="muted">Recommended. Sends your morning and evening check-ins, follow-ups until today\'s log is done, the Mon/Thu weigh-in, and the Sunday 6 PM weekly-report reminder, even when the app is closed. Only reminder times, time zone, first name, camp/recovery phase and event dates, generic pause/quiet preferences and whether today\'s log is finished (yes/no) are sent to the reminder server; your logs stay on this phone.</p>'; }
 function calURL() { return new URL(Reminders.calFile(S.reminders.morning, S.reminders.evening), location.href.replace(/[#?].*$/,'')).href; }
 async function shareICS() { const url = calURL(), name = 'FightReady-reminders.ics';
   try { const txt = await (await fetch(url, { cache:'no-store' })).text(); const f = new File([txt], name, { type:'text/calendar' });
@@ -851,7 +851,7 @@ if (!S.profile && S.fighter) S.profile = { name:S.fighter, coach:S.coach||'', ta
 RC.install();
 { const q = new URLSearchParams(location.search).get('tab'); show(['dash','log','plan','report','setup','help'].includes(q) ? q : 'dash'); }
 if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.tab) { V._date = null; V._sec = null; show(e.data.tab); } });
-if (S.push && Recovery.phase(S.recovery,today()).mode==='camp') Push.update(S.reminders, (S.profile&&S.profile.name)||S.fighter).then(sendStatusNow).catch(()=>{});
+if (S.push) Push.update(S.reminders, (S.profile&&S.profile.name)||S.fighter, Recovery.pushMetadata(S,today())).then(sendStatusNow).catch(()=>{});
 
 // Only new sign-ups queue an automatic tour. Existing installs and restores stay uninterrupted.
 const tutorial = FRTutorial.create({

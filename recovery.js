@@ -16,11 +16,12 @@
   delete r.previewDate; // production never trusts fixture clocks from a restored file
   S.recovery=r;S.schemaVersion=3;return S;
  }
- function restricted(r,today){return (r.holds||[]).some(h=>(!h.date||h.date<=today)&&(!h.cleared || h.clearance?.date>today));}
+ function isCleared(h){return h.cleared===true&&['Clinician','Commission'].includes(h.clearance?.authority)&&dateOK(h.clearance?.date)&&!!String(h.clearance?.note||'').trim();}
+ function restricted(r,today){return (r.holds||[]).some(h=>(!h.date||h.date<=today)&&(!isCleared(h) || h.clearance.date>today));}
  function addHold(r,today,reason,source){const h={id:'hold-'+Date.now()+'-'+r.holds.length,date:today,reason,source,cleared:false};r.holds.push(h);return h;}
  function clearHolds(r,today,{authority,note,confirmed}){
   if(!confirmed||!['Clinician','Commission'].includes(authority)||!String(note||'').trim())throw new Error('Record qualified clinician or commission clearance, not a coach override.');
-  r.holds.filter(h=>!h.cleared).forEach(h=>{h.cleared=true;h.clearance={date:today,authority,note:String(note).trim()};});
+  r.holds.filter(h=>!isCleared(h)).forEach(h=>{h.cleared=true;h.clearance={date:today,authority,note:String(note).trim()};});
  }
  function schedule(r,today,input){
   const {fightDate,weighInDate='',recoveryDays=7,opponent='',id}=input;
@@ -62,6 +63,7 @@
   const flags=entries.flatMap(e=>[e.injury&&e.injury!=='none'?e.date+': injury '+e.injury:null,e.ill?e.date+': illness reported':null,+e.mood>0&&+e.mood<=2?e.date+': low mood':null,+e.stress>=4?e.date+': higher stress':null,+e.soreness>=4?e.date+': higher soreness':null].filter(Boolean));
   return {entries,sessions: sessions.length,target,checkins,score,nudges,flags,band,hydrated,direction,restricted:restrictedNow};
  }
+ function pushMetadata(S,today){const r=S.recovery,p=phase(r,today),o=r.reminders||{};return {version:1,mode:p.mode,asOf:today,campOptIn:S.push===true,fightDate:p.next?.fightDate||null,previousFightDate:p.past?.fightDate||null,recoveryUntil:p.end?new Date(p.end*DAY).toISOString().slice(0,10):null,restrictionPause:p.hold,paused:o.paused===true,snoozeUntil:o.snoozeUntil||null,quietStart:o.applyToCamp?o.quietStart||null:null,quietEnd:o.applyToCamp?o.quietEnd||null:null};}
  function reminderAllowed(r,today,time){const o=r.reminders||{};if(!o.optIn||o.paused||o.snoozeUntil&&o.snoozeUntil>=today)return false;const a=o.quietStart||'21:00',b=o.quietEnd||'08:00';return !(a<b?time>=a&&time<b:time>=a||time<b);}
 
  const choices=['Yes','No','Not sure','N/A'];
@@ -77,7 +79,7 @@
   const duration=past?Math.max(3,Math.min(14,+past.recoveryDays||7)):7;
   const end=past?Math.max(n(past.fightDate)+duration,n(past.extendUntil||past.fightDate)):null;
   if(hold || (past&&n(today)<=end))return {mode:'recovery',past,next,day:days,duration,hold,end};
-  return {mode:next?'camp':'maintenance',past,next,day:days,duration,hold:false};
+  return {mode:next?'camp':'maintenance',past,next,day:days,duration,end,hold:false};
  }
  function questions(discipline){return CORE.concat((BANK[discipline]||[]).map((q,i)=>['skill'+i,q]));}
  function summary(review,discipline){
@@ -91,5 +93,5 @@
  function daily(p,style){const i=(Math.max(1,p.day||1)-1)%7;
   const comment=p.hold? (i===1||i===4?'Your people are in your corner. A quiet call or visit is enough.':'No deadline to hit. Following your clinician’s plan is progress.'):COMMENTS[i];
   return {comment,idea:style==='break'?null:p.hold?'Rest or a quiet conversation, only if your care plan allows. No physical activity suggestion.':IDEAS[i],social:i===1||i===4};}
- const api={dateOK,addDays,migrate,sync,entryMode,campEntries,maintenanceReport,reminderAllowed,restricted,addHold,clearHolds,schedule,cancel,extend,phase,summary,questions,choices,CARE,daily};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.Recovery=api;
+ const api={dateOK,addDays,migrate,sync,entryMode,campEntries,maintenanceReport,pushMetadata,reminderAllowed,isCleared,restricted,addHold,clearHolds,schedule,cancel,extend,phase,summary,questions,choices,CARE,daily};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.Recovery=api;
 })(typeof window==='undefined'?globalThis:window);

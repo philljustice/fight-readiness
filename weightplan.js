@@ -21,8 +21,9 @@
   // Personal fight-week allowance A (% of target)
   function allowance(p = {}, today = new Date()) {
     const a = age(p.dob, today), minor = a != null && a < 18, notes = [];
-    let pct = BASE[p.weighIn] || BASE['day-before'];
-    notes.push(`${pct}% base, ${{'day-before':'day-before','mid':'6–20 h','same-day':'same-day'}[p.weighIn||'day-before']||'day-before'} weigh-in`);
+    const timing = isDate(p.weighInDate) && p.weighInDate === p.fightDate ? 'same-day' : p.weighIn;
+    let pct = BASE[timing] || BASE['day-before'];
+    notes.push(`${pct}% base, ${{'day-before':'day-before','mid':'6–20 h','same-day':'same-day'}[timing||'day-before']||'day-before'} weigh-in`);
     if (a != null && a >= 18 && a <= 20) { pct -= 1; notes.push('−1 age 18–20'); }
     if (p.cutExp === 'first' || p.cutExp === 'some' || !p.cutExp) { pct -= 1; notes.push('−1 early cut experience'); }
     if (p.lastCutBad) { pct -= 1; notes.push('−1 last cut went badly'); }
@@ -33,7 +34,7 @@
     else if (!water && pct > NO_WATER_CAP) { pct = NO_WATER_CAP; notes.push('food-only steps: 3% cap'); }
     return { pct, minor, water, age:a, notes };
   }
-  const weighInDate = p => { if (!isDate(p.fightDate)) return null; if ((p.weighIn||'day-before') === 'same-day') return p.fightDate; const x = new Date(p.fightDate+'T12:00'); x.setDate(x.getDate()-1); return ymd(x); };
+  const weighInDate = p => { if (!isDate(p.fightDate)) return null; if (isDate(p.weighInDate) && p.weighInDate <= p.fightDate) return p.weighInDate; if ((p.weighIn||'day-before') === 'same-day') return p.fightDate; const x = new Date(p.fightDate+'T12:00'); x.setDate(x.getDate()-1); return ymd(x); };
   // Fight-week target for k days before weigh-in (k <= 5). Food steps take the first part, water (if opted in) the last day.
   const FRAC = { 5:1, 4:0.85, 3:0.7, 2:0.55, 1:0.4, 0:0 }, FRAC_FOOD = { 5:1, 4:0.8, 3:0.6, 2:0.4, 1:0.2, 0:0 };
   function weekTarget(T, A, k, water) { const f = k >= 5 ? 1 : (water ? FRAC : FRAC_FOOD)[Math.max(0,k)]; return r1(T * (1 + A/100 * f)); }

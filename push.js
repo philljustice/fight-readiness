@@ -12,17 +12,17 @@ const Push = (() => {
   function status() { if (!configured()) return 'not-configured'; if (isIOS() && !standalone()) return 'ios-install'; return supported() ? 'ok' : 'unsupported'; }
   const key = s => { s = s.replace(/-/g, '+').replace(/_/g, '/'); s += '='.repeat((4 - s.length % 4) % 4); return Uint8Array.from(atob(s), c => c.charCodeAt(0)); };
   const tz = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch (e) { return 'UTC'; } };
-  const payload = (sub, r, name) => ({ subscription: sub.toJSON ? sub.toJSON() : sub, morning: r.morning, evening: r.evening, weekly: '18:00', remind: r.untilDone !== false, weighDays: [1, 4], tz: tz(), name: (name || '').trim().split(/\s+/)[0] || '' });
+  const payload = (sub, r, name, lifecycle) => ({ lifecycle: lifecycle || null, subscription: sub.toJSON ? sub.toJSON() : sub, morning: r.morning, evening: r.evening, weekly: '18:00', remind: r.untilDone !== false, weighDays: [1, 4], tz: tz(), name: (name || '').trim().split(/\s+/)[0] || '' });
   async function call(path, body) { const res = await fetch(CONFIG.WORKER_URL + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), keepalive: true }); if (!res.ok) throw new Error('Server ' + res.status); return res.json(); }
   async function current() { if (!supported()) return null; const reg = await navigator.serviceWorker.ready; return reg.pushManager.getSubscription(); }
-  async function enable(reminders, name) { // must be called from a user tap
+  async function enable(reminders, name, lifecycle) { // must be called from a user tap
     const p = await Notification.requestPermission(); if (p !== 'granted') throw new Error('denied');
     const reg = await navigator.serviceWorker.ready;
     const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key(CONFIG.VAPID_PUBLIC_KEY) });
-    await call('/subscribe', payload(sub, reminders, name)); return true;
+    await call('/subscribe', payload(sub, reminders, name, lifecycle)); return true;
   }
-  async function update(reminders, name) { const sub = await current(); if (!sub) return false;
-    try { await call('/update', payload(sub, reminders, name)); } catch (e) { await call('/subscribe', payload(sub, reminders, name)); } return true; }
+  async function update(reminders, name, lifecycle) { const sub = await current(); if (!sub) return false;
+    try { await call('/update', payload(sub, reminders, name, lifecycle)); } catch (e) { await call('/subscribe', payload(sub, reminders, name, lifecycle)); } return true; }
   // Per-day completion flag only: { date: 'YYYY-MM-DD', complete: bool, missing: number }. No log data.
   async function setDayStatus(st) { const sub = await current(); if (!sub) return false;
     await call('/status', { endpoint: sub.endpoint, date: st.date, complete: !!st.complete, missing: st.missing | 0, morning: !!st.morning }); return true; }
