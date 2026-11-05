@@ -10,13 +10,16 @@
   function age(dob, today = new Date()) { if (!isDate(dob)) return null; const [y,m,d] = dob.split('-').map(Number);
     let a = today.getFullYear() - y; if (today.getMonth()+1 < m || (today.getMonth()+1 === m && today.getDate() < d)) a--; return a; }
   const daysTo = (date, today = new Date()) => isDate(date) ? dn(date) - dn(ymd(today)) : null;
-  function validate(p, today = new Date()) {
+  function validate(p, today = new Date(), opts = {}) {
     const e = {}; const t = ymd(today);
     if (!String(p.name||'').trim()) e.name = 'Fighter name is required.';
     else if (p.name.trim().length > 60) e.name = 'Keep the name under 60 characters.';
     if (p.dob) { const a = age(p.dob, today); if (a == null || p.dob > t) e.dob = 'Enter a valid date of birth.'; else if (a < 8 || a > 80) e.dob = 'Age must be between 8 and 80.'; }
     for (const k of ['startWeight','targetWeight']) if (p[k] !== '' && p[k] != null) { const v = +p[k]; if (isNaN(v) || v < 60 || v > 400) e[k] = 'Enter a weight between 60 and 400 lbs.'; }
-    if (p.fightDate) { if (!isDate(p.fightDate)) e.fightDate = 'Enter a valid date.'; else if (p.fightDate < t) e.fightDate = 'Fight date is in the past.'; }
+    if (p.fightDate) { if (!isDate(p.fightDate)) e.fightDate = 'Enter a valid date.';
+      // New/future bout dates must still be today or later. An already-recorded fight date may be past
+      // during Recovery/Maintenance profile edits; fight-date changes stay on the scheduler.
+      else if (p.fightDate < t && !(opts && opts.allowPastFightDate && opts.allowPastFightDate === p.fightDate)) e.fightDate = 'Fight date is in the past.'; }
     if (p.coachContact) { const c = p.coachContact.trim(); if (c.includes('@') ? !isEmail(c) : digits(c) < 7) e.coachContact = 'Enter a valid email or phone number.'; }
     if (p.emPhone && digits(p.emPhone) < 7) e.emPhone = 'Enter a valid phone number.';
     if (p.emPhone && !String(p.emName||'').trim()) e.emName = 'Add the emergency contact\'s name.';

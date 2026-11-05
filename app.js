@@ -762,7 +762,7 @@ document.addEventListener('click', async ev => {
       d.fightDate = (S.profile && S.profile.fightDate) || '';
       if (!first) d.startWeight = S.profile.startWeight || '';
       if (!Weekly.CONFIG.SHOW_COACH_CONTACT) d.coachContact = (S.profile && S.profile.coachContact) || ''; // hidden in testing: keep existing value
-      const errs = Profile.validate(d); if (d.waterCut && !d.waterAck) errs.waterAck = 'Tick the box to confirm you understand, or turn water-cut steps off.'; if (Object.keys(errs).length) { V._perr = errs; V._pdraft = d; show('profile'); const f = document.querySelector('.err'); if (f) f.previousElementSibling.focus(); return; }
+      const errs = Profile.validate(d, new Date(today()+'T12:00'), { allowPastFightDate: (!first && S.profile && S.profile.fightDate === d.fightDate) ? d.fightDate : null }); if (d.waterCut && !d.waterAck) errs.waterAck = 'Tick the box to confirm you understand, or turn water-cut steps off.'; if (Object.keys(errs).length) { V._perr = errs; V._pdraft = d; show('profile'); const f = document.querySelector('.err'); if (f) f.previousElementSibling.focus(); return; }
       d.schedule = JSON.parse(JSON.stringify(V._sched));
       V._perr = V._pdraft = null; S.profile = d; const wk0 = mondayOf(new Date()); S.weeks.forEach(w => { if (w.start >= wk0 || S.weeks.length === 1) Profile.applyToWeek(d.schedule, w); }); S.fighter = d.name; S.coach = d.coach; S.targetWeight = d.targetWeight;
       if (first) { if (!S.startDate) S.startDate = today();
