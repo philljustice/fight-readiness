@@ -23,3 +23,5 @@ for(const f of templates){
 }
 assert.throws(()=>restore({app:'fight-readiness',schemaVersion:999,fighter:'UNIT',entries:[]}));
 console.log('Synthetic backup acceptance passed:',JSON.stringify(results));
+
+module.exports=templates;

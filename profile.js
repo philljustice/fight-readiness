@@ -51,7 +51,11 @@
     if (!d || typeof d !== 'object' || Array.isArray(d) || !Array.isArray(d.entries) || (d.app && d.app !== 'fight-readiness')) throw new Error('This file isn\'t a FightReady backup. Pick the FightReady-backup-….json file you exported from Setup.');
     if (d.entries.some(e => !e || typeof e !== 'object' || !/^\d{4}-\d{2}-\d{2}$/.test(String(e.date || '')))) throw new Error('This backup looks damaged (a day has no valid date). Nothing was changed.');
     d = Object.assign({}, d); ['app','version','exported','push','notify'].forEach(k => delete d[k]);
-    const S = Object.assign({}, base, d); S.wellScale = d.wellScale; Sc.migrateWellScale(S);
+    // Restore replaces athlete/lifecycle data. A legacy backup's missing fields must not
+    // inherit another athlete's active bout, holds, snapshots or profile from this install.
+    // Retain existing fallback settings/week scaffolding for old-format compatibility.
+    const defaults = {weeks:base.weeks,weekIdx:base.weekIdx,reminders:base.reminders};
+    const S = Object.assign({}, defaults, d); S.wellScale = d.wellScale; Sc.migrateWellScale(S);
     S.params = Object.assign({}, Sc.DEFAULT_PARAMS, d.params);
     if (!S.profile && S.fighter) S.profile = { name: S.fighter, coach: S.coach || '', targetWeight: S.targetWeight || '', startWeight: '' };
     if (!S.profile || !String(S.profile.name || '').trim()) throw new Error('This backup has no fighter profile. Nothing was changed.');
