@@ -149,8 +149,11 @@ nav button span{white-space:nowrap;overflow:hidden;text-overflow:clip;letter-spa
 label.chk{display:flex;gap:8px;align-items:flex-start;margin:10px 0;font-weight:500}label.chk input{width:auto;margin-top:3px}
 .hyd-alert{margin:6px 0;padding:9px 11px;border-radius:10px;font-weight:600;background:#3a2a10;border:1px solid #fb8c00}.hyd-alert.stop{background:#4a1414;border-color:#e53935}.hyd-alert.ok{background:#13321b;border-color:#2e7d32}.hyd-alert.info{background:#161616;border-color:#333}
 /* Tutorial: no motion; respects reduced-motion without requiring an animation override. */
-.tour-layer{--tour-left:env(safe-area-inset-left,0px);--tour-right:env(safe-area-inset-right,0px);--tour-top:env(safe-area-inset-top,0px);--tour-bottom:env(safe-area-inset-bottom,0px);position:fixed;inset:0;z-index:10000;isolation:isolate;touch-action:none;background:rgba(0,0,0,.18)}
+.tour-layer{position:fixed;inset:0;z-index:10000;isolation:isolate;touch-action:none;background:rgba(0,0,0,.18)}
 .tour-ring{position:fixed;border:3px solid #ffc43d;border-radius:14px;box-shadow:0 0 0 9999px rgba(0,0,0,.6);pointer-events:none;box-sizing:border-box}
 .tour-panel{position:fixed;box-sizing:border-box;overflow:auto;overscroll-behavior:contain;touch-action:pan-y;background:#202020;color:#fff;border:1px solid #ffc43d;border-radius:16px;padding:18px;box-shadow:0 12px 36px #000b;font-size:16px;line-height:1.45}
 .tour-panel h2{font-size:21px;margin:6px 0 10px}.tour-panel p{margin:0 0 14px}.tour-panel .tour-count{font-size:13px;color:#ffcf63;font-weight:bold;letter-spacing:.04em}
 .tour-controls{display:flex;gap:8px;flex-wrap:wrap}.tour-controls button{min-height:44px;flex:1;padding:10px 8px;border:1px solid #777;border-radius:9px;background:#303030;color:#fff;font:inherit;cursor:pointer}.tour-controls button:last-child{background:#f2b321;color:#171717;border-color:#f2b321;font-weight:bold}.tour-controls button:disabled{opacity:.4;cursor:default}.tour-panel :focus-visible{outline:3px solid #fff;outline-offset:3px}
+
+.tour-safe-probe{position:fixed;visibility:hidden;pointer-events:none;box-sizing:content-box;width:0;height:0;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+.tour-panel{min-height:0;min-width:0;overflow-anchor:none;transition:none!important;animation:none!important}

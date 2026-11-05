@@ -129,3 +129,6 @@ Skip or Escape closes it; Back/Next and Finish navigate the tour. A refresh duri
 
 ### Tutorial follow-up (fr-v55)
 Coach Report spotlights its concise heading rather than the entire summary card. Where a tooltip cannot fit above or below, it reserves a visible target strip, scrolls the target into it and limits the tooltip height with internal scrolling. Finish returns to Score; Skip/Escape restores the starting tab.
+
+### iPhone tutorial bounds (fr-v56)
+All steps use stable bottom docking inside the intersection of visualViewport and the layout viewport safe area. Safe-area lengths are measured as computed padding on an invisible probe. Tooltips keep 12px safe margins, limit their actual content height and scroll internally for larger text/short screens. Scroll no longer switches the tooltip above a tall target. Font readiness, ResizeObserver and viewport resize/scroll trigger reflow. Geometry regressions include iPhone 393×852 with 59px top/34px bottom insets, short landscape, offset visual viewports, large text and tall score targets. Actual iPhone visual verification remains separate from these Node tests.

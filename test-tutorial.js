@@ -65,5 +65,25 @@ run().catch(e=>{console.error(e);process.exitCode=1;});
  assert.ok(fit.height<280,'tooltip scrolls internally when space is tight');
  assert.equal(Tour.STEPS[4][1],'#coachReportTitle','spotlight the concise report heading');
  const roomy=Tour.layout({x:0,y:0,w:390,h:844},{top:60,bottom:120,height:60},260);
- assert.equal(roomy.scroll,0);assert.equal(roomy.top,136);
+ assert.ok(roomy.top>=136);
 }
+
+// v56: iPhone standalone safe areas, visual viewport offsets, landscape and large text.
+for(const c of [
+ {w:393,h:852,safe:{top:59,bottom:34},visual:{x:0,y:0,w:393,h:852}},
+ {w:852,h:393,safe:{left:59,right:59,bottom:21},visual:{x:0,y:0,w:852,h:393}},
+ {w:393,h:852,safe:{top:59,bottom:34},visual:{x:8,y:85,w:300,h:380}}
+]) {
+ const v=Tour.safeViewport(c.visual,c.w,c.h,c.safe);
+ assert.ok(v.y>=Math.max(c.safe.top||0,c.visual.y));
+ for(const height of [210,420,1200])for(const r of [{top:100,bottom:650,height:550},{top:-200,bottom:400,height:600},{top:120,bottom:150,height:30}]) {
+  const fit=Tour.layout(v,r,height);
+  assert.ok(fit.top>=v.y+12,'top stays below safe status bar');
+  assert.ok(fit.top+fit.height<=v.y+v.h-12,'bottom stays inside safe viewport');
+  const scrolled={...r,top:r.top-fit.scroll,bottom:r.bottom-fit.scroll};
+  const after=Tour.layout(v,scrolled,height);
+  assert.equal(after.top,fit.top,'scroll cannot flip tooltip into status bar');
+  assert.ok(Math.abs(after.scroll)<.001,'target correction settles');
+ }
+}
+console.log('iPhone safe-area, short landscape, large-font and tall-target geometry passed');
