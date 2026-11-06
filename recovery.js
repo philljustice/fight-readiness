@@ -12,7 +12,7 @@
   for(const b of r.bouts||[])if(!dateOK(b.fightDate)||!b.id||!['scheduled','cancelled','postponed'].includes(b.status))throw new Error('Damaged bout schedule');
   for(const k of ['holds','events','camps','goals'])if(r[k]!=null&&!Array.isArray(r[k]))throw new Error('Damaged recovery '+k);
   for(const b of r.bouts||[])b.recoveryDays=clamp(+b.recoveryDays||7,3,14);
-  Object.assign(r,{bouts:r.bouts||[],holds:r.holds||[],events:r.events||[],camps:r.camps||[],reviews:r.reviews||{},goals:r.goals||[],style:r.style==='break'?'break':'gentle',adoptedDate:r.adoptedDate||today,maintenance:r.maintenance||{sessions:2,checkins:3,minRPE:null},reminders:r.reminders||{optIn:false,quietStart:'21:00',quietEnd:'08:00',snoozeUntil:'',paused:false}});
+  Object.assign(r,{bouts:r.bouts||[],holds:r.holds||[],events:r.events||[],camps:r.camps||[],reviews:r.reviews||{},goals:r.goals||[],style:['gentle','break'].includes(r.style)?r.style:null,styleChosen:r.styleChosen===true,adoptedDate:r.adoptedDate||today,maintenance:r.maintenance||{sessions:2,checkins:3,minRPE:null},reminders:r.reminders||{optIn:false,quietStart:'21:00',quietEnd:'08:00',snoozeUntil:'',paused:false}});
   delete r.previewDate; // production never trusts fixture clocks from a restored file
   S.recovery=r;S.schemaVersion=3;return S;
  }
@@ -40,7 +40,24 @@
   return phase(r,today);
  }
  function entryMode(S,date){if(restricted(S.recovery,date))return 'recovery';const e=S.entries.find(e=>e.date===date);return e?.context?.mode || (date<S.recovery.adoptedDate?'camp':phase(S.recovery,date).mode);}
- function campEntries(S,today){if(!S.recovery)return S.entries;const p=phase(S.recovery,today);const previous=(S.recovery.bouts||[]).filter(b=>b.fightDate<today&&b.status==='scheduled').sort((a,b)=>b.fightDate.localeCompare(a.fightDate))[0];return S.entries.filter(e=>(!e.context||e.context.mode==='camp')&&(!previous||e.date>previous.fightDate));}
+ function campEntries(S,today){
+  if(!S.recovery)return S.entries;
+  const p=phase(S.recovery,today),campish=e=>!e.context||e.context.mode==='camp';
+  // Active next camp: only logs after the previous bout (new camp window).
+  if(p.mode==='camp'){
+   const previous=(S.recovery.bouts||[]).filter(b=>b.fightDate<today&&b.status==='scheduled').sort((a,b)=>b.fightDate.localeCompare(a.fightDate))[0];
+   return S.entries.filter(e=>campish(e)&&(!previous||e.date>previous.fightDate));
+  }
+  // Recovery / Maintenance after a bout: keep that camp's dated logs so the genuine rolling
+  // FightReady score stays visible. Optional recovery check-ins (context.mode=recovery) are excluded
+  // and never create score/streak pressure. As those camp days age out of the score window, readiness
+  // can drop from freshness alone — not from an invented recovery penalty.
+  if(p.past){
+   const start=p.past.campStart||null;
+   return S.entries.filter(e=>campish(e)&&e.date<=p.past.fightDate&&(!start||e.date>=start));
+  }
+  return S.entries.filter(campish);
+ }
  function maintenanceReport(S,today){
   const r=S.recovery, p=phase(r,today);
   const start=p.mode==='recovery'?(p.past?addDays(p.past.fightDate,1):r.adoptedDate):p.past?addDays(p.past.fightDate,Math.max(p.past.recoveryDays||7, p.past.extendUntil?n(p.past.extendUntil)-n(p.past.fightDate):0)+1):r.adoptedDate;

@@ -18,7 +18,7 @@ a.run("show('log')");assert.ok(a.doc.querySelector('#tiles'));assert.ok(!a.doc.q
 a.run("V._sec='morning';show('log')");assert.ok(a.doc.querySelector('#f_sleep'));assert.ok(!a.doc.querySelector('#waterAff'));
 a.run("V._sec=null;show('setup')");assert.ok(a.doc.querySelector('#rcFight'));assert.ok(a.doc.querySelector('#exportBtn'),'original backup controls kept');assert.ok(!a.doc.querySelector('#c_fight'),'legacy date editor removed');
 a.run("S.recovery.bouts=[{id:'unit-bout',fightDate:Recovery.addDays(today(),-2),status:'scheduled',recoveryDays:7}];show('dash')");
-assert.ok(a.doc.body.textContent.includes('Recovery day 2'));assert.ok(!a.doc.querySelector('#heroScore'));assert.ok(a.doc.querySelector('.rc-logo-crown'));
+assert.ok(a.doc.body.textContent.includes('Post fight - day 2'));assert.ok(a.doc.querySelector('#rcCampScore'));assert.ok(a.doc.querySelector('#heroScore')||a.doc.querySelector('#rcCampScore'));assert.ok(a.doc.querySelector('.rc-logo-crown'));
 a.run("V._sec='training';show('log')");assert.ok(a.doc.querySelector('#f_xlabel'));assert.ok(!a.doc.body.textContent.includes('Rest day: training counts 100%'));
 a.run("V._sec=null;show('report')");assert.ok(a.doc.querySelector('#rcEditedSummary'));assert.ok(a.doc.querySelector('#shareBtn'));assert.ok(a.run('shareText()').includes('Recovery: no score'));
 a.run("show('profile')");assert.ok(a.doc.querySelector('#cutCard').hasAttribute('hidden'),'no cut controls outside camp');
