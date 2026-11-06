@@ -352,7 +352,7 @@ const V = {
    ${Insights.WELL.map(([k,l,lo,hi])=>`<label>${l} <span class="muted">(${lo} … ${hi})</span></label><div class="sc" data-k="${k}">${[1,2,3,4,5].map(n=>`<button class="${+e[k]===n?'on':''}" data-val="${n}">${n}</button>`).join('')}</div>`).join('')}
    ${well3Html(e)}
    </div>`,
-   nutrition: `<div class="card" id="sec_nutrition">${head('nutrition','🍽️ Nutrition')}${optional?'<p>Normal meals, no targets or tracking required. Use evening notes for anything you want to record.</p>':nutLogHtml(e)}</div>`,
+   nutrition: `<div class="card" id="sec_nutrition">${head('nutrition','🍽️ Nutrition')}${optional?optionalNutritionHtml(e):nutLogHtml(e)}</div>`,
    training: `<div class="card" id="sec_training">${head('training','🥊 Training')}${optional?optionalTrainingHtml(e):sessCard()}</div>`,
    evening: `<div class="card" id="sec_evening">${head('evening','🌙 Evening')}
    ${step('screen','Recreational screen time (hours) *',0.5)}${chips('screen',[0,1,2,3,4])}
@@ -578,14 +578,14 @@ window.addEventListener('popstate', () => { if (cur === 'log' && V._sec) leaveSe
 try { if (history.state && history.state.frSec) history.replaceState(null, ''); } catch (e) {}
 // ---- Log screen: every field autosaves silently; one Save button validates and reports what's missing ----
 const hasData = b => ['nutrition','training','family'].some(k => b[k] === true || b[k] === false) || ['sleep','screen','weight'].some(k => b[k] !== '' && b[k] != null) || Scoring.WELL_KEYS.concat(['sleepq','motivation','appetite','rhr','sleepDev']).some(k => +b[k] > 0) || b.injury === 'minor' || b.injury === 'limiting' || b.ill === true || Scoring.hydrationOK(b) || ['kcal','protein','carbs','fat'].some(k => b[k] !== '' && b[k] != null)
-  || !!(b.notes && String(b.notes).trim()) || !!b.extra || (Array.isArray(b.sessions) && b.sessions.some(x => x.done != null));
+  || !!(b.notes && String(b.notes).trim()) || !!(b.nutritionNote && String(b.nutritionNote).trim()) || !!b.extra || (Array.isArray(b.sessions) && b.sessions.some(x => x.done != null));
 // Build the day's entry from what is on screen + the taps held in V._e. Out-of-range numbers keep the last good value (and show up at Save).
 function readDraft() { const u = V._e; if (!u) return null;
   const d = u.date, b = blankOr(S.entries.find(x => x.date === d), d), has = id => !!$(id), nv = id => { const v = $(id).value; return v === '' ? '' : (isNaN(+v) ? NaN : +v); };
   const rng = (v, old, lo, hi) => v === '' ? '' : (v >= lo && v <= hi ? v : old);
   // Only one section is on screen at a time: fields that aren't on screen keep their stored value.
   if (has('#f_sleep')) b.sleep = rng(nv('#f_sleep'), b.sleep, 0, 24); if (has('#f_screen')) b.screen = rng(nv('#f_screen'), b.screen, 0, 24); if (has('#f_weight')) b.weight = rng(nv('#f_weight'), b.weight, 60, 400);
-  if (has('#f_notes')) b.notes = $('#f_notes').value; b.nutrition = u.nutrition ?? null; b.family = u.family ?? null; Scoring.WELL_KEYS.forEach(k => { b[k] = u[k] ?? ''; });
+  if (has('#f_notes')) b.notes = $('#f_notes').value; if (has('#f_nutritionNote')) b.nutritionNote = $('#f_nutritionNote').value; b.nutrition = u.nutrition ?? null; b.family = u.family ?? null; Scoring.WELL_KEYS.forEach(k => { b[k] = u[k] ?? ''; });
   ['sleepq','motivation','appetite'].forEach(k => { if (u[k] !== undefined) b[k] = u[k]; }); ['injury','ill','sleepDevice'].forEach(k => { if (u[k] !== undefined) b[k] = u[k]; });
   if (has('#f_injArea')) b.injuryArea = (b.injury === 'minor' || b.injury === 'limiting') ? $('#f_injArea').value : '';
   if (has('#f_rhr')) b.rhr = rng(nv('#f_rhr'), b.rhr ?? '', 30, 120); if (has('#f_sleepDev')) b.sleepDev = rng(nv('#f_sleepDev'), b.sleepDev ?? '', 0, 100);
@@ -602,7 +602,10 @@ function readDraft() { const u = V._e; if (!u) return null;
     if (!r && !m) return { label: x.label, done, rpe: done ? (x.rpe > 0 ? x.rpe : '') : '', mins: done ? (x.mins > 0 ? x.mins : '') : '' };
     return { label: x.label, done, rpe: done ? (+(r && r.value) > 0 ? +r.value : '') : '', mins: done ? (+(m && m.value) > 0 ? +m.value : '') : '' }; }); }
   if (has('#f_xlabel')) { const xl = $('#f_xlabel').value.trim(), xr = $('#f_xrpe').value, xm = $('#f_xmin').value;
-    if (!xl && !xr && !xm) b.extra = null; else if (+xr > 0 && +xm > 0) b.extra = { label: xl || 'Extra session', rpe:+xr, mins:+xm }; }
+    if (!xl && !xr && !xm) b.extra = null;
+    else if (+xr > 0 && +xm > 0) b.extra = { label: xl || 'Extra session', rpe:+xr, mins:+xm };
+    else if (Recovery.entryMode(S,d) !== 'camp') b.extra = { label: xl || 'Activity note', rpe: +xr > 0 ? +xr : null, mins: +xm > 0 ? +xm : null, soft: true };
+    else { /* camp: keep stored extra until RPE+mins complete; do not wipe on partial type */ } }
   if (Array.isArray(b.sessions) && !V._legacy) b.training = b.sessions.some(x => x.done == null) ? null : Scoring.trainingPct(b) === 100;
   return b; }
 function autosave() { const b = readDraft(); if (!b) return null;
@@ -634,7 +637,7 @@ function saveDay() { const b = autosave(); if (!b) return; const date = b.date;
   if (bad('#f_weight', 60, 400)) items.push({ key:'weight', label:'Weight: should be between 60 and 400 lbs' });
   if (bad('#f_sleep', 0, 24) && !items.some(x => x.key === 'sleep')) items.push({ key:'sleep', label:'Sleep: enter hours between 0 and 24' });
   if (bad('#f_screen', 0, 24) && !items.some(x => x.key === 'screen')) items.push({ key:'screen', label:'Screen time: enter hours between 0 and 24' });
-  const xlE = $('#f_xlabel'), xl = xlE ? xlE.value.trim() : '', xr = xlE ? $('#f_xrpe').value : '', xm = xlE ? $('#f_xmin').value : ''; if ((xl || xr || xm) && !(+xr > 0 && +xm > 0)) items.push({ key:'extra', label:'Extra session: add effort (RPE) and minutes, or clear it' });
+  const xlE = $('#f_xlabel'), xl = xlE ? xlE.value.trim() : '', xr = xlE ? $('#f_xrpe').value : '', xm = xlE ? $('#f_xmin').value : ''; if ((xl || xr || xm) && !(+xr > 0 && +xm > 0) && Recovery.entryMode(S,date)==='camp') items.push({ key:'extra', label:'Extra session: add effort (RPE) and minutes, or clear it' });
   sendStatusNow();
   const box = $('#saveResult'), w = $('#todayWrap'); if (w) w.innerHTML = todayCard(date === today() ? "Today's score" : 'Score for ' + date); { const ts = $('#topScore'), dd = Early.daily(b, S.params); if (ts && dd) ts.textContent = dd.score; }
   if (!items.length) box.innerHTML = `<div class="hint ok" id="saveOk">✅ <b>${date === today() ? "Today's log is complete" : 'This day is complete'} and saved.</b> Great work. Your score is below.</div>`;
@@ -717,7 +720,7 @@ document.addEventListener('click', async ev => {
     const e = blankOr(S.entries.find(x => x.date === d), d); e.cheat = true; e.cheatWeek = cheatEval().mon; upsert([e]); save(); return show('dash'); }
   if (t.dataset.sd != null) { const i = +t.dataset.sd, n = +t.dataset.n, sd = V._sched.days[i]; sd.n = n; refreshSched(); return; }
   if (t.dataset.perday) { V._sched.perDay = +t.dataset.perday; V._sched.days.forEach(d => { if (d.n) d.n = V._sched.perDay; }); refreshSched(); return; }
-  if (t.closest('.yn')) { const k = t.closest('.yn').dataset.k; V._e[k] = t.dataset.val==='1'; t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t)); autosave(); return; }
+  if (t.closest('.yn')) { const k = t.closest('.yn').dataset.k; if (t.dataset.clearNut || t.dataset.val==='') { V._e[k]=null; } else { V._e[k] = t.dataset.val==='1'; } t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t)); autosave(); return; }
   if (t.closest('.hyd')) { const n = +t.dataset.hyd; V._e.hydration = +V._e.hydration === n ? '' : n; const on = V._e.hydration !== '';
     t.parentNode.querySelectorAll('button').forEach(b => { const s = on && +b.dataset.hyd === n; b.classList.toggle('on', s); b.setAttribute('aria-pressed', s); });
     if ($('#wcheck') && $('#f_weight')) $('#wcheck').innerHTML = wcheckHtml($('#f_weight').value, V._date || today());
@@ -868,10 +871,19 @@ const tutorial = FRTutorial.create({
 window.addEventListener('load', () => tutorial.start(false), {once:true});
 
 // Recovery/Maintenance reuse the regular morning/evening controls, without camp completeness pressure.
+function optionalNutritionHtml(e){
+  const note=e.nutritionNote||'';
+  const yn=e.nutrition===true?'1':e.nutrition===false?'0':'';
+  return `<p>Optional recovery check-in only. No calories, macros, weight-cut targets or scoring.</p>
+   <p style="margin:10px 0 6px"><b>Ate normally / as planned?</b></p>
+   <div class="yn" data-k="nutrition">${[['1','Yes'],['0','No']].map(([v,l])=>`<button type="button" class="y ${yn===v?'on':''}" data-val="${v}">${l}</button>`).join('')}<button type="button" class="${yn===''?'on':''}" data-val="" data-clear-nut="1">Skip</button></div>
+   <label>Optional nutrition note</label><textarea id="f_nutritionNote" rows="3" placeholder="e.g. appetite low, ate with family, no tracking">${esc(note)}</textarea>
+   <p class="muted">Saved on this phone for the selected date. Never sent automatically.</p>`;
+}
 function optionalTrainingHtml(e) { return `<p>Optional record only. Rest is valid. No score bonus for returning early or going harder; professional restrictions always apply.</p>${(e.sessions||[]).length?'<p>Previously logged/planned sessions are preserved in this entry. Record any additional chosen activity below.</p>':''}<details open><summary>Activity or training you chose to do</summary><label>What did you do?</label><input id="f_xlabel" value="${esc(e.extra?.label||'')}" placeholder="e.g. easy technique, or leave blank for rest"><div class="row"><div><label>Effort (RPE 1–10)</label><select id="f_xrpe"><option value="">—</option>${Array.from({length:10},(_,i)=>`<option ${+e.extra?.rpe===i+1?'selected':''}>${i+1}</option>`).join('')}</select></div><div><label>Minutes</label><input id="f_xmin" type="number" min="1" max="600" value="${esc(e.extra?.mins||'')}"></div></div></details>`; }
 function optionalLogMenu(d,e,ex) {
  const meta=Insights.SECTION_META;
- const fields={morning:['sleep','hydration','energy','soreness','stress','mood','sleepq','motivation','appetite','rhr'],nutrition:[],training:['extra'],evening:['screen','family','notes']};
- const saved=k=>fields[k].some(f=>e[f]!==undefined&&e[f]!==null&&e[f]!==''&&(f!=='extra'||e.extra?.label));
+ const fields={morning:['sleep','hydration','energy','soreness','stress','mood','sleepq','motivation','appetite','rhr'],nutrition:['nutrition','nutritionNote'],training:['extra'],evening:['screen','family','notes']};
+ const saved=k=>k==='nutrition'?(e.nutrition===true||e.nutrition===false||!!(e.nutritionNote&&String(e.nutritionNote).trim())):k==='training'?!!(e.extra&&e.extra.label):fields[k].some(f=>e[f]!==undefined&&e[f]!==null&&e[f]!=='');
  return `<div class="card"><h2>${Recovery.entryMode(S,d)==='recovery'?'Recovery':'Maintenance'} · optional log</h2><p>Choose any fields you want. Nothing is missing or overdue; no score or streak penalty. Existing camp days stay in history.</p><label>Date<input id="f_date" type="date" value="${d}" max="${today()}"></label></div><div id="tiles" class="rc-check-grid" role="list">${meta.map(([k,icon,t])=>`<button class="tile rc-check-tile ${saved(k)?'done':'todo'}" data-sec="${k}" role="listitem" aria-label="${esc(t)}"><span class="ti">${icon}</span><span class="tt"><b>${esc(t.split(' ')[0])}</b></span><span class="tk">${saved(k)?'✓':'›'}</span></button>`).join('')}</div><div class="card"><button class="btn" id="saveDay">Save chosen entries</button><div id="saveResult" aria-live="polite"></div>${ex?'<button class="btn alt" id="delLog">Delete this day</button>':''}</div><div class="card"><h3>Log history</h3>${S.entries.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,21).map(x=>`<p><a href="#" data-edit="${x.date}">${esc(x.date)}</a> · ${esc(x.context?.mode||'camp history')} · ${esc(x.notes||'')}</p>`).join('')||'<p>No entries yet.</p>'}</div>`;
 }
