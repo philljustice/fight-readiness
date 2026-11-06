@@ -13,7 +13,7 @@ function app(seed){
 }
 let a=app();assert.ok(a.doc.querySelector('#saveProfile'),'new install still has signup');
 a.run(`S.profile={name:'UNIT Fighter',schedule:Profile.scheduleFromWeek(S.weeks[0])};S.fighter='UNIT Fighter';show('dash')`);
-assert.ok(a.doc.querySelector('.recoveryHero'));assert.ok(a.doc.body.textContent.includes('MAINTENANCE'));
+assert.ok(a.doc.querySelector('#rcInterimMaintPage')||a.doc.querySelector('#rcInterimMaint'));assert.ok(a.doc.querySelector('#heroScore'),'interim Maintenance reuses camp FightReady score front-centre');assert.ok(!a.doc.querySelector('.recoveryHero'),'blue Recovery hero is Recovery-only');assert.ok(a.doc.body.textContent.includes('interim')||a.doc.body.textContent.includes('Maintenance'));
 a.run("show('log')");assert.ok(a.doc.querySelector('#tiles'));assert.ok(!a.doc.querySelector('#topScore'));
 a.run("V._sec='morning';show('log')");assert.ok(a.doc.querySelector('#f_sleep'));assert.ok(!a.doc.querySelector('#waterAff'));
 a.run("V._sec=null;show('setup')");assert.ok(a.doc.querySelector('#rcFight'));assert.ok(a.doc.querySelector('#exportBtn'),'original backup controls kept');assert.ok(!a.doc.querySelector('#c_fight'),'legacy date editor removed');

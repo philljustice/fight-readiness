@@ -221,3 +221,8 @@ label.chk{display:flex;gap:8px;align-items:flex-start;margin:10px 0;font-weight:
 .rc-metric span{display:block;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:#aaa;margin-bottom:6px}
 .rc-metric b{font-size:1.15rem;color:#f0c968;font-family:'Exo2',system-ui,sans-serif;font-style:italic}
 .rc-fr-mark{display:block;width:72px;height:54px;object-fit:contain;margin:0 auto 4px}
+
+/* t210u Recovery countdown + interim Maintenance */
+.rc-countdown{margin:.35rem 0 .15rem;font-weight:800;font-size:1.35rem;letter-spacing:.02em;color:#e8f1ff}
+.rc-countdown .rc-count-num{font-size:1.75rem;margin-right:.25rem}
+.rc-interim-maint #rcInterimMaint{margin:0}

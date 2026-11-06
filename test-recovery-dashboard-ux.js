@@ -23,18 +23,17 @@ assert.ok(html.includes('Care note on file'));
 assert.ok(html.includes('Start Fight Review'));
 assert.ok(html.includes('Camp scores — for reference'));
 assert.ok(html.indexOf('rcFightReviewCard')<html.indexOf('rcCampScore'));
-assert.ok(html.includes('id="rcOptionalIdea"'));
-assert.ok(html.includes('Recovery activity')||html.includes('id="rcRecoveryActivity"'));
 assert.ok(html.includes('rc-hero-blue')||html.includes('id="rcRecoveryHero"'));
+assert.ok(html.includes('id="rcRecoveryCountdown"')||html.includes('recovery remaining'));
 assert.ok(html.includes('rcCheckGrid')||html.includes('id="rcRecoveryCheckin"'));
 assert.ok(html.includes('data-sec="morning"'));
-assert.ok(html.indexOf('rcFightReviewCard')<html.indexOf('rcOptionalIdea'));
-assert.ok(html.indexOf('rcOptionalIdea')<html.indexOf('rcRecoveryCheckin')||html.indexOf('rcOptionalIdea')<html.indexOf('Recovery check-in'));
 assert.ok(html.indexOf('rcFightReviewCard')<html.indexOf('rcRecoveryCheckin'));
 assert.ok(html.indexOf('rcRecoveryCheckin')<html.indexOf('rcCampScore'));
+assert.ok(!html.includes('id="rcOptionalIdea"')); // day1: Fight Review is main until complete/Later
 assert.ok(!html.includes('class="rc-idea"'));
 assert.ok(html.includes('rc-laurel')||html.includes('class="rc-laurel"'));
-assert.ok(html.includes('Rest or a quiet conversation')||html.includes('Rest and keep the day simple')); // hold uses care-safe copy
+assert.ok(html.includes('Talk with your coach'));
+assert.ok(html.includes('Rest or a quiet conversation')||html.includes('Rest and keep the day simple')||html.includes('Care note on file'));
 
 
 // Dedicated screen opens at top with focusable heading
@@ -69,16 +68,16 @@ x.doc.querySelector('#rcFightReviewComplete').click();
 assert.equal(x.run('cur'),'dash');
 assert.equal(x.run('S.recovery.reviews.b.status'),'complete');
 assert.equal(x.run('S.recovery.reviews.b.completedAt'),'2026-11-05');
-assert.ok(x.doc.querySelector('#rcFightReviewDone'));
-assert.ok(x.doc.body.textContent.includes('Edit Fight Review'));
+assert.ok(!x.doc.querySelector('#rcFightReviewCard'),'completed Fight Review leaves main Score');
+assert.ok(!x.doc.querySelector('#rcFightReviewDone'));
 assert.equal(x.run('S.recovery.holds.filter(h=>h.reason==="UNIT existing hold"&&!h.cleared).length'),1);
-
-// Edit completed still available; optional incomplete answers allowed
-x.doc.querySelector('#rcFightReviewCta').click();
+// Edit completed via Setup
+x.run("show('setup')");
+assert.ok(x.doc.querySelector('[data-rc="review"]'));
+x.doc.querySelector('[data-rc="review"]').click();
 assert.equal(x.run('cur'),'fightReview');
 x.doc.querySelector('#rcFightReviewBack').click();
-assert.equal(x.run('S.recovery.reviews.b.status'),'complete'); // back after complete stays complete unless we mark draft on back always
-// Actually markDraft sets draft if not complete - for complete, markDraft keeps complete. Good.
+assert.equal(x.run('S.recovery.reviews.b.status'),'complete');
 
 // Per-bout isolation
 x.run("S.recovery.reviews['other']={answers:{injury:'Yes'},status:'draft'};save()");
