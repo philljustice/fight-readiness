@@ -35,6 +35,10 @@ assert.equal(afterPace.recovery.style,'break');assert.equal(afterPace.recovery.s
 // delay hides Fight Review for this document/session; tab nav keeps it hidden; new sessionStorage clears it
 x=boot(base);x.run("show('dash')");
 assert.ok(x.doc.body.textContent.includes('Fight Review'));
+x.doc.querySelector('[data-rc="review"]').click();
+assert.ok(x.doc.querySelector('#rcFightReviewFormLead'));
+assert.ok(x.doc.body.textContent.includes('Let’s get your recovery right.'));
+assert.ok(x.doc.body.textContent.includes('A few quick post-fight questions will help tailor your recovery and flag anything that needs attention. You can skip questions or come back later.'));
 x.doc.querySelector('[data-rc="defer"]').click();
 assert.equal(x.sess.get('fr.reviewDelay.b'),'1');
 x.run("show('log');show('dash')");
