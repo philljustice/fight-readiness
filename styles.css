@@ -172,3 +172,21 @@ label.chk{display:flex;gap:8px;align-items:flex-start;margin:10px 0;font-weight:
 @keyframes rcFadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion: reduce){.rc-fade{animation:none}}
 .rc-answers .selected{outline:2px solid #E8A828}
+
+.rc-page{background:linear-gradient(180deg,#1a1408 0%,#0d0d0d 28%,#0d0d0d 100%);padding:4px 0 24px;border-radius:0 0 16px 16px}
+.rc-page .card.rc{border:1px solid #8a6a28;box-shadow:0 0 0 1px rgba(232,168,40,.08),0 10px 28px rgba(0,0,0,.35);background:linear-gradient(180deg,#18140c,#101010)}
+.rc-cta{border-color:#E8A828!important;background:linear-gradient(180deg,#2a210f,#14110a)!important}
+.rc-cta .btn:not(.alt){width:100%;margin-top:8px}
+.rc-ref{opacity:.95}
+.recoveryHero{text-align:center;padding:18px 18px 22px;border:1px solid #E8A828;background:radial-gradient(ellipse at 50% 0%,#3a2c12 0%,#16110a 42%,#0d0d0d 75%)}
+.recoveryHero .rc-logo-crown,.rc-logo-crown{width:48px;height:48px;display:block;margin:0 auto 2px}
+.rc-brand-title,.recoveryHero h1{font-family:'Exo2',system-ui,sans-serif;font-style:italic;font-weight:900;letter-spacing:.04em;text-transform:uppercase;color:#E8A828;margin:2px 0 6px;font-size:1.55rem;line-height:1.05}
+.rc-eyebrow{margin:0 0 2px;color:#f0c968;font-family:'Exo2',system-ui,sans-serif;font-style:italic;letter-spacing:.14em}
+.rc-tight{margin:4px 0}
+.rc-gold{color:#f0c968}
+.rc-done-row{align-items:center;gap:10px;margin:8px 0}
+.rc-review-screen{min-height:70vh}
+.rc-review-bar{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,#1a1408ee,#1a1408cc);padding:8px 4px;margin-bottom:8px;border-bottom:1px solid #E8A82855}
+.rc-review-actions{display:grid;gap:8px;margin-top:16px}
+.rc-idea{background:linear-gradient(180deg,#2c2414,#1a160e);border:1px solid #8a6a28}
+.rc-hold{border-left:3px solid #E8A828;background:linear-gradient(90deg,#30240f,#1a150c)}
