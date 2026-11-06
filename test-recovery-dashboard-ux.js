@@ -60,4 +60,26 @@ assert.ok(x.doc.body.textContent.includes('Open Fight Review'));
 
 // reduced-motion stylesheet present
 assert.ok(fs.readFileSync('styles.css','utf8').includes('prefers-reduced-motion'));
+
+// Pace select must not jump scroll / close form; other draft fields stay.
+x=boot(base);x.run("show('dash')");
+x.doc.querySelector('[data-rc="review"]').click();
+x.doc.querySelector('#rcReviewDays').value='12';
+x.doc.querySelector('#rcReviewHoldNote').value='UNIT draft note not saved yet';
+x.doc.querySelector('[data-rc-note="injury"]').value='UNIT area draft';
+let scrolled=false;x.c.scrollTo=function(a,b){scrolled=true;x._sy=typeof a==='object'?a.top:b;};
+x.c.scrollY=420;Object.defineProperty(x.c,'scrollY',{configurable:true,get:()=>420});
+const before=x.doc.querySelector('#rcFightReviewFormLead');
+assert.ok(before);
+x.doc.querySelector('[data-rc="gentle"]').click();
+assert.equal(x.run('S.recovery.style'),'gentle');
+assert.equal(x.run('S.recovery.styleChosen'),true);
+assert.ok(x.doc.querySelector('#rcFightReviewFormLead'),'questionnaire stayed open');
+assert.equal(x.doc.querySelector('#rcReviewDays').value,'12','recovery days draft retained');
+assert.equal(x.doc.querySelector('#rcReviewHoldNote').value,'UNIT draft note not saved yet');
+assert.equal(x.doc.querySelector('[data-rc-note="injury"]').value,'UNIT area draft');
+assert.equal(scrolled,false,'pace click must not call scrollTo/jump');
+assert.ok(x.doc.querySelector('#rcPaceFields [data-rc="gentle"].selected'));
+console.log('Pace in-place update retains draft fields without scroll jump');
+
 console.log('Unified post-fight card, in-questionnaire pace/plan, hold-safe length save, delay semantics pass');

@@ -43,7 +43,11 @@ const RC=(()=>{
  }
  function reportText(){const q=p(),m=Recovery.maintenanceReport(S,today()),v=review();return ['FightReady '+q.mode+' report · '+today(),q.hold?'Protective hold active':'No active hold recorded',q.mode==='maintenance'?'Maintenance process score: '+(m.score??'not yet available')+'/100':'Recovery: no score or missed-day penalty','Check-ins this week: '+m.checkins,'Sessions recorded: '+m.sessions,'Goals ('+(r().goalsConfirmed?'coach-agreed':'draft')+'): '+r().goals.join('; '),...m.flags,v.editedSummary||v.summary||Recovery.summary(v,discipline()),r().coachNotes?'Coach notes: '+r().coachNotes:''].filter(Boolean).join('\n');}
  function report(){const m=Recovery.maintenanceReport(S,today()),v=review();return card('Weekly Coach Report · review before sharing',`<p>${e(p().mode)} · ${p().hold?'Protective hold active':'No active hold recorded'} · No automatic sends.</p><p>${m.checkins} wellness check-ins · ${m.sessions} sessions recorded. ${p().mode==='recovery'?'No completion or intensity assessment.':'Maintenance process score: '+(m.score??'—')+' / 100'}</p><p>Goals (${r().goalsConfirmed?'coach-agreed':'draft'}): ${e(r().goals.join('; ')||'Not set')}</p>${p().mode==='maintenance'&&m.band?`<p>Hydrated weights: ${m.hydrated.map(x=>e(x.date)+': '+e(x.weight)+' lbs').join('; ')||'None this week'}. Band ${e(m.band.low)}–${e(m.band.high)} lbs, no cutting.</p>`:''}<ul>${m.flags.map(x=>`<li>${e(x)}</li>`).join('')}</ul><h3>Athlete draft · editable</h3><textarea id="rcEditedSummary" rows="9">${e(v.editedSummary||v.summary||Recovery.summary(v,discipline()))}</textarea><label>Coach notes (separate from athlete answers)<textarea id="rcCoachNotes">${e(r().coachNotes||'')}</textarea></label>${button('review','Edit athlete answers')}<pre>${e(reportText())}</pre><button class="btn" id="shareBtn">Review & share text report</button><button class="btn alt" id="printBtn">Print / save PDF</button><p class="muted">Sharing opens your device’s existing share flow. You decide whether and where to send it.</p>`)+(reviewing?questionnaire():'')+card('Past athlete drafts',Object.entries(r().reviews).filter(([k])=>k!==reviewKey()).map(([k,v])=>`<details><summary>${e(k)}</summary><pre>${e(v.editedSummary||v.summary||Recovery.summary(v,v.discipline))}</pre></details>`).join('')||'<p>No earlier reviews.</p>');}
- function persist(action){if(S.push)Push.update(S.reminders,(S.profile&&S.profile.name)||S.fighter,Recovery.pushMetadata(S,today())).catch(()=>{});if(action)r().events.push({date:today(),action});save();show(cur);}
+ function persist(action){if(S.push)Push.update(S.reminders,(S.profile&&S.profile.name)||S.fighter,Recovery.pushMetadata(S,today())).catch(()=>{});if(action)r().events.push({date:today(),action});save();
+  const keep=reviewing, y=(typeof scrollY==='number'?scrollY:0), focusId=document.activeElement&&(document.activeElement.id||null), focusRc=document.activeElement&&document.activeElement.getAttribute('data-rc');
+  show(cur);
+  if(keep){const restore=()=>{try{scrollTo(0,y);}catch(e){} const el=focusId&&document.getElementById(focusId)||(focusRc&&document.querySelector('[data-rc="'+focusRc+'"]'));el&&el.focus&&el.focus({preventScroll:true});};restore();requestAnimationFrame(restore);}
+ }
  function celebrate(b){if(document.querySelector('#fightCelebration'))return;
   const overlay=document.createElement('section');overlay.id='fightCelebration';overlay.className='fight-celebration';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label','Fight date confirmed');
   const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches,held=p().mode==='recovery';
@@ -54,7 +58,9 @@ const RC=(()=>{
   if(!reduced)celebrationTimer=setTimeout(close,held?2400:3800);
  }
  function act(a){const q=p(),v=review();try{
-  if(['gentle','break'].includes(a)){r().style=a;r().styleChosen=true;}
+  if(['gentle','break'].includes(a)){r().style=a;r().styleChosen=true;save();
+   document.querySelectorAll('#rcPaceFields [data-rc]').forEach(btn=>{const on=btn.dataset.rc===a;btn.classList.toggle('selected',on);btn.setAttribute('aria-pressed',on?'true':'false');});
+   return;}
   if(a==='pace-edit'){reviewing=true;r().styleChosen=false;r().style=null;}
   if(a==='review'){reviewing=true;v.dismissed=false;try{sessionStorage.removeItem(deferKey());}catch(e){}}
   if(a==='dismiss'){reviewing=false;v.dismissed=true;}
