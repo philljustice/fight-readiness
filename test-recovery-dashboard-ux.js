@@ -24,9 +24,16 @@ assert.ok(html.includes('Start Fight Review'));
 assert.ok(html.includes('Camp scores — for reference'));
 assert.ok(html.indexOf('rcFightReviewCard')<html.indexOf('rcCampScore'));
 assert.ok(html.includes('id="rcOptionalIdea"'));
+assert.ok(html.includes('Recovery activity')||html.includes('id="rcRecoveryActivity"'));
+assert.ok(html.includes('rc-hero-blue')||html.includes('id="rcRecoveryHero"'));
+assert.ok(html.includes('rcCheckGrid')||html.includes('id="rcRecoveryCheckin"'));
+assert.ok(html.includes('data-sec="morning"'));
 assert.ok(html.indexOf('rcFightReviewCard')<html.indexOf('rcOptionalIdea'));
-assert.ok(html.indexOf('rcOptionalIdea')<html.indexOf('Recovery check-in'));
-assert.ok(!html.includes('class="rc-idea"')); // no longer nested inside hero
+assert.ok(html.indexOf('rcOptionalIdea')<html.indexOf('rcRecoveryCheckin')||html.indexOf('rcOptionalIdea')<html.indexOf('Recovery check-in'));
+assert.ok(html.indexOf('rcFightReviewCard')<html.indexOf('rcRecoveryCheckin'));
+assert.ok(html.indexOf('rcRecoveryCheckin')<html.indexOf('rcCampScore'));
+assert.ok(!html.includes('class="rc-idea"'));
+assert.ok(html.includes('rc-laurel')||html.includes('class="rc-laurel"'));
 assert.ok(html.includes('Rest or a quiet conversation')||html.includes('Rest and keep the day simple')); // hold uses care-safe copy
 
 
@@ -88,8 +95,25 @@ console.log('Fight Review dedicated screen, draft/complete, plain restriction co
  y.doc.querySelector('[data-rc="defer"]').click();
  const h=y.doc.getElementById('view').innerHTML;
  assert.ok(!h.includes('id="rcFightReviewCard"'));
- assert.ok(h.includes('id="rcOptionalIdea"'));
- assert.ok(h.indexOf('rcOptionalIdea')<h.indexOf('Recovery check-in'));
+ assert.ok(h.includes('id="rcOptionalIdea"')||h.includes('id="rcRecoveryActivity"'));
+ assert.ok(h.includes('id="rcRecoveryCheckin"'));
+ assert.ok(h.indexOf('rcOptionalIdea')<h.indexOf('rcRecoveryCheckin')||h.indexOf('rcRecoveryActivity')<h.indexOf('rcRecoveryCheckin'));
  assert.ok(h.includes('Rest or a quiet conversation')||h.includes('Rest and keep the day simple'));
 }
-console.log('Optional idea order + defer placement pass');
+console.log('Blue recovery layout, Recovery activity order + defer placement pass');
+
+// Recovery check-in tiles open optional Log sections and persist
+{
+ const z=boot(base);z.run("show('dash')");
+ assert.ok(z.doc.querySelector('#rcCheckTile_morning'));
+ assert.ok(z.doc.querySelector('#rcCheckTile_nutrition'));
+ assert.ok(z.doc.querySelector('#rcCheckTile_training'));
+ assert.ok(z.doc.querySelector('#rcCheckTile_evening'));
+ z.doc.querySelector('#rcCheckTile_morning').click();
+ assert.equal(z.run('cur'),'log');
+ assert.equal(z.run('V._sec'),'morning');
+ z.run("V._sec=null; show('dash')");
+ assert.ok(z.doc.querySelector('.rc-hero-blue')||z.doc.querySelector('#rcRecoveryHero.rc-hero-blue')||z.doc.getElementById('rcRecoveryHero').className.includes('rc-hero-blue'));
+ assert.ok(z.doc.querySelector('.rc-laurel'));
+}
+console.log('Recovery check-in tile routes + blue hero pass');
