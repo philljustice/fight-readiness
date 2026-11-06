@@ -167,3 +167,8 @@ label.chk{display:flex;gap:8px;align-items:flex-start;margin:10px 0;font-weight:
 .rc-day1{border:1px solid #E8A828;background:linear-gradient(180deg,#1a1a1a,#111)}.rc-day1 .rc-logo-crown{width:42px;height:42px;display:block;margin:0 0 8px}.rc-day1 h1{color:#E8A828;margin:4px 0 8px}
 
 .rc-next{margin-top:10px;padding-top:8px;border-top:1px solid #333}.rc-next ul{margin:6px 0 0;padding-left:18px}.rc-pace .btn{display:inline;padding:4px 8px;font-size:12px}
+
+.rc-fade{animation:rcFadeIn .2s ease-out}
+@keyframes rcFadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){.rc-fade{animation:none}}
+.rc-answers .selected{outline:2px solid #E8A828}
