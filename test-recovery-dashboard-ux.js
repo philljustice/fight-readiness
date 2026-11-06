@@ -23,6 +23,12 @@ assert.ok(html.includes('Care note on file'));
 assert.ok(html.includes('Start Fight Review'));
 assert.ok(html.includes('Camp scores — for reference'));
 assert.ok(html.indexOf('rcFightReviewCard')<html.indexOf('rcCampScore'));
+assert.ok(html.includes('id="rcOptionalIdea"'));
+assert.ok(html.indexOf('rcFightReviewCard')<html.indexOf('rcOptionalIdea'));
+assert.ok(html.indexOf('rcOptionalIdea')<html.indexOf('Recovery check-in'));
+assert.ok(!html.includes('class="rc-idea"')); // no longer nested inside hero
+assert.ok(html.includes('Rest or a quiet conversation')||html.includes('Rest and keep the day simple')); // hold uses care-safe copy
+
 
 // Dedicated screen opens at top with focusable heading
 x.scrollCalls.length=0;
@@ -46,6 +52,7 @@ assert.equal(x.run('S.recovery.style'),'break');
 html=x.doc.getElementById('view').innerHTML;
 assert.ok(html.includes('Resume Fight Review')||html.includes('Draft saved'));
 assert.ok(!html.includes('id="rcFightReviewScreen"'));
+assert.ok(!html.includes('id="rcOptionalIdea"')); // Taking a break hides optional idea; Fight Review stay deferred-independent
 
 // Resume keeps answers; Complete returns with checkmark; holds unchanged
 x.doc.querySelector('#rcFightReviewCta').click();
@@ -74,3 +81,15 @@ assert.equal(x.run('S.recovery.reviews.other.status'),'draft');
 assert.ok(fs.readFileSync('styles.css','utf8').includes('rc-brand-title'));
 assert.ok(fs.readFileSync('styles.css','utf8').includes('prefers-reduced-motion'));
 console.log('Fight Review dedicated screen, draft/complete, plain restriction copy, brand styles pass');
+
+// Deferred Fight Review still leaves Optional idea below its normal slot (no resurrect)
+{
+ const y=boot(base);y.run("show('dash')");
+ y.doc.querySelector('[data-rc="defer"]').click();
+ const h=y.doc.getElementById('view').innerHTML;
+ assert.ok(!h.includes('id="rcFightReviewCard"'));
+ assert.ok(h.includes('id="rcOptionalIdea"'));
+ assert.ok(h.indexOf('rcOptionalIdea')<h.indexOf('Recovery check-in'));
+ assert.ok(h.includes('Rest or a quiet conversation')||h.includes('Rest and keep the day simple'));
+}
+console.log('Optional idea order + defer placement pass');

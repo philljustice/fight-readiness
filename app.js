@@ -643,8 +643,12 @@ function saveDay() { const b = autosave(); if (!b) return; const date = b.date;
 // Tell the reminder server only whether today's log is complete (plus how many items are open). Never any log data.
 let _stTimer = null, _stSent = '';
 function statusNow() { return Object.assign({ date: today() }, Insights.dayStatus(S.entries.find(e => e.date === today()))); }
-function sendStatusNow() { clearTimeout(_stTimer); if (Recovery.phase(S.recovery,today()).mode!=='camp' || !S.push) return; const st = statusNow(), key = JSON.stringify(st); if (key === _stSent) return; _stSent = key; Push.setDayStatus(st).catch(() => { _stSent = ''; }); }
-function scheduleStatus() { if (Recovery.phase(S.recovery,today()).mode!=='camp' || !S.push) return; clearTimeout(_stTimer); _stTimer = setTimeout(sendStatusNow, 3000); }
+function sendStatusNow() { clearTimeout(_stTimer); if (!S.push) return; const mode=Recovery.phase(S.recovery,today()).mode; let st;
+  if(mode==='camp') st=statusNow();
+  else if(mode==='recovery'){ const e=S.entries.find(x=>x.date===today()); const soft=!!(e&&(e.energy||e.mood||e.sleep||e.soreness||e.stress||e.notes)); st={date:today(),complete:false,missing:0,morning:!!(e&&e.sleep!=null),recoveryCheckin:soft}; }
+  else return;
+  const key=JSON.stringify(st); if(key===_stSent) return; _stSent=key; Push.setDayStatus(st).catch(()=>{_stSent='';}); }
+function scheduleStatus() { if (!S.push) return; const mode=Recovery.phase(S.recovery,today()).mode; if(mode!=='camp'&&mode!=='recovery') return; clearTimeout(_stTimer); _stTimer=setTimeout(sendStatusNow,3000); }
 function wcheckHtml(w, d = today()) { if(Recovery.entryMode(S,d)!=='camp')return ''; // uses the unsaved draft (typed weight + tapped pee colour) so the pill matches the Score page once saved
   const ents = WeightPlan.withDraft(S.entries, d, V._e && (V._date || today()) === d ? Object.assign({}, V._e, +w > 0 ? { weight: w } : {}) : (+w > 0 ? { weight: w } : null));
   const s = wpStatus(new Date(d+'T09:00'), ents), c = s && WeightPlan.dayCheck(w, s); if (!s || !(s.planToday > 0)) return '';
