@@ -51,3 +51,17 @@ Pablo alone has tested the app through a camp. No real athlete data or Diego app
 - Synthetic backup acceptance and staged server-policy smoke tests are complete; device visual/manual migration and conservative medical-copy QA are still outstanding. `releaseApproved` MUST remain false until those are recorded.
 - Tester currently remains pinned to the earlier `6cc2e301` candidate while parent visually reviews it. This local follow-up commit has NOT been copied into tester artifacts or deployed anywhere.
 - Garmin-inspired Score redesign is ideas-only and NOT in the Monday release.
+
+## Production release — 2026-11-09 ~00:08 America/Toronto (t212s735)
+
+**Authorization:** t211u (tester waived) + answered card t212s735 “Go ahead and release Recovery now.”
+
+**Frozen / deployed identities:**
+- App candidate merged: `c2c85bcf26f153733b886b444270d52f3fdb0670` (fr-v57)
+- Push worker deployed: `6fcf973d2df158369d636b7eeb40e07cfaeb82ba` (content = day1 policy from `26bd93d` + health label `recovery-v3-day1-camp-slots`)
+- Pre-release production savepoint unchanged: `b397e56295e431f81b4762f4fa085958f3790890` fr-v56; verified backup sha256 `5e66c5c7e1775830c6d3027821525df429e424f7b9ce79f7714d9210f94ee311`
+- Backup recheck at release: origin/main + live sw.js still fr-v56/b397e562 — PASS
+- App tests 31/31; worker tests 26/26 at deploy time
+- Stale earlier readiness SHAs (541199b6 / a30dee4b) superseded — do not deploy those
+
+**Scope:** Recovery + interim Maintenance landing. Full Maintenance deferred next week.
