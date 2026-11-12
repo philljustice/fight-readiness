@@ -12,7 +12,8 @@
   for(const b of r.bouts||[])if(!dateOK(b.fightDate)||!b.id||!['scheduled','cancelled','postponed'].includes(b.status))throw new Error('Damaged bout schedule');
   for(const k of ['holds','events','camps','goals'])if(r[k]!=null&&!Array.isArray(r[k]))throw new Error('Damaged recovery '+k);
   for(const b of r.bouts||[])b.recoveryDays=clamp(+b.recoveryDays||7,3,14);
-  Object.assign(r,{bouts:r.bouts||[],holds:r.holds||[],events:r.events||[],camps:r.camps||[],reviews:r.reviews||{},goals:r.goals||[],style:['gentle','break'].includes(r.style)?r.style:null,styleChosen:r.styleChosen===true,adoptedDate:r.adoptedDate||today,earlyMaintRequested:r.earlyMaintRequested===true,maintenance:r.maintenance||{sessions:2,checkins:3,minRPE:null},reminders:r.reminders||{optIn:false,quietStart:'21:00',quietEnd:'08:00',snoozeUntil:'',paused:false}});
+  Object.assign(r,{bouts:r.bouts||[],holds:r.holds||[],events:r.events||[],camps:r.camps||[],reviews:r.reviews||{},goals:r.goals||[],style:['gentle','break'].includes(r.style)?r.style:null,styleChosen:r.styleChosen===true,adoptedDate:r.adoptedDate||today,earlyMaintRequested:r.earlyMaintRequested===true,maintenance:r.maintenance||{sessions:4,checkins:3,minRPE:null,weighInsPerWeek:1},reminders:r.reminders||{optIn:false,quietStart:'21:00',quietEnd:'08:00',snoozeUntil:'',paused:false}});
+  if(r.maintenance && r.maintenance.weighInsPerWeek==null)r.maintenance.weighInsPerWeek=1;
   delete r.previewDate; // production never trusts fixture clocks from a restored file
   S.recovery=r;S.schemaVersion=3;return S;
  }
@@ -40,23 +41,32 @@
   return phase(r,today);
  }
  function entryMode(S,date){if(restricted(S.recovery,date))return 'recovery';const e=S.entries.find(e=>e.date===date);return e?.context?.mode || (date<S.recovery.adoptedDate?'camp':phase(S.recovery,date).mode);}
+ function scoredEntry(e){return !e||!e.context||e.context.mode==='camp'||e.context.mode==='maintenance';}
+ function neverInCamp(S){
+  const r=S.recovery||{};
+  if((r.bouts||[]).length||(r.camps||[]).length)return false;
+  if(S.profile&&S.profile.fightDate)return false;
+  return !(S.entries||[]).some(e=>e.context&&e.context.mode==='camp');
+ }
+ function historyLabel(S,e){
+  const m=e&&e.context&&e.context.mode;
+  if(m==='recovery')return 'Recovery';
+  if(m==='maintenance')return 'Maintenance';
+  if(m==='camp')return 'Camp';
+  return neverInCamp(S)?'Log':'Camp';
+ }
  function campEntries(S,today){
   if(!S.recovery)return S.entries;
-  const p=phase(S.recovery,today),campish=e=>!e.context||e.context.mode==='camp';
-  // Active next camp: only logs after the previous bout (new camp window).
+  const p=phase(S.recovery,today);
+  // Recovery check-ins never count. Camp and everyday Maintenance logs do.
+  // New camp after a previous bout: keep logs after that fight (includes Maintenance
+  // between camps) and do not reset startDate elsewhere. Older camp days age out of
+  // the rolling window naturally when still in Recovery or Maintenance.
   if(p.mode==='camp'){
    const previous=(S.recovery.bouts||[]).filter(b=>b.fightDate<today&&b.status==='scheduled').sort((a,b)=>b.fightDate.localeCompare(a.fightDate))[0];
-   return S.entries.filter(e=>campish(e)&&(!previous||e.date>previous.fightDate));
+   return S.entries.filter(e=>scoredEntry(e)&&(!previous||e.date>previous.fightDate));
   }
-  // Recovery / Maintenance after a bout: keep that camp's dated logs so the genuine rolling
-  // FightReady score stays visible. Optional recovery check-ins (context.mode=recovery) are excluded
-  // and never create score/streak pressure. As those camp days age out of the score window, readiness
-  // can drop from freshness alone — not from an invented recovery penalty.
-  if(p.past){
-   const start=p.past.campStart||null;
-   return S.entries.filter(e=>campish(e)&&e.date<=p.past.fightDate&&(!start||e.date>=start));
-  }
-  return S.entries.filter(campish);
+  return S.entries.filter(scoredEntry);
  }
  function maintenanceReport(S,today){
   const r=S.recovery, p=phase(r,today);
@@ -103,11 +113,25 @@
   return {mode:next?'camp':'maintenance',past,next,day:days,duration,end,hold:false,remaining:0};
  }
  function questions(discipline){return CORE.concat((BANK[discipline]||[]).map((q,i)=>['skill'+i,q]));}
+ function reviewBlocks(review,discipline){
+  const used=new Set(), blocks=[];
+  const push=(q,a,note)=>{const n=String(note||'').trim(); if(choices.includes(a)||n)blocks.push({q,a:choices.includes(a)?a:'',note:n});};
+  CARE.concat(PREFER).concat(questions(discipline)).forEach(([k,q])=>{used.add(k);push(q,(review.answers||{})[k],(review.notes||{})[k]);});
+  Object.entries(review.notes||{}).forEach(([k,v])=>{if(!used.has(k)&&String(v).trim())blocks.push({q:k,a:'',note:String(v).trim()});});
+  return blocks;
+ }
+ function reviewHtml(review,discipline){
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  return reviewBlocks(review,discipline).map(b=>'<div class="rc-qa"><p class="rc-q"><b>'+esc(b.q)+'</b></p>'+(b.a?'<p class="rc-a">'+esc(b.a)+'</p>':'')+(b.note?'<p class="rc-a">'+esc(b.note)+'</p>':'')+'</div>').join('');
+ }
+ function daysAfterFight(completedAt,fightDate){
+  if(!dateOK(completedAt)||!dateOK(fightDate))return null;
+  return Math.max(0, Math.round(n(completedAt)-n(fightDate)));
+ }
  function summary(review,discipline){
   const lines=['DRAFT — athlete answers, not a diagnosis. Review before sharing.'];
-  CARE.concat(PREFER).concat(questions(discipline)).forEach(([k,q])=>{const a=(review.answers||{})[k];if(choices.includes(a))lines.push(q+' '+a);});
-  Object.entries(review.notes||{}).forEach(([k,v])=>{if(String(v).trim())lines.push(k+': '+String(v).trim());});
-  return lines.join('\n');
+  reviewBlocks(review,discipline).forEach(b=>{lines.push(b.q); if(b.a)lines.push(b.a); if(b.note)lines.push(b.note); lines.push('');});
+  return lines.join('\n').trim();
  }
  const COMMENTS=['Take the rest. You earned it.','The people who backed you this camp would like to see you. Recovery counts too.','A big event can leave you feeling flat. Keep a little rhythm if it helps.','Do something you enjoy today that isn’t training.','Who helped you get here? Today is a good day to reach out.','One small idea for the future is enough.','Steady is fine. Look at your next chapter when you feel ready.'];
  const IDEAS=['Rest and keep the day simple.','A family meal or a catch-up with a friend, if you feel like it.','An easy walk only if pain-free and your clinician’s restrictions allow it.','A hobby, a game or some music.','A social gym visit to talk fights, not work out, only if restrictions allow. A quiet call is equally good.','An optional coach conversation, not a training deadline.','Look at a gentle Maintenance outline with your coach.'];
@@ -146,5 +170,5 @@
    intro:'The next few days are for rest and recovery. Stay connected with the people who backed you. Activity is optional and only if appropriate for how you feel and any medical restrictions. Morning and evening logs and the optional review stay available, but nothing here earns points or streaks.'
   };
  }
- const api={dateOK,addDays,migrate,sync,entryMode,campEntries,maintenanceReport,pushMetadata,reminderAllowed,isCleared,restricted,addHold,clearHolds,schedule,cancel,extend,phase,summary,questions,choices,CARE,PREFER,daily,day1Welcome,applyReviewShape,requestEarlyMaint,clearEarlyMaint};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.Recovery=api;
+ const api={dateOK,addDays,migrate,sync,entryMode,scoredEntry,neverInCamp,historyLabel,campEntries,maintenanceReport,pushMetadata,reminderAllowed,isCleared,restricted,addHold,clearHolds,schedule,cancel,extend,phase,reviewBlocks,reviewHtml,daysAfterFight,summary,questions,choices,CARE,PREFER,daily,day1Welcome,applyReviewShape,requestEarlyMaint,clearEarlyMaint};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.Recovery=api;
 })(typeof window==='undefined'?globalThis:window);

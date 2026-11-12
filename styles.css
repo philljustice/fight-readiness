@@ -226,3 +226,24 @@ label.chk{display:flex;gap:8px;align-items:flex-start;margin:10px 0;font-weight:
 .rc-countdown{margin:.35rem 0 .15rem;font-weight:800;font-size:1.35rem;letter-spacing:.02em;color:#e8f1ff}
 .rc-countdown .rc-count-num{font-size:1.75rem;margin-right:.25rem}
 .rc-interim-maint #rcInterimMaint{margin:0}
+
+/* Phase 1: white Fight Review / Recovery report print, and Q/A typography */
+.rc-q{font-weight:700;margin:12px 0 2px}.rc-q:first-child,.rc-qa:first-child .rc-q{margin-top:0}
+.rc-a{font-weight:400;margin:0 0 14px;color:#ddd}
+.rc-qa{margin:0 0 8px}
+@media print{
+  html,body{background:#fff!important;color:#000!important}
+  .rc-page,.rc-page-blue,.rc-maint-page,.rc-interim-maint,.rc-review-screen,.rc-review-body,.card.rc,.card,.rc-review-print,pre,textarea,input,select{
+    background:#fff!important;color:#000!important;box-shadow:none!important;border-color:#ccc!important;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact
+  }
+  .rc-page .card.rc,.rc-page .card.rc.recoveryHero.rc-hero-blue,.recoveryHero,.recoveryHero.rc-hero-blue{
+    background:#fff!important;color:#000!important;border:1px solid #ccc!important;box-shadow:none!important
+  }
+  .rc-brand-title,.rc-hero-blue .rc-brand-title,h1,h2,h3,.rc-q b,.rc-q{color:#000!important}
+  .rc-a,.muted{color:#222!important}
+  .rc-q{margin:14px 0 2px}
+  .rc-a{margin:0 0 16px}
+  textarea,input,select{border:1px solid #999!important}
+  .btn,.rc-later,.noprint,header,nav{display:none!important}
+}

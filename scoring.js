@@ -67,6 +67,56 @@
   function trainingPct(e) { if (!e) return 0;
     if (Array.isArray(e.sessions)) { if (!e.sessions.length) return 100; return e.sessions.filter(x => x.done === true).length / e.sessions.length * 100; }
     return e.training === true ? 100 : 0; }
+  // Maintenance qualifying session: comment of what was trained + estimated intensity. Minutes optional.
+  // Camp completed sessions count too (label from the schedule, or a comment, plus done).
+  function qualifyingSession(s) {
+    if (!s || s.done === false) return false;
+    const comment = String(s.comment || s.label || '').trim();
+    const intensity = isNum(s.rpe) && +s.rpe >= 1 && +s.rpe <= 10;
+    return !!(comment && intensity);
+  }
+  function countQualifyingSessions(entries) {
+    return (entries || []).reduce((n, e) => {
+      let c = 0;
+      if (Array.isArray(e.sessions)) c += e.sessions.filter(qualifyingSession).length;
+      else if (e.training === true) c += 1;
+      if (e.extra && qualifyingSession(Object.assign({ done:true }, e.extra))) c += 1;
+      return n + c;
+    }, 0);
+  }
+  // 4 sessions/week = 100, 3 = 90, 2 = 60, 1 = 30, 0 = 0; interpolate between.
+  function weeklyTrainingScore(sessionsPerWeek) {
+    const pts = [[0,0],[1,30],[2,60],[3,90],[4,100]];
+    if (!(sessionsPerWeek > 0)) return 0;
+    if (sessionsPerWeek >= 4) return 100;
+    for (let i = 1; i < pts.length; i++) if (sessionsPerWeek <= pts[i][0]) {
+      const [x0,y0] = pts[i-1], [x1,y1] = pts[i];
+      return y0 + (y1 - y0) * (sessionsPerWeek - x0) / (x1 - x0);
+    }
+    return 100;
+  }
+  function maintenanceTrainingScore(entries, today, params = {}) {
+    const p = Object.assign({}, DEFAULT_PARAMS, params);
+    const t = dayNum(ymd(today));
+    const windowStart = t - p.windowDays;
+    const st = p.startDate ? dayNum(p.startDate) : windowStart;
+    const from = Math.max(windowStart, st);
+    const to = p.includeToday ? t : t - 1;
+    if (to < from) return 0;
+    const inWin = (entries || []).filter(e => { const n = dayNum(e.date); return n >= from && n <= to; });
+    if (!inWin.length) return 0;
+    // Denominator starts at the first log in the window so empty weeks before the
+    // fighter began logging do not dilute a 4-session week down to a 21-day rate.
+    const from2 = Math.max(from, Math.min(...inWin.map(e => dayNum(e.date))));
+    const span = Math.max(1, to - from2 + 1);
+    const sessions = countQualifyingSessions(inWin);
+    return weeklyTrainingScore(sessions / (span / 7));
+  }
+  function weekSessionCount(entries, date) {
+    const t = dayNum(date);
+    const mon = t - ((new Date(date + 'T12:00:00Z').getUTCDay() + 6) % 7);
+    return countQualifyingSessions((entries || []).filter(e => { const n = dayNum(e.date); return n >= mon && n < mon + 7; }));
+  }
   // Completed sessions with load (scheduled + optional extra; legacy single rpe/mins)
   function sessionsDone(e) { if (!e) return [];
     const out = Array.isArray(e.sessions) ? e.sessions.filter(x => x.done === true).map(x => ({ label:x.label||'', rpe:x.rpe, mins:x.mins })) : (isNum(e.rpe) || isNum(e.mins) ? [{ label:'', rpe:e.rpe, mins:e.mins }] : []);
@@ -150,17 +200,20 @@
     const w = entries.filter(e => { const n = dayNum(e.date); return n >= t - p.windowDays && (p.includeToday ? n <= t : n < t); }); // today counts only once closed out (from tomorrow)
     const N = w.length;
     const pctY = k => N ? w.filter(e => e[k] === true).length / N * 100 : 0; // blank counts as N, like COUNTIFS/N4
+    const maint = p.trainingPlan === 'maintenance';
     const cats = {
-      nutrition: N ? avg(w.map(e => nutritionScore(e) ?? 0)) : 0, training: N ? avg(w.map(trainingPct)) : 0, family: pctY('family'),
+      nutrition: N ? avg(w.map(e => nutritionScore(e) ?? 0)) : 0,
+      training: maint ? maintenanceTrainingScore(entries, today, p) : (N ? avg(w.map(trainingPct)) : 0),
+      family: pctY('family'),
       wellness: N ? (avg(w.map(e => wellnessScore(e, rhrBaseline(entries, e.date))).filter(v => v != null)) || 0) : 0,
       sleep: N ? (avg(w.filter(e => num(e.sleep)).map(e => sleepScore(+e.sleep, p))) || 0) : 0,
       screen: N ? (avg(w.filter(e => num(e.screen)).map(e => screenScore(+e.screen, p))) || 0) : 0,
     };
     const wt = { nutrition:p.wNutrition, training:p.wTraining, sleep:p.wSleep, wellness:p.wWellness||0, screen:p.wScreen, family:p.wFamily };
     let base = 0; for (const k in cats) base += cats[k] * wt[k] / 100;
-    const consistency = N ? w.filter(e => nutritionHit(e) && trainingPct(e) === 100).length / N * 100 : 0;
+    const consistency = N ? w.filter(e => nutritionHit(e) && (maint ? weekSessionCount(entries, e.date) >= 3 : trainingPct(e) === 100)).length / N * 100 : 0;
     const bonus = bonusFor(consistency, p);
-    const mom = momentum(entries, today, p.startDate, p.fightDate);
+    const mom = p.noMomentum ? { points:0, weighted:0, streak:0, campDays:0, consistentDays:0, wPts:0, sPts:0, daysToFight:null, campLength:null } : momentum(entries, today, p.startDate, p.fightDate);
     const final = Math.min(100, base + bonus + mom.points);
     const delta = weightDelta(entries, t);
     const weighed = entries.filter(e => num(e.weight) && +e.weight > 0).sort((a,b)=>a.date<b.date?-1:1);
@@ -182,11 +235,17 @@
       if (miss) why.push(`Not logged on ${pl(miss, 'day')} (scored 0)`);
       if (cheat) why.push(`${pl(cheat, 'cheat day')} (counted as on plan)`);
       add('nutrition', 'Nutrition', why); }
-    { const why = []; let sch = 0, done = 0, legacyMiss = 0; w.forEach(e => { if (Array.isArray(e.sessions)) { sch += e.sessions.length; done += e.sessions.filter(x => x.done === true).length; } else if (e.training !== true) legacyMiss++; });
-      const daysShort = w.filter(e => trainingPct(e) < 100).length;
-      if (sch > done) why.push(`Missed ${sch - done} of ${pl(sch, 'scheduled session')}`);
-      if (legacyMiss) why.push(`Training marked No/blank on ${pl(legacyMiss, 'day')}`);
-      if (daysShort) why.push(`${pl(daysShort, 'day')} of ${N} not fully completed`);
+    { const why = [];
+      if (p.trainingPlan === 'maintenance') {
+        const sess = countQualifyingSessions(w);
+        why.push(`${sess} qualifying session${sess===1?'':'s'} in the window (comment + intensity; 4/week = 100, 3/week = 90)`);
+      } else {
+        let sch = 0, done = 0, legacyMiss = 0; w.forEach(e => { if (Array.isArray(e.sessions)) { sch += e.sessions.length; done += e.sessions.filter(x => x.done === true).length; } else if (e.training !== true) legacyMiss++; });
+        const daysShort = w.filter(e => trainingPct(e) < 100).length;
+        if (sch > done) why.push(`Missed ${sch - done} of ${pl(sch, 'scheduled session')}`);
+        if (legacyMiss) why.push(`Training marked No/blank on ${pl(legacyMiss, 'day')}`);
+        if (daysShort) why.push(`${pl(daysShort, 'day')} of ${N} not fully completed`);
+      }
       add('training', 'Training', why); }
     { const why = [], sl = w.filter(e => num(e.sleep)).map(e => +e.sleep), un = N - sl.length;
       if (sl.length) { why.push(`Average ${f1(avg(sl))}h vs ${p.idealSleep}h target`); const lo = sl.filter(h => h < p.idealSleep - 1).length, hi = sl.filter(h => h > p.idealSleep + 1).length;
@@ -216,6 +275,6 @@
       if (no) why.push(`No family/friends time on ${pl(no, 'day')} of ${N}`); if (bl) why.push(`Not logged on ${pl(bl, 'day')} (counted as No)`);
       add('family', 'Family/Friends', why); }
     return out; }
-  const api = { WELL3_FROM, DEVICES, SLEEP_SCALES, usesWatch, deviceSleepQuality, deviceBand, INJURY, INJ_AREAS, RHR, median, rhrBaseline, rhrScore, W3, wellnessParts, WELL_INV, WELL_SCALE, wellGood, migrateWellScale, PAR, belowPar, NUT_FULL, NUT_ZERO, NUT_HIT, MACRO_W, closeness, nutMode, nutritionDone, nutritionScore, nutritionHit, HYD_FROM, hydrationOK, hydrationRequired, WELL_KEYS, wellnessScore, trainingPct, sessionsDone, sessionLoad, DEFAULT_PARAMS, sleepScore, screenScore, weightDelta, trendLabel, compute, momentum, isConsistent, MOM, ymd, dayNum, verdict, dataQuality };
+  const api = { WELL3_FROM, DEVICES, SLEEP_SCALES, usesWatch, deviceSleepQuality, deviceBand, INJURY, INJ_AREAS, RHR, median, rhrBaseline, rhrScore, W3, wellnessParts, WELL_INV, WELL_SCALE, wellGood, migrateWellScale, PAR, belowPar, NUT_FULL, NUT_ZERO, NUT_HIT, MACRO_W, closeness, nutMode, nutritionDone, nutritionScore, nutritionHit, HYD_FROM, hydrationOK, hydrationRequired, WELL_KEYS, wellnessScore, trainingPct, qualifyingSession, countQualifyingSessions, weeklyTrainingScore, maintenanceTrainingScore, weekSessionCount, sessionsDone, sessionLoad, DEFAULT_PARAMS, sleepScore, screenScore, weightDelta, trendLabel, compute, momentum, isConsistent, MOM, ymd, dayNum, verdict, dataQuality };
   if (typeof module !== 'undefined') module.exports = api; else root.Scoring = api;
 })(this);
