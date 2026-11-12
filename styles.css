@@ -246,4 +246,5 @@ label.chk{display:flex;gap:8px;align-items:flex-start;margin:10px 0;font-weight:
   .rc-a{margin:0 0 16px}
   textarea,input,select{border:1px solid #999!important}
   .btn,.rc-later,.noprint,header,nav{display:none!important}
+  #rcAthleteDraft,#rcEditedSummary,label[for="rcEditedSummary"]{display:none!important}
 }

@@ -182,12 +182,92 @@ function app(seed){
   const Early = require('./early');
   const weighOnly = {date:'2026-11-08', v:2, context:{mode:'maintenance'}, weight:170, sessions:[]};
   const d = Early.daily(weighOnly, {});
-  assert.ok(d.cats.training === 0, 'weigh-in-only Maintenance day is not a 100% rest-day training score, got '+d.cats.training);
+  assert.equal(d.scorable, false, 'weigh-in-only is not a scorable day');
+  assert.equal(d.score, null, 'weigh-in-only today score is blank, not 0, got '+d.score);
+  assert.equal(d.trainingRest, true);
+  const rest = {date:'2026-11-08', v:2, context:{mode:'maintenance'}, nutrition:true, family:true, sleep:8, screen:1, energy:5, soreness:1, mood:5, stress:1, sessions:[]};
+  const rd = Early.daily(rest, {});
+  assert.equal(rd.trainingRest, true);
+  assert.equal(rd.weights.training, 0, 'rest day omits training from today\'s score');
+  assert.equal(rd.score, 100, 'Maintenance rest day is neutral, not a Training 0 penalty, got '+rd.score);
+  const mid = {date:'2026-11-08', v:2, context:{mode:'maintenance'}, nutrition:true, family:true, sleep:8, screen:1, energy:4, soreness:2, mood:4, stress:2, sessions:[]};
+  const md = Early.daily(mid, {});
+  assert.equal(md.score, 95, 'rest day renormalizes remaining categories, got '+md.score);
+  const fbRest = Early.feedback(md, mid);
+  assert.ok(fbRest.fix !== 'training', 'rest day does not treat unlogged training as the thing to fix');
   const trained = {date:'2026-11-08', v:2, context:{mode:'maintenance'}, nutrition:true, sessions:[{label:'Technique', rpe:5, done:true}]};
-  const t = Early.daily(trained, {});
-  assert.equal(Math.round(t.cats.training), 100);
-  const fb = Early.feedback(t, trained);
+  const tr = Early.daily(trained, {});
+  assert.equal(Math.round(tr.cats.training), 100);
+  const fb = Early.feedback(tr, trained);
   assert.ok(!fb.text.includes('scheduled session'));
+  // weekly FightReady training is unchanged: 4=100, 3=90 even when some days are rest
+  const days = ['2026-11-02','2026-11-03','2026-11-04','2026-11-05','2026-11-06','2026-11-07','2026-11-08'];
+  const sess = i => ({date:days[i], v:2, context:{mode:'maintenance'}, nutrition:true, sessions:[{label:'Technique', rpe:6, done:true}]});
+  const restDay = {date:'2026-11-08', v:2, context:{mode:'maintenance'}, nutrition:true, family:true, sleep:8, screen:1, energy:5, soreness:1, mood:5, stress:1, sessions:[]};
+  const week = [0,1,2].map(sess).concat([restDay]);
+  const wr = Scoring.compute(week, new Date('2026-11-08T12:00:00-05:00'), {startDate:'2026-10-01', trainingPlan:'maintenance', includeToday:true, noMomentum:true, unlockDays:7});
+  assert.equal(Math.round(wr.cats.training), 90, 'weekly training still 3/week = 90 when today is rest');
+  const onlyW = Scoring.compute([weighOnly], new Date('2026-11-08T12:00:00-05:00'), {startDate:'2026-11-08', trainingPlan:'maintenance', includeToday:true, noMomentum:true});
+  assert.equal(onlyW.scorable, false);
+  assert.equal(onlyW.daysLogged, 1);
+}
+
+// New fighter: ring and today's score show — not 0
+{
+  const a = app();
+  a.run(`S.profile={name:'UNIT New',schedule:Profile.scheduleFromWeek(S.weeks[0])};S.fighter='UNIT New';S.startDate=today();S.entries=[{date:today(),v:2,context:{mode:'maintenance'},weight:180,sessions:[]}];save();show('dash')`);
+  assert.equal(a.run('res().scorable'), false);
+  const hero = a.doc.querySelector('.hero-num');
+  assert.ok(hero, 'hero ring exists');
+  assert.equal(hero.textContent.trim(), '—', 'new fighter ring is a dash, got '+hero.textContent);
+  const todayScore = a.doc.querySelector('#todayCard b');
+  assert.ok(todayScore);
+  assert.equal(todayScore.textContent.trim(), '—', 'today score is a dash for no scorable day, got '+todayScore.textContent);
+  const cats = a.doc.querySelectorAll('#todayCard .row b');
+  assert.ok([...cats].every(b => b.textContent.trim() === '—' || b.textContent.trim() === todayScore.textContent.trim()));
+}
+
+// Maintenance rest day: today's score is not Training 0; log shows the light-work note (and not under a hold)
+{
+  const a = app();
+  a.run(`S.profile={name:'UNIT Rest',schedule:Profile.scheduleFromWeek(S.weeks[0])};S.fighter='UNIT Rest';S.startDate='2026-10-01';
+    S.entries=[
+      {date:'2026-11-02',v:2,context:{mode:'maintenance'},nutrition:true,sessions:[{label:'Technique',rpe:6,done:true}]},
+      {date:'2026-11-03',v:2,context:{mode:'maintenance'},nutrition:true,sessions:[{label:'Wrestling',rpe:6,done:true}]},
+      {date:'2026-11-04',v:2,context:{mode:'maintenance'},nutrition:true,sessions:[{label:'Strength',rpe:6,done:true}]},
+      {date:today(),v:2,context:{mode:'maintenance'},nutrition:true,family:true,sleep:8,screen:1,energy:4,soreness:2,mood:4,stress:2,sessions:[]}
+    ];save();show('dash')`);
+  const card = a.doc.querySelector('#todayCard');
+  assert.ok(card);
+  const n = +card.querySelector('h3 + b, .row b').textContent.trim();
+  const todayNum = a.run(`Early.daily(S.entries.find(e=>e.date===today()), S.params).score`);
+  assert.equal(todayNum, 95);
+  assert.ok(card.textContent.includes('Rest'), 'today card marks training as Rest, not 0/25');
+  assert.ok(!/Training[\s\S]{0,40}0\/25/.test(card.textContent.replace(/\s+/g,' ')), 'no Training 0/25 on a rest day');
+  a.run("V._sec='training';show('log')");
+  const note = a.doc.querySelector('#maintRestNote');
+  assert.ok(note, 'rest-day encouragement is on the training log');
+  assert.ok(/stretching|mobility|easy walk/i.test(note.textContent));
+  assert.ok(a.doc.querySelector('#maintSessions'), 'can still log an activity on a rest day');
+  a.run(`S.recovery.holds=[{id:'h1',date:today(),reason:'care',cleared:false,source:'unit'}];V._sec='training';show('log')`);
+  const held = a.doc.body.textContent;
+  assert.ok(!/stretching|mobility|easy walk/i.test(held), 'no physical-activity suggestion while a care hold is active');
+}
+
+// Print/PDF: athlete draft textarea and its label are hidden; Q/A list remains
+{
+  const a = app();
+  a.run(`S.profile={name:'UNIT',schedule:Profile.scheduleFromWeek(S.weeks[0])};S.fighter='UNIT';
+    S.recovery.bouts=[{id:'unit-bout',fightDate:Recovery.addDays(today(),-2),status:'scheduled',recoveryDays:7}];
+    const v=S.recovery.reviews['unit-bout']={status:'complete',completedAt:today(),answers:{injury:'No',head:'No',cardio:'Yes'},notes:{},summary:Recovery.summary({answers:{injury:'No',head:'No',cardio:'Yes'},notes:{}},'MMA')};
+    show('report')`);
+  const draft = a.doc.querySelector('#rcAthleteDraft');
+  const ta = a.doc.querySelector('#rcEditedSummary');
+  assert.ok(draft && ta, 'editable draft remains on screen');
+  assert.ok(draft.classList.contains('noprint'), 'draft wrapper is noprint so it is hidden in print/PDF');
+  const qa = a.doc.querySelector('#rcReviewQa');
+  assert.ok(qa && qa.innerHTML.includes('<b>'), 'clean Q/A list is still in the report');
+  assert.ok(!qa.contains(ta), 'textarea is not inside the printed Q/A list');
 }
 
 console.log('Maintenance r1 scoring, history, copy, report typography, startDate, and dash chrome pass');

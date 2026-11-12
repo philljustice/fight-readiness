@@ -117,6 +117,21 @@
     const mon = t - ((new Date(date + 'T12:00:00Z').getUTCDay() + 6) % 7);
     return countQualifyingSessions((entries || []).filter(e => { const n = dayNum(e.date); return n >= mon && n < mon + 7; }));
   }
+  // A day is scorable when at least one FightReady category was actually logged.
+  // A weigh-in, hydration colour, or note alone does not start the score (show — not 0).
+  function entryScorable(e) {
+    if (!e) return false;
+    if (nutritionDone(e)) return true;
+    if (num(e.sleep)) return true;
+    if (wellnessScore(e) != null) return true;
+    if (num(e.screen)) return true;
+    if (e.family === true || e.family === false) return true;
+    if (e.training === true || e.training === false) return true;
+    if (Array.isArray(e.sessions) && e.sessions.some(s => qualifyingSession(s) || s.done === true || s.done === false)) return true;
+    if (e.extra && (String(e.extra.label || e.extra.comment || '').trim() || qualifyingSession(Object.assign({ done:true }, e.extra)))) return true;
+    return false;
+  }
+  const hasScorable = entries => (entries || []).some(entryScorable);
   // Completed sessions with load (scheduled + optional extra; legacy single rpe/mins)
   function sessionsDone(e) { if (!e) return [];
     const out = Array.isArray(e.sessions) ? e.sessions.filter(x => x.done === true).map(x => ({ label:x.label||'', rpe:x.rpe, mins:x.mins })) : (isNum(e.rpe) || isNum(e.mins) ? [{ label:'', rpe:e.rpe, mins:e.mins }] : []);
@@ -219,7 +234,7 @@
     const weighed = entries.filter(e => num(e.weight) && +e.weight > 0).sort((a,b)=>a.date<b.date?-1:1);
     return { locked, unlockIn, daysSinceStart, score: Math.round(final), base, bonus, consistency, momentum: mom, cats, weights: wt, daysLogged: N, windowDays: p.windowDays,
       delta, trend: trendLabel(delta), verdict: verdict(final), dataQuality: dataQuality(N),
-      latestWeight: weighed.length ? weighed[weighed.length-1] : null, windowEntries: w, rhrBase: Object.fromEntries(w.map(e => [e.date, rhrBaseline(entries, e.date)])) };
+      latestWeight: weighed.length ? weighed[weighed.length-1] : null, windowEntries: w, scorable: hasScorable(w), rhrBase: Object.fromEntries(w.map(e => [e.date, rhrBaseline(entries, e.date)])) };
   }
 
   // Below par: for each category under PAR (75 = green "Fight Ready" tier) in the score window, list the inputs dragging it down.
@@ -275,6 +290,6 @@
       if (no) why.push(`No family/friends time on ${pl(no, 'day')} of ${N}`); if (bl) why.push(`Not logged on ${pl(bl, 'day')} (counted as No)`);
       add('family', 'Family/Friends', why); }
     return out; }
-  const api = { WELL3_FROM, DEVICES, SLEEP_SCALES, usesWatch, deviceSleepQuality, deviceBand, INJURY, INJ_AREAS, RHR, median, rhrBaseline, rhrScore, W3, wellnessParts, WELL_INV, WELL_SCALE, wellGood, migrateWellScale, PAR, belowPar, NUT_FULL, NUT_ZERO, NUT_HIT, MACRO_W, closeness, nutMode, nutritionDone, nutritionScore, nutritionHit, HYD_FROM, hydrationOK, hydrationRequired, WELL_KEYS, wellnessScore, trainingPct, qualifyingSession, countQualifyingSessions, weeklyTrainingScore, maintenanceTrainingScore, weekSessionCount, sessionsDone, sessionLoad, DEFAULT_PARAMS, sleepScore, screenScore, weightDelta, trendLabel, compute, momentum, isConsistent, MOM, ymd, dayNum, verdict, dataQuality };
+  const api = { WELL3_FROM, DEVICES, SLEEP_SCALES, usesWatch, deviceSleepQuality, deviceBand, INJURY, INJ_AREAS, RHR, median, rhrBaseline, rhrScore, W3, wellnessParts, WELL_INV, WELL_SCALE, wellGood, migrateWellScale, PAR, belowPar, NUT_FULL, NUT_ZERO, NUT_HIT, MACRO_W, closeness, nutMode, nutritionDone, nutritionScore, nutritionHit, HYD_FROM, hydrationOK, hydrationRequired, WELL_KEYS, wellnessScore, trainingPct, qualifyingSession, countQualifyingSessions, weeklyTrainingScore, maintenanceTrainingScore, weekSessionCount, entryScorable, hasScorable, sessionsDone, sessionLoad, DEFAULT_PARAMS, sleepScore, screenScore, weightDelta, trendLabel, compute, momentum, isConsistent, MOM, ymd, dayNum, verdict, dataQuality };
   if (typeof module !== 'undefined') module.exports = api; else root.Scoring = api;
 })(this);

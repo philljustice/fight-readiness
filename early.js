@@ -11,8 +11,21 @@
   function daily(e, params = {}) { if (!e) return null;
     const maint = params.trainingPlan==='maintenance' || (e.context && e.context.mode==='maintenance');
     const r = Sc.compute([e], new Date(e.date + 'T12:00'), Object.assign({}, params, { startDate:null, includeToday:true, noMomentum: !!(maint || params.noMomentum), trainingPlan: maint ? 'maintenance' : (params.trainingPlan || 'camp') }));
-    return { score: Math.round(r.base), base: r.base, cats: r.cats, weights: r.weights, trainingPlan: maint ? 'maintenance' : 'camp' }; }
-  function feedback(d, e) { if (!d) return null; const ks = Object.keys(d.cats);
+    const scorable = typeof Sc.entryScorable === 'function' ? Sc.entryScorable(e) : true;
+    const out = { score: Math.round(r.base), base: r.base, cats: Object.assign({}, r.cats), weights: Object.assign({}, r.weights), trainingPlan: maint ? 'maintenance' : 'camp', scorable, trainingRest: false };
+    if (maint && Sc.countQualifyingSessions([e]) === 0) {
+      out.trainingRest = true;
+      out.weights.training = 0;
+      const denom = Object.keys(out.weights).reduce((s,k)=>s+(+out.weights[k]||0),0);
+      if (scorable && denom > 0) {
+        let pts = 0; for (const k in out.weights) if (k !== 'training') pts += (out.cats[k]||0) * out.weights[k] / 100;
+        out.base = pts / denom * 100; out.score = Math.round(out.base);
+      } else { out.base = null; out.score = null; }
+    } else if (!scorable) { out.base = null; out.score = null; }
+    return out; }
+  function feedback(d, e) { if (!d) return null;
+    if (!d.scorable || d.score == null) return { best:null, fix:null, text:'Log what you did today to start your score.' };
+    const ks = Object.keys(d.cats).filter(k => (d.weights[k]||0) > 0);
     const tips = (d.trainingPlan==='maintenance' || (e && e.context && e.context.mode==='maintenance')) ? MAINT_TIPS : TIPS;
     const best = ks.slice().sort((a,b) => d.cats[b]*d.weights[b] - d.cats[a]*d.weights[a] || d.cats[b]-d.cats[a])[0];
     const fix = ks.slice().sort((a,b) => (100-d.cats[b])*d.weights[b] - (100-d.cats[a])*d.weights[a])[0];
