@@ -177,4 +177,18 @@ function app(seed){
   assert.ok(a.run('res().daysLogged') >= 2);
 }
 
+
+{
+  const Early = require('./early');
+  const weighOnly = {date:'2026-11-08', v:2, context:{mode:'maintenance'}, weight:170, sessions:[]};
+  const d = Early.daily(weighOnly, {});
+  assert.ok(d.cats.training === 0, 'weigh-in-only Maintenance day is not a 100% rest-day training score, got '+d.cats.training);
+  const trained = {date:'2026-11-08', v:2, context:{mode:'maintenance'}, nutrition:true, sessions:[{label:'Technique', rpe:5, done:true}]};
+  const t = Early.daily(trained, {});
+  assert.equal(Math.round(t.cats.training), 100);
+  const fb = Early.feedback(t, trained);
+  assert.ok(!fb.text.includes('scheduled session'));
+}
+
 console.log('Maintenance r1 scoring, history, copy, report typography, startDate, and dash chrome pass');
+
