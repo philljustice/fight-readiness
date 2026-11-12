@@ -133,8 +133,14 @@ Coach Report spotlights its concise heading rather than the entire summary card.
 ### iPhone tutorial bounds (fr-v56)
 All steps use stable bottom docking inside the intersection of visualViewport and the layout viewport safe area. Safe-area lengths are measured as computed padding on an invisible probe. Tooltips keep 12px safe margins, limit their actual content height and scroll internally for larger text/short screens. Scroll no longer switches the tooltip above a tall target. Font readiness, ResizeObserver and viewport resize/scroll trigger reflow. Geometry regressions include iPhone 393×852 with 59px top/34px bottom insets, short landscape, offset visual viewports, large text and tall score targets. Actual iPhone visual verification remains separate from these Node tests.
 
-## Recovery and Maintenance candidate (fr-v57, NOT released)
-The next-day lifecycle, optional ordinary log tiles, version-3 backup migration, archived camp snapshots, care-first athlete review, professional restriction records, Maintenance process score, hydrated-band discussions, in-app reminder preferences and branded fight-date confirmation are implemented on the isolated candidate branch. See RELEASE-READINESS.md for release gates. Production is frozen at fr-v56 until the authorized Monday release and all blockers are cleared.
+## Recovery (fr-v57)
+
+The next-day lifecycle, optional ordinary log tiles, version-3 backup migration, archived camp snapshots, care-first athlete review, professional restriction records, hydrated-band discussions, in-app reminder preferences and branded fight-date confirmation shipped in fr-v57.
+
+## Maintenance round 1 (fr-v58)
+
+A fighter can start in Maintenance with no fight date. Everyday Maintenance logs count toward the FightReady score (7-day unlock, same as camp; 4 sessions a week = 100, 3 = 90). A rest day is neutral on Today's score. The training category is a rolling weekly rate, shown separately from this week's session count. Fight Review stays in Recovery. Service worker cache is `fr-v58`.
+
 
 Install dev-only test tooling with `npm ci`; `npm test` runs all `node test-*.js` files. Linkedom is a DOM-unit test dependency only, not a runtime dependency. No browser automation is part of this test suite. No sample scenario routes or preview clock are loaded by the production index.
 
