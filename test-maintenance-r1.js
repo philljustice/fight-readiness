@@ -244,12 +244,28 @@ function app(seed){
   assert.equal(todayNum, 95);
   assert.ok(card.textContent.includes('Rest'), 'today card marks training as Rest, not 0/25');
   assert.ok(!/Training[\s\S]{0,40}0\/25/.test(card.textContent.replace(/\s+/g,' ')), 'no Training 0/25 on a rest day');
+  const dash = a.doc.body.textContent;
+  assert.ok(dash.includes('This week: 3 of 4 sessions'), 'weekly line is labelled as this week\'s session count');
+  assert.ok(!/\b3\/4 this week\b/.test(dash), 'old compact 3/4 this week label is gone');
+  assert.ok(/Training, rolling/.test(dash), 'FightReady training category is labelled as rolling');
+  const catVals = [...a.doc.querySelectorAll('.cat-table .cat-val')];
+  assert.ok(catVals.length >= 6, 'category value cells use .cat-val');
+  assert.ok(catVals.some(el => /→/.test(el.textContent)), 'rolling figures still use the 100 → 25.0 form');
+  const css = fs.readFileSync('styles.css','utf8');
+  assert.ok(/\.cat-val[^}]*white-space:\s*nowrap/.test(css) && /\.cat-val[^}]*tabular-nums/.test(css), 'category values are nowrap + tabular nums');
+  assert.ok(!/cat-val[^>]*width:70px/.test(a.doc.querySelector('.cat-table').innerHTML), 'no fixed 70px value width that wraps the figures');
   a.run("V._sec='training';show('log')");
   const note = a.doc.querySelector('#maintRestNote');
   assert.ok(note, 'rest-day encouragement is on the training log');
   assert.ok(/stretching|mobility|easy walk/i.test(note.textContent));
   assert.ok(a.doc.querySelector('#maintSessions'), 'can still log an activity on a rest day');
-  a.run(`S.recovery.holds=[{id:'h1',date:today(),reason:'care',cleared:false,source:'unit'}];V._sec='training';show('log')`);
+  const okTrain = a.doc.querySelector('#ok_training');
+  assert.ok(okTrain, 'training section header is present');
+  assert.ok(!/Saved|✓ Done/.test(okTrain.textContent), 'empty training form does not show Saved, got '+okTrain.textContent);
+  a.run(`S.entries.find(e=>e.date===today()).sessions=[{label:'Easy walk',rpe:3,done:true}];V._sec='training';show('log')`);
+  const okSaved = a.doc.querySelector('#ok_training');
+  assert.ok(okSaved && /Saved/.test(okSaved.textContent), 'Saved appears after a real session is logged, got '+(okSaved&&okSaved.textContent));
+  a.run(`S.entries.find(e=>e.date===today()).sessions=[];S.recovery.holds=[{id:'h1',date:today(),reason:'care',cleared:false,source:'unit'}];V._sec='training';show('log')`);
   const held = a.doc.body.textContent;
   assert.ok(!/stretching|mobility|easy walk/i.test(held), 'no physical-activity suggestion while a care hold is active');
 }
@@ -268,6 +284,9 @@ function app(seed){
   const qa = a.doc.querySelector('#rcReviewQa');
   assert.ok(qa && qa.innerHTML.includes('<b>'), 'clean Q/A list is still in the report');
   assert.ok(!qa.contains(ta), 'textarea is not inside the printed Q/A list');
+  assert.ok(!a.doc.body.textContent.includes('Past athlete drafts'), 'empty past-drafts section is hidden on screen and in print');
+  a.run(`S.recovery.reviews['older']={status:'complete',completedAt:Recovery.addDays(today(),-1),answers:{injury:'No'},notes:{},discipline:'MMA'};show('report')`);
+  assert.ok(a.doc.body.textContent.includes('Past athlete drafts'), 'past-drafts heading appears when an earlier review exists');
 }
 
 console.log('Maintenance r1 scoring, history, copy, report typography, startDate, and dash chrome pass');

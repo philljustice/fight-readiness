@@ -1,4 +1,4 @@
-const APP_VERSION='fr-v57-maint-r1b';
+const APP_VERSION='fr-v58';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -243,9 +243,13 @@ function weightChart() {
    <path d="${line}" fill="none" stroke="#ff5252" stroke-width="2.5"/>${pts.map((p,i)=>`<circle cx="${X(xs[i])}" cy="${Y(ys[i])}" r="3" fill="#ff5252"/>`).join('')}
    <text x="${P}" y="${H-4}" fill="#999" font-size="10">${pts[0].date}</text><text x="${W-70}" y="${H-4}" fill="#999" font-size="10">${pts[pts.length-1].date}</text></svg>`;
 }
+function catLabel(k,l,w) { return (!inCamp() && k==='training') ? l+', rolling ('+S.params[w]+'%)' : l+' ('+S.params[w]+'%)'; }
+function catRow(k,l,w,barPct,val) {
+  return `<div class="row cat-row"><span class="cat-lab">${catLabel(k,l,w)}</span><div class="bar"><i style="width:${barPct}%"></i></div><b class="cat-val">${val}</b></div>`;
+}
 function catTable(r) {
-  if (!r.scorable) return CATS.map(([k,l,w]) => `<div class="row"><span style="width:110px">${l} (${S.params[w]}%)</span><div class="bar"><i style="width:0%"></i></div><b style="width:70px;text-align:right">—</b></div>`).join('');
-  return CATS.map(([k,l,w]) => `<div class="row"><span style="width:110px">${l} (${S.params[w]}%)</span><div class="bar"><i style="width:${r.cats[k]}%"></i></div><b style="width:70px;text-align:right">${r.cats[k].toFixed(0)} → ${(r.cats[k]*S.params[w]/100).toFixed(1)}</b></div>`).join('');
+  if (!r.scorable) return `<div class="cat-table">${CATS.map(([k,l,w]) => catRow(k,l,w,0,'—')).join('')}</div>`;
+  return `<div class="cat-table">${CATS.map(([k,l,w]) => catRow(k,l,w,r.cats[k], `${r.cats[k].toFixed(0)} → ${(r.cats[k]*S.params[w]/100).toFixed(1)}`)).join('')}</div>`;
 }
 
 function todayCard(title) { const e = S.entries.find(x=>x.date===(V._date||today())), d = Early.daily(e, S.params); if (!d) return '';
@@ -296,7 +300,7 @@ function todayTrainCard() {
     const rows = sess.length
       ? sess.map(x => `<div class="tt-row done"><span>${esc(x.comment||x.label||'Session')}${+x.rpe>0?' <span class="muted">• RPE '+esc(x.rpe)+'</span>':''}${+x.mins>0?' <span class="muted">• '+esc(x.mins)+' min</span>':''}</span><span class="tt-st ok">✓ Logged</span></div>`).join('')
       : `<div class="tt-row"><span>No session logged yet. Rest is fine — there is no required schedule.</span></div>`;
-    return `<div class="card tt" id="todayTrain"><div class="tt-head"><span>🥊 TODAY'S TRAINING</span><span class="muted">${weekN}/4 this week</span></div>${rows}<p class="muted" style="margin:8px 0 0">Target 4 sessions a week (3 can still be Fight Ready). Each session needs what you trained and an estimated intensity. Minutes are optional.</p></div>`;
+    return `<div class="card tt" id="todayTrain"><div class="tt-head"><span>🥊 TODAY'S TRAINING</span><span class="muted">This week: ${weekN} of 4 sessions</span></div>${rows}<p class="muted" style="margin:8px 0 0">Target 4 sessions a week (3 can still be Fight Ready). The FightReady training category is a rolling weekly rate, not today's rest.</p></div>`;
   }
   const t = todayTraining(), st = x => x.done === true ? '<span class="tt-st ok">✓ Done</span>' : x.done === false ? '<span class="tt-st no">✗ Missed</span>' : '<span class="tt-st">To do</span>';
   const nd = t.sessions.filter(x => x.done === true).length;
@@ -361,7 +365,11 @@ const V = {
   const step = (k,l,st) => `<label>${l}</label><div class="step"><button data-step="${k}" data-d="-${st}">−</button><input id="f_${k}" type="number" inputmode="decimal" step="${st}" min="0" max="24" value="${esc(e[k])}"><button data-step="${k}" data-d="${st}">+</button></div>`;
   const chips = (k, vals) => `<div class="chips">${vals.map(v=>`<button data-chip="${k}" data-val="${v}" class="${+e[k]===v&&e[k]!==''?'on':''}">${v}h</button>`).join('')}</div>`;
   const wd = !optional && [1,4].includes(new Date(d+'T12:00').getDay()), st = Insights.sections(e), nDone = Object.values(st).filter(Boolean).length, left = missingToday(e);
-  const head = (key, title) => `<div class="row" style="margin:0 0 4px"><h3 style="margin:0">${title}</h3><span class="secok ${st[key]?'on':''}" id="ok_${key}">${st[key]?'✓ Done':'…'}</span></div>`;
+  const trainingLogged = Recovery.entryMode(S,d)==='recovery'
+    ? !!(e.extra && String(e.extra.label||e.extra.comment||'').trim())
+    : (Array.isArray(e.sessions)&&e.sessions.some(Scoring.qualifyingSession)) || !!(e.extra&&Scoring.qualifyingSession(Object.assign({done:true},e.extra)));
+  const sectionDone = key => (optional && key==='training') ? trainingLogged : !!st[key];
+  const head = (key, title) => `<div class="row" style="margin:0 0 4px"><h3 style="margin:0">${title}</h3><span class="secok ${sectionDone(key)?'on':''}" id="ok_${key}">${sectionDone(key)?'✓ Done':'…'}</span></div>`;
   const sessCard = () => legacy ? `${yn('training','Training session completed?')}` :
     (e.sessions.length ? e.sessions.map((x,i)=>{ const ok = ex && ex.sessions && ex.sessions[i] && ex.sessions[i].done != null && (ex.sessions[i].done === false || (ex.sessions[i].rpe > 0 && ex.sessions[i].mins > 0));
       return `<div class="sess"><p style="margin:8px 0 6px" id="sessq_${i}"><b>Did you complete session ${i+1}${x.label?' ('+esc(x.label)+')':''}?</b> ${ok?'<span class="secok on">✓</span>':''}</p>
