@@ -12,8 +12,13 @@
   for(const b of r.bouts||[])if(!dateOK(b.fightDate)||!b.id||!['scheduled','cancelled','postponed'].includes(b.status))throw new Error('Damaged bout schedule');
   for(const k of ['holds','events','camps','goals'])if(r[k]!=null&&!Array.isArray(r[k]))throw new Error('Damaged recovery '+k);
   for(const b of r.bouts||[])b.recoveryDays=clamp(+b.recoveryDays||7,3,14);
-  Object.assign(r,{bouts:r.bouts||[],holds:r.holds||[],events:r.events||[],camps:r.camps||[],reviews:r.reviews||{},goals:r.goals||[],style:['gentle','break'].includes(r.style)?r.style:null,styleChosen:r.styleChosen===true,adoptedDate:r.adoptedDate||today,earlyMaintRequested:r.earlyMaintRequested===true,maintenance:r.maintenance||{sessions:4,checkins:3,minRPE:null,weighInsPerWeek:1},reminders:r.reminders||{optIn:false,quietStart:'21:00',quietEnd:'08:00',snoozeUntil:'',paused:false}});
+  Object.assign(r,{bouts:r.bouts||[],holds:r.holds||[],events:r.events||[],camps:r.camps||[],reviews:r.reviews||{},goals:r.goals||[],style:['gentle','break'].includes(r.style)?r.style:null,styleChosen:r.styleChosen===true,adoptedDate:r.adoptedDate||today,earlyMaintRequested:r.earlyMaintRequested===true,maintenance:r.maintenance||{sessions:4,checkins:3,minRPE:null,weighInsPerWeek:1},reminders:r.reminders||{optIn:false,quietStart:'21:00',quietEnd:'08:00',snoozeUntil:'',paused:false},goalRatings:r.goalRatings||{}});
   if(r.maintenance && r.maintenance.weighInsPerWeek==null)r.maintenance.weighInsPerWeek=1;
+  if(r.maintenance && r.maintenance.sessions==null)r.maintenance.sessions=4;
+  if(r.maintenance && r.maintenance.checkins==null)r.maintenance.checkins=3;
+  if(!r.goalRatings||typeof r.goalRatings!=='object'||Array.isArray(r.goalRatings))r.goalRatings={};
+  for(const v of Object.values(r.reviews||{})){ if(v && v.goals==null)v.goals=[]; if(v && !Array.isArray(v.goals))v.goals=[]; }
+  if(!Array.isArray(r.goals))r.goals=[];
   delete r.previewDate; // production never trusts fixture clocks from a restored file
   S.recovery=r;S.schemaVersion=3;return S;
  }
@@ -38,6 +43,7 @@
  function extend(r,today,id,until){const b=r.bouts.find(x=>x.id===id);if(!b||!dateOK(until)||until<today||until<addDays(b.fightDate,b.recoveryDays||7)||b.extendUntil&&until<b.extendUntil)throw new Error('An extension must keep or lengthen the current recovery window.');b.extendUntil=until;}
  function sync(S,today){const r=S.recovery;
   for(const b of r.bouts.filter(b=>b.fightDate<today))if(!r.camps.some(c=>c.boutId===b.id))r.camps.push({boutId:b.id,fightDate:b.fightDate,status:b.status,captured:today,params:JSON.parse(JSON.stringify(S.params||{})),profile:JSON.parse(JSON.stringify(S.profile||{})),entries:JSON.parse(JSON.stringify(S.entries.filter(e=>e.date<=b.fightDate && (!b.campStart||e.date>=b.campStart))))});
+  maybeCopyReviewGoals(S,today);
   return phase(r,today);
  }
  function entryMode(S,date){if(restricted(S.recovery,date))return 'recovery';const e=S.entries.find(e=>e.date===date);return e?.context?.mode || (date<S.recovery.adoptedDate?'camp':phase(S.recovery,date).mode);}
@@ -118,6 +124,8 @@
   const push=(q,a,note)=>{const n=String(note||'').trim(); if(choices.includes(a)||n)blocks.push({q,a:choices.includes(a)?a:'',note:n});};
   CARE.concat(PREFER).concat(questions(discipline)).forEach(([k,q])=>{used.add(k);push(q,(review.answers||{})[k],(review.notes||{})[k]);});
   Object.entries(review.notes||{}).forEach(([k,v])=>{if(!used.has(k)&&String(v).trim())blocks.push({q:k,a:'',note:String(v).trim()});});
+  const reviewGoals=(review.goals||[]).map(x=>String(x||'').trim()).filter(Boolean);
+  reviewGoals.forEach((g,i)=>blocks.push({q:reviewGoals.length===1?'Goal':'Goal '+(i+1),a:'',note:g,kind:'goal'}));
   return blocks;
  }
  function reviewHtml(review,discipline){
@@ -170,5 +178,63 @@
    intro:'The next few days are for rest and recovery. Stay connected with the people who backed you. Activity is optional and only if appropriate for how you feel and any medical restrictions. Morning and evening logs and the optional review stay available, but nothing here earns points or streaks.'
   };
  }
- const api={dateOK,addDays,migrate,sync,entryMode,scoredEntry,neverInCamp,historyLabel,campEntries,maintenanceReport,pushMetadata,reminderAllowed,isCleared,restricted,addHold,clearHolds,schedule,cancel,extend,phase,reviewBlocks,reviewHtml,daysAfterFight,summary,questions,choices,CARE,PREFER,daily,day1Welcome,applyReviewShape,requestEarlyMaint,clearEarlyMaint};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.Recovery=api;
+ function weekMonday(date){
+  if(!dateOK(date))return null;
+  const dow=new Date(date+'T12:00:00Z').getUTCDay();
+  return addDays(date,-((dow+6)%7));
+ }
+ function outlineSaved(r){return !!(r&&r.maintenance&&r.maintenance.outlineSaved);}
+ function latestReviewGoals(r){
+  let best=null;
+  for(const v of Object.values((r&&r.reviews)||{})){
+    const goals=(v&&v.goals||[]).map(x=>String(x||'').trim()).filter(Boolean);
+    if(!goals.length)continue;
+    const stamp=v.completedAt||v.updatedAt||'';
+    if(!best||stamp>best.stamp)best={goals,stamp};
+  }
+  return best?best.goals:[];
+ }
+ // One-time copy of Fight Review goals into an empty Maintenance outline when first in Maintenance.
+ // Never overwrites goals already on the outline, and never copies again after a saved empty outline.
+ function maybeCopyReviewGoals(S,today){
+  const r=S&&S.recovery; if(!r)return {copied:false};
+  r.maintenance=r.maintenance||{sessions:4,checkins:3,weighInsPerWeek:1};
+  if(phase(r,today).mode!=='maintenance')return {copied:false};
+  if(r.maintenance.goalsCopiedFromReview)return {copied:false,already:true};
+  const existing=(r.goals||[]).map(x=>String(x||'').trim()).filter(Boolean);
+  if(existing.length){r.maintenance.goalsCopiedFromReview=true;return {copied:false,skipped:'outline-has-goals'};}
+  if(r.maintenance.outlineSaved){r.maintenance.goalsCopiedFromReview=true;return {copied:false,skipped:'outline-saved-empty'};}
+  const src=latestReviewGoals(r);
+  if(!src.length)return {copied:false};
+  r.goals=src.slice();
+  r.maintenance.goalsCopiedFromReview=true;
+  r.events=r.events||[];
+  r.events.push({date:today,action:'Copied Fight Review goals into Maintenance outline'});
+  return {copied:true,goals:r.goals.slice()};
+ }
+ function goalRatingsFor(r,week){const all=(r&&r.goalRatings)||{};return all[week]||{};}
+ function goalRatingsReady(r,today){
+  const goals=((r&&r.goals)||[]).map(x=>String(x||'').trim()).filter(Boolean);
+  if(!goals.length)return true;
+  const week=weekMonday(today), ratings=goalRatingsFor(r,week);
+  return goals.every((g,i)=>{const x=ratings[i]||ratings[String(i)];return x&&+x.value>=1&&+x.value<=5&&String(x.comment||'').trim();});
+ }
+ function weeklyTrainingLog(S,today){
+  const week=weekMonday(today);
+  const Sc=(typeof Scoring!=='undefined'?Scoring:(typeof require==='function'?require('./scoring.js'):null));
+  const isQual=s=>Sc&&Sc.qualifyingSession?Sc.qualifyingSession(s):!!(s&&(s.comment||s.label)&&+s.rpe>=1);
+  const rows=[];
+  (S.entries||[]).filter(e=>e.date>=week&&e.date<=today).sort((a,b)=>a.date.localeCompare(b.date)).forEach(e=>{
+    const list=(Array.isArray(e.sessions)?e.sessions:[]).slice();
+    if(e.extra)list.push(Object.assign({done:true},e.extra));
+    list.filter(isQual).forEach(s=>rows.push({date:e.date,comment:String(s.comment||s.label||'').trim(),rpe:+s.rpe||null,mins:+s.mins||null}));
+  });
+  return {week,sessions:rows,count:rows.length};
+ }
+ function weighInsThisWeek(S,today){
+  const week=weekMonday(today);
+  return (S.entries||[]).filter(e=>e.date>=week&&e.date<=today&&+e.weight>0).length;
+ }
+
+ const api={dateOK,addDays,migrate,sync,entryMode,scoredEntry,neverInCamp,historyLabel,campEntries,maintenanceReport,pushMetadata,reminderAllowed,isCleared,restricted,addHold,clearHolds,schedule,cancel,extend,phase,reviewBlocks,reviewHtml,daysAfterFight,summary,questions,choices,CARE,PREFER,daily,day1Welcome,applyReviewShape,requestEarlyMaint,clearEarlyMaint,weekMonday,outlineSaved,latestReviewGoals,maybeCopyReviewGoals,goalRatingsFor,goalRatingsReady,weeklyTrainingLog,weighInsThisWeek};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.Recovery=api;
 })(typeof window==='undefined'?globalThis:window);

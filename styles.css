@@ -254,3 +254,16 @@ label.chk{display:flex;gap:8px;align-items:flex-start;margin:10px 0;font-weight:
   .btn,.rc-later,.noprint,header,nav{display:none!important}
   #rcAthleteDraft,#rcEditedSummary,label[for="rcEditedSummary"]{display:none!important}
 }
+
+/* Maintenance outline & weekly goal ratings (r2) */
+.rc-goal-row{margin:0 0 10px}
+.rc-goal-row .row{gap:8px;align-items:flex-end}
+.rc-goal-row input{flex:1}
+.rc-goal-row .btn{flex:none;width:auto;padding:8px 12px}
+.rc-rate{margin:0 0 16px;padding-bottom:12px;border-bottom:1px solid var(--line,#333)}
+.rc-rate:last-child{border-bottom:0}
+#rcMaintScoreBlock .row{justify-content:space-between;gap:12px}
+#rcWeekSessions{margin:0;padding-left:1.1em}
+@media print{
+  #rcOutlinePrompt,#rcOpenOutline,#rcRatingsPending,#rcReportNotReady{display:none!important}
+}
