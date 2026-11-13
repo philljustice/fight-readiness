@@ -1,4 +1,4 @@
-const APP_VERSION='fr-v58';
+const APP_VERSION='fr-v59';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -342,14 +342,17 @@ const V = {
  dash() {
   const r = res(), lw = r.latestWeight, camp = inCamp();
   const isWeighDay = camp && [1,4].includes(new Date().getDay()) && !S.entries.some(e=>e.date===today() && +e.weight>0);
-  const weighInsPerWeek = (S.recovery&&S.recovery.maintenance&&S.recovery.maintenance.weighInsPerWeek)||1;
-  const weekWeighs = S.entries.filter(e=>+e.weight>0 && Scoring.dayNum(today())-Scoring.dayNum(e.date)<7).length;
-  const maintWeighNag = !camp && weighInsPerWeek>0 && weekWeighs < weighInsPerWeek;
+  const weighInsPerWeek = (S.recovery&&S.recovery.maintenance&&S.recovery.maintenance.weighInsPerWeek);
+  const weighTarget = weighInsPerWeek==null?1:+weighInsPerWeek;
+  const weekStart = mondayOf(new Date(today()+'T12:00'));
+  const weekWeighs = S.entries.filter(e=>+e.weight>0 && e.date>=weekStart && e.date<=today()).length;
+  const inMaint = !camp && typeof Recovery!=='undefined' && Recovery.phase(S.recovery,today()).mode==='maintenance';
+  const maintWeighNag = inMaint && weighTarget>0 && weekWeighs < weighTarget;
   const dueNow = camp ? Reminders.due(S.entries.find(e=>e.date===today()), new Date(), S.reminders.morning, S.reminders.evening) : [];
   const top = scoreHero(r) + todayTrainCard() + (camp?fwTodayCard():'') + minorHydCard();
   const rs = V._restored; V._restored = null;
   return `${rs?`<div class="card hint" id="restoredNote">✅ Restored <b>${esc(rs.name)}</b> with ${rs.days} logged day${rs.days===1?'':'s'}. 🔔 Notifications aren't restored: turn them on again in <a href="#" data-goto="setup">Setup</a>.</div>`:''}${top}${camp?otCard():''}${camp?day1Banner(false):''}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning check-in not done: '+esc(Insights.morningMissing(S.entries.find(e=>e.date===today())).map(x=>x.replace(/^[^:]*: /,'')).join('; ')||'sleep, hydration, how you feel')+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: nutrition, each training session (effort + minutes), screen hours, family/friends'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${camp?weeklyCard():''}${camp?fightCard():''}${camp?cheatCard():''}${camp?streakCard():''}${nutCard()}
-  ${isWeighDay?'<div class="card hint">⚖️ It\'s a weigh-in day (Mon/Thu). Weigh in this morning, fasted, and log it.</div>':''}${maintWeighNag?'<div class="card hint" id="maintWeighNag">⚖️ Optional weekly weigh-in. Default is once a week — log it when you can. It does not change your score.</div>':''}
+  ${isWeighDay?'<div class="card hint">⚖️ It\'s a weigh-in day (Mon/Thu). Weigh in this morning, fasted, and log it.</div>':''}${maintWeighNag?'<div class="card hint" id="maintWeighNag">⚖️ Weigh-in reminder: your outline asks for '+weighTarget+' weigh-in'+(weighTarget===1?'':'s')+' this week ('+weekWeighs+' logged so far). Reminder only — it does not change your score.</div>':''}
   ${r.locked?`${todayCard()}<div class="card"><h3>Categories so far (${r.daysLogged} day${r.daysLogged==1?'':'s'})</h3>${catTable(r)}<p class="muted">Consistency bonus: 🔒 unlocks in ${r.unlockIn} day${r.unlockIn==1?'':'s'}.</p></div>`:`${todayCard()}
   <div class="card"><h3>Categories (last 3 weeks)</h3>${catTable(r)}
   <p>Core consistency (Nutrition hit + all Training done${(S.params.nutMode||'yn')==='yn'?'':'; goal days count at 80+'}): <b>${r.consistency.toFixed(0)}%</b> → ${r.bonus?'+'+r.bonus+' pts for daily discipline!':'Build streaks on both key plans'}</p>
@@ -780,7 +783,7 @@ document.addEventListener('click', async ev => {
     if ($('#wcheck') && $('#f_weight')) $('#wcheck').innerHTML = wcheckHtml($('#f_weight').value, V._date || today());
     const st = $('#hydStatus'); if (st) { const s = Insights.hydrationStatus(V._e.hydration); st.className = 'hydst ' + hydLevelCls(s); st.innerHTML = hydStatusHtml(V._e.hydration); } autosave(); return; }
   if (t.closest('.opt') && t.dataset.val) { const k = t.closest('.opt').dataset.k; V._e[k] = t.dataset.val; t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t)); const ab = $('#injAreaBox'); if (ab) ab.style.display = V._e[k]==='none' ? 'none' : ''; autosave(); return; }
-  if (t.closest('.sc')) { const k = t.closest('.sc').dataset.k, n = +t.dataset.val; V._e[k] = V._e[k]===n ? '' : n; t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t && V._e[k]!=='')); autosave(); return; }
+  if (t.closest('.sc')) { if (t.closest('[data-goal-rate]') || !V._e || t.closest('.sc').dataset.k == null) return; const k = t.closest('.sc').dataset.k, n = +t.dataset.val; V._e[k] = V._e[k]===n ? '' : n; t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t && V._e[k]!=='')); autosave(); return; }
   if (t.dataset.chip) { $('#f_'+t.dataset.chip).value = t.dataset.val; t.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===t)); autosave(); return; }
   if (t.dataset.step) { const i = $('#f_'+t.dataset.step); i.value = Math.max(0, Math.min(24, (+i.value||0) + +t.dataset.d)); autosave(); return; }
   if (t.dataset.jump) { ev.preventDefault(); const k = t.dataset.jump; if (!fieldFor(k)) { openSection(Insights.sectionOf(k)); setTimeout(() => jumpTo(k), 60); return; } return jumpTo(k); }
