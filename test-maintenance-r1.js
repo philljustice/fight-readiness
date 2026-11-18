@@ -103,7 +103,7 @@ function app(seed){
  ctx.window=ctx;ctx.globalThis=ctx;ctx.document.defaultView=ctx;ctx.HTMLElement=window.HTMLElement;
  window.HTMLElement.prototype.scrollIntoView=function(){};window.HTMLElement.prototype.focus=function(){};
  const c=vm.createContext(ctx);
- for(const f of ['recovery.js','scoring.js','reminders.js','profile.js','insights.js','weightplan.js','early.js','cheat.js','weekly.js','report.js','push.js','tutorial.js','recovery-ui.js','app.js'])vm.runInContext(fs.readFileSync(f,'utf8'),c,{filename:f});
+ for(const f of ['recovery.js','scoring.js','reminders.js','profile.js','insights.js','weightplan.js','early.js','cheat.js','weekly.js','report.js','coachreport.js','push.js','tutorial.js','recovery-ui.js','app.js'])vm.runInContext(fs.readFileSync(f,'utf8'),c,{filename:f});
  return {c,storage,run:s=>vm.runInContext(s,c),doc:ctx.document};
 }
 
@@ -122,7 +122,7 @@ function app(seed){
   assert.ok(!t.includes('Fight Review'));
   assert.ok(!t.includes("it's a weigh-in day (Mon/Thu)") && !t.includes("It's a weigh-in day (Mon/Thu)"));
   const days = a.run('res().daysLogged');
-  assert.ok(days >= 1, 'Maintenance log counts in FightReady score, got '+days);
+  assert.ok(days >= 1, 'Maintenance log counts in CornerReady score, got '+days);
   a.run("show('log')");
   const hist = a.doc.body.textContent;
   assert.ok(!hist.includes('camp history'));
@@ -200,7 +200,7 @@ function app(seed){
   assert.equal(Math.round(tr.cats.training), 100);
   const fb = Early.feedback(tr, trained);
   assert.ok(!fb.text.includes('scheduled session'));
-  // weekly FightReady training is unchanged: 4=100, 3=90 even when some days are rest
+  // weekly CornerReady training is unchanged: 4=100, 3=90 even when some days are rest
   const days = ['2026-11-02','2026-11-03','2026-11-04','2026-11-05','2026-11-06','2026-11-07','2026-11-08'];
   const sess = i => ({date:days[i], v:2, context:{mode:'maintenance'}, nutrition:true, sessions:[{label:'Technique', rpe:6, done:true}]});
   const restDay = {date:'2026-11-08', v:2, context:{mode:'maintenance'}, nutrition:true, family:true, sleep:8, screen:1, energy:5, soreness:1, mood:5, stress:1, sessions:[]};
@@ -247,7 +247,7 @@ function app(seed){
   const dash = a.doc.body.textContent;
   assert.ok(dash.includes('This week: 3 of 4 sessions'), 'weekly line is labelled as this week\'s session count');
   assert.ok(!/\b3\/4 this week\b/.test(dash), 'old compact 3/4 this week label is gone');
-  assert.ok(/Training, rolling/.test(dash), 'FightReady training category is labelled as rolling');
+  assert.ok(/Training, rolling/.test(dash), 'CornerReady training category is labelled as rolling');
   const catVals = [...a.doc.querySelectorAll('.cat-table .cat-val')];
   assert.ok(catVals.length >= 6, 'category value cells use .cat-val');
   assert.ok(catVals.some(el => /→/.test(el.textContent)), 'rolling figures still use the 100 → 25.0 form');

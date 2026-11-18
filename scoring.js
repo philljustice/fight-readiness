@@ -117,7 +117,7 @@
     const mon = t - ((new Date(date + 'T12:00:00Z').getUTCDay() + 6) % 7);
     return countQualifyingSessions((entries || []).filter(e => { const n = dayNum(e.date); return n >= mon && n < mon + 7; }));
   }
-  // A day is scorable when at least one FightReady category was actually logged.
+  // A day is scorable when at least one CornerReady category was actually logged.
   // A weigh-in, hydration colour, or note alone does not start the score (show — not 0).
   function entryScorable(e) {
     if (!e) return false;

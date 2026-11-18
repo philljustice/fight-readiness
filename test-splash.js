@@ -5,11 +5,11 @@ assert.equal(Sp.shouldPlay({ search:'', hidden:false, played:true }), false, 're
 assert.equal(Sp.shouldPlay({ search:'', hidden:true, played:false }), false, 'background open skipped');
 assert.equal(Sp.shouldPlay({ search:'?replay', played:true }), true); assert.equal(Sp.shouldPlay({ search:'?nosplash' }), false);
 const sw = fs.readFileSync('sw.js', 'utf8'), idx = fs.readFileSync('index.html', 'utf8'), css = fs.readFileSync('splash.css', 'utf8');
-['splash.js','splash.css','brand/splash/crown.webp','brand/splash/f.webp','brand/splash/r.webp'].forEach(f => { assert.ok(sw.includes(`'${f}'`), 'precached ' + f); assert.ok(fs.existsSync(f), f); });
+['splash.js','splash.css','brand/splash/crown.webp','brand/splash/c.webp','brand/cr/word.png','brand/cr/mark.png','brand/splash/r.webp'].forEach(f => { assert.ok(sw.includes(`'${f}'`), 'precached ' + f); assert.ok(fs.existsSync(f), f); });
 assert.ok(idx.indexOf('src="splash.js"') > idx.indexOf('src="app.js"'), 'splash runs after the app has rendered');
 assert.ok(/prefers-reduced-motion/.test(css), 'reduced motion handled');
 assert.ok(!/(^|[{}, ])\.(logo|mark|crown|fr|word|plate|burst|flash)\b/.test(css), 'splash CSS is scoped under #splash');
-const kb = ['crown','f','r'].reduce((s, f) => s + fs.statSync(`brand/splash/${f}.webp`).size, 0) / 1024; assert.ok(kb < 60, 'assets small: ' + kb.toFixed(1) + ' KB');
+const kb = ['crown','c','r'].reduce((s, f) => s + fs.statSync(`brand/splash/${f}.webp`).size, 0) / 1024; assert.ok(kb < 60, 'assets small: ' + kb.toFixed(1) + ' KB');
 console.log('splash ok', kb.toFixed(1) + ' KB');
 // fr-v44: readiness gate
 const js = fs.readFileSync('splash.js', 'utf8'), app = fs.readFileSync('app.js', 'utf8');

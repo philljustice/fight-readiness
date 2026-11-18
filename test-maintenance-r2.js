@@ -1,4 +1,4 @@
-// Phase 2 Maintenance: outline & goals, review goals copy, weekly ratings, FightReady report, weigh-in reminders.
+// Phase 2 Maintenance: outline & goals, review goals copy, weekly ratings, CornerReady report, weigh-in reminders.
 const assert = require('assert');
 const {parseHTML} = require('linkedom');
 const vm = require('vm');
@@ -15,7 +15,7 @@ function app(seed){
  ctx.window=ctx;ctx.globalThis=ctx;ctx.document.defaultView=ctx;ctx.HTMLElement=window.HTMLElement;ctx.Event=window.Event;ctx.CustomEvent=window.CustomEvent;
  window.HTMLElement.prototype.scrollIntoView=function(){};window.HTMLElement.prototype.focus=function(){};
  const c=vm.createContext(ctx);
- for(const f of ['recovery.js','scoring.js','reminders.js','profile.js','insights.js','weightplan.js','early.js','cheat.js','weekly.js','report.js','push.js','tutorial.js','recovery-ui.js','app.js'])vm.runInContext(fs.readFileSync(f,'utf8'),c,{filename:f});
+ for(const f of ['recovery.js','scoring.js','reminders.js','profile.js','insights.js','weightplan.js','early.js','cheat.js','weekly.js','report.js','coachreport.js','push.js','tutorial.js','recovery-ui.js','app.js'])vm.runInContext(fs.readFileSync(f,'utf8'),c,{filename:f});
  return {c,storage,run:s=>vm.runInContext(s,c),doc:ctx.document};
 }
 
@@ -169,7 +169,7 @@ function seedMaint(extra){
   assert.deepEqual(a.run("S.recovery.reviews.pb.goals"),['Build an aerobic base']);
 }
 
-// Weekly ratings gate the Maintenance coach report; report uses FightReady score not process score
+// Weekly ratings gate the Maintenance coach report; report uses CornerReady score not process score
 {
   const a=app();
   a.run(`S.profile={name:'UNIT',schedule:Profile.scheduleFromWeek(S.weeks[0])};S.fighter='UNIT';S.startDate='2026-10-01';
@@ -186,7 +186,7 @@ function seedMaint(extra){
   assert.ok(a.doc.querySelector('#shareBtn').disabled && a.doc.querySelector('#printBtn').disabled,'share/print wait until ratings are done');
   assert.ok(a.doc.querySelector('#rcReportNotReady'));
   assert.ok(!/process score/i.test(a.doc.body.textContent));
-  assert.ok(a.doc.querySelector('#rcMaintFrScore'),'FightReady score is on the Maintenance report');
+  assert.ok(a.doc.querySelector('#rcMaintFrScore'),'CornerReady score is on the Maintenance report');
   assert.ok(/3 sessions/.test(a.doc.querySelector('#rcWeekTrainTotal').textContent));
   assert.ok(/Technique/.test(a.doc.querySelector('#rcWeekSessions').textContent) && /RPE 6/.test(a.doc.querySelector('#rcWeekSessions').textContent));
   const scale=a.doc.querySelector('[data-goal-rate="0"]');
@@ -209,7 +209,7 @@ function seedMaint(extra){
   assert.ok(/4\/5/.test(html) && /Moved well in technique/.test(html));
   assert.ok(/3\/5/.test(html) && /Sleep is still patchy/.test(html));
   const text=a.run('shareText()');
-  assert.ok(/FightReady score:/.test(text));
+  assert.ok(/CornerReady score:/.test(text));
   assert.ok(/Stay mobile · 4\/5/.test(text));
   assert.ok(!/process score/i.test(text));
   const draft=a.doc.querySelector('#rcAthleteDraft');
@@ -259,10 +259,10 @@ function seedMaint(extra){
   assert.equal(JSON.stringify(pablo.entries[0].notes),'\"UNIT camp log\"','source backup left unchanged');
 }
 
-// Push client still hardcodes Mon/Thu — worker is not part of this change
+// fr-v60: push weigh-in days follow the Maintenance outline (camp keeps Mon/Thu); covered in test-cornerready.js
 {
   const push=fs.readFileSync('push.js','utf8');
-  assert.ok(/weighDays:\s*\[\s*1\s*,\s*4\s*\]/.test(push),'client payload still sends Mon/Thu weigh days; do not change the production worker');
+  assert.ok(/weighDays:\s*weighDaysFor\(lifecycle\)/.test(push),'client payload derives weigh days from the lifecycle/outline');
 }
 
-console.log('Maintenance r2 outline, copy-once goals, weekly ratings, FightReady report, weigh-in reminders, and v3 restore pass');
+console.log('Maintenance r2 outline, copy-once goals, weekly ratings, CornerReady report, weigh-in reminders, and v3 restore pass');

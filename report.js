@@ -17,7 +17,7 @@
     ctx.fillText(`${v[0].date.slice(5)} → ${v[v.length-1].date.slice(5)} • latest ${v[v.length-1].y}${o.unit||''}${o.ref!=null?' • target '+o.ref+(o.unit||''):''}`, x0, y + h + 32);
     return y + h + 60; }
   // d: { subject, name, meta, score, scoreLabel, verdict, cats:[[label,val,weight]], head:[[label,value]], weight:[{date,y}], target, sleep:[], idealSleep, daily:[], loadWeeks:[4], hydration:{days:[{date,v,color}],summary}, training, flags:[], review:{well,missed,focus} }
-  function laurels(ctx, cx, cy, R, filled) { const col = filled ? '#E8A828' : 'rgba(216,245,220,.9)';
+  function laurels(ctx, cx, cy, R, filled) { const col = filled ? '#E1A42B' : 'rgba(216,245,220,.9)';
     for (const s of [1, -1]) { ctx.save(); ctx.translate(cx, 0); ctx.scale(s, 1); ctx.translate(-cx, 0); ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = filled ? 3 : 2; ctx.lineCap = 'round';
       const pt = i => { const a = (128 + i * 13.5) * Math.PI / 180; return [cx + R * Math.cos(a), cy + R * Math.sin(a), a]; };
       ctx.beginPath(); for (let i = 0; i <= 8; i++) { const [x, y] = pt(i); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
@@ -27,19 +27,19 @@
       ctx.restore(); } }
   function draw(canvas, d, scale = 1) { const H = 4400; canvas.width = W * scale; canvas.height = H * scale; const ctx = canvas.getContext('2d'); ctx.scale(scale, scale);
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = '#111'; ctx.fillRect(0, 0, W, 150); ctx.fillStyle = '#fff'; ctx.font = 'bold 46px -apple-system,Helvetica,Arial'; ctx.fillText('🥊 FightReady weekly report', PAD, 70);
+    ctx.fillStyle = '#111'; ctx.fillRect(0, 0, W, 150); ctx.fillStyle = '#fff'; ctx.font = 'bold 46px -apple-system,Helvetica,Arial'; ctx.fillText('🥊 CornerReady weekly report', PAD, 70);
     ctx.font = '28px Helvetica,Arial'; ctx.fillStyle = '#ddd'; ctx.fillText(d.subject.split(' – ').filter((_, i) => i !== 1).join(' • '), PAD, 118);
     let y = 200; ctx.fillStyle = INK; ctx.font = '26px Helvetica,Arial'; if (d.meta) y = wrap(ctx, d.meta, PAD, y, W - 2*PAD, 34) + 10;
     // hero score card: tier gradient, ring, bold title, verdict badge
-    { const v = d.score, tier = v == null ? 'solid' : v >= 90 ? 'elite' : v >= 75 ? 'ready' : v >= 60 ? 'solid' : 'low', G = { elite:['#000000','#1a1408','#3a2a08','#E8A828'], ready:['#0b1f17','#11502f','#2e9d55','#7ee29a'], solid:['#0b1730','#12345e','#1e6fb8','#8fd0fb'], low:['#1a0204','#4a0509','#8a0d16','#ff6b6b'] }[tier];
+    { const v = d.score, tier = v == null ? 'solid' : v >= 90 ? 'elite' : v >= 75 ? 'ready' : v >= 60 ? 'solid' : 'low', G = { elite:['#000000','#1a1408','#3a2a08','#E1A42B'], ready:['#0b1f17','#11502f','#2e9d55','#7ee29a'], solid:['#0b1730','#12345e','#1e6fb8','#8fd0fb'], low:['#1a0204','#4a0509','#8a0d16','#ff6b6b'] }[tier];
       const x0 = PAD, w = W - 2*PAD, h = 300, g = ctx.createLinearGradient(x0, y, x0 + w, y + h); g.addColorStop(0, G[0]); g.addColorStop(0.55, G[1]); g.addColorStop(1, G[2]);
       ctx.save(); ctx.shadowColor = G[2]; ctx.shadowBlur = 24; ctx.fillStyle = g; ctx.beginPath(); (ctx.roundRect ? ctx.roundRect(x0, y, w, h, 24) : ctx.rect(x0, y, w, h)); ctx.fill(); ctx.restore();
       const cx = x0 + 160, cy = y + h/2, R = 110; ctx.lineWidth = 18; ctx.lineCap = 'round';
       ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2); ctx.stroke();
       if (v != null) { ctx.save(); ctx.shadowColor = G[3]; ctx.shadowBlur = 14; ctx.strokeStyle = G[3]; ctx.beginPath(); ctx.arc(cx, cy, R, -Math.PI/2, -Math.PI/2 + Math.PI*2*Math.max(0, Math.min(100, v))/100); ctx.stroke(); ctx.restore(); }
       ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.font = '900 104px Helvetica,Arial'; ctx.fillText(v == null ? '—' : v, cx, cy + 36); ctx.textAlign = 'left';
-      const tx = x0 + 320, tw = w - 340; ctx.font = '900 40px Helvetica,Arial'; ctx.fillText('FIGHTREADY SCORE', tx, y + 70);
-      ctx.font = 'bold 24px Helvetica,Arial'; ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.fillText(String(d.scoreLabel || '').replace(/fightready score/i, '').replace(/[()]/g, '').replace(/\s+/g, ' ').trim().toUpperCase(), tx, y + 108);
+      const tx = x0 + 320, tw = w - 340; ctx.font = '900 40px Helvetica,Arial'; ctx.fillText('CORNERREADY SCORE', tx, y + 70);
+      ctx.font = 'bold 24px Helvetica,Arial'; ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.fillText(String(d.scoreLabel || '').replace(/(?:corner|fight)ready score/i, '').replace(/[()]/g, '').replace(/\s+/g, ' ').trim().toUpperCase(), tx, y + 108);
       const badge = String(d.verdict || '').split(' — ')[0].split('.')[0].toUpperCase().slice(0, 28); ctx.font = '900 26px Helvetica,Arial'; const bw = Math.min(tw, ctx.measureText(badge).width + 40);
       ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.beginPath(); (ctx.roundRect ? ctx.roundRect(tx, y + 128, bw, 46, 23) : ctx.rect(tx, y + 128, bw, 46)); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillText(badge, tx + 20, y + 160);
       ctx.font = '24px Helvetica,Arial'; ctx.fillStyle = 'rgba(255,255,255,.9)'; wrap(ctx, String(d.verdict || '').split(' — ').slice(1).join(' — ') || '', tx, y + 210, tw, 30);
@@ -59,7 +59,7 @@
       d.belowPar.items.forEach(x => { ctx.fillStyle = RED; ctx.font = 'bold 28px Helvetica,Arial'; ctx.fillText(x.label + (x.score != null ? ' ' + x.score + '/100' : ''), PAD, y + 4); y += 40;
         ctx.fillStyle = '#333'; ctx.font = '26px Helvetica,Arial'; x.why.forEach(t => { y = wrap(ctx, '• ' + t, PAD + 20, y, W - 2*PAD - 20, 34); }); y += 8; });
       if (d.belowPar.note) { ctx.fillStyle = MUTE; ctx.font = '22px Helvetica,Arial'; y = wrap(ctx, d.belowPar.note, PAD, y + 4, W - 2*PAD, 30); } y += 20; }
-    y = section(ctx, 'Daily FightReady score', y); y = line(ctx, d.daily, y, 200, { min: 0, max: 100 });
+    y = section(ctx, 'Daily CornerReady score', y); y = line(ctx, d.daily, y, 200, { min: 0, max: 100 });
     y = section(ctx, 'Weight vs target', y); y = line(ctx, d.weight, y, 220, { ref: d.target, unit: ' lbs' });
     y = section(ctx, 'Sleep hours', y); y = line(ctx, d.sleep, y, 200, { ref: d.idealSleep, unit: 'h' });
     if (d.hydration) { y = section(ctx, 'Hydration (first pee colour, last 7 mornings)', y); const hd = d.hydration.days, cw = (W - 2*PAD) / hd.length;
@@ -79,12 +79,12 @@
       [['✅ Went well', d.review.well], ['❌ Missed', d.review.missed], ['🎯 Focus next week', d.review.focus]].forEach(([t, a]) => { if (!a || !a.length) return;
         ctx.fillStyle = INK; ctx.font = 'bold 28px Helvetica,Arial'; ctx.fillText(t, PAD, y + 4); y += 40; ctx.font = '26px Helvetica,Arial'; ctx.fillStyle = '#333';
         a.forEach(x => { y = wrap(ctx, '• ' + x, PAD + 10, y, W - 2*PAD - 10, 34); }); y += 12; }); }
-    ctx.fillStyle = MUTE; ctx.font = '22px Helvetica,Arial'; ctx.fillText('Generated by FightReady • data stays on the fighter\'s phone', PAD, y + 30); y += 60;
+    ctx.fillStyle = MUTE; ctx.font = '22px Helvetica,Arial'; ctx.fillText('Generated by CornerReady • data stays on the fighter\'s phone', PAD, y + 30); y += 60;
     // crop to content
     const out = document.createElement('canvas'); out.width = W * scale; out.height = Math.ceil(y * scale); out.getContext('2d').drawImage(canvas, 0, 0); return out; }
   // Share text: subject first so it can be copied if Mail leaves the subject blank.
   const shareText = (to, subj, lines) => [`Subject: ${subj}`, `To: ${to}`, '', ...lines].join('\n');
-  const fileName = (name, wk) => `FightReady-${String(name||'Fighter').replace(/\W+/g,'-')}-${wk}.png`;
+  const fileName = (name, wk) => `CornerReady-${String(name||'Fighter').replace(/\W+/g,'-')}-${wk}.png`;
   const api = { draw, shareText, fileName };
   if (typeof module !== 'undefined') module.exports = api; else root.Report = api;
 })(this);
