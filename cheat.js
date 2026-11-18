@@ -1,7 +1,7 @@
 // Earned weekend Cheat Day. Shared by app + node tests.
 // Week = Mon-Fri of the current week; the award is for that week's Sat/Sun. Rules (all required):
 //  1. Mon-Fri all 5 days fully logged, nutrition hit on >= 4 of 5 (Yes, or goal-day score >= 80)
-//  2. Pace: FightReady score >= 80, or up >= 3 points vs the score one week earlier
+//  2. Pace: CornerReady score >= 80, or up >= 3 points vs the score one week earlier
 //  3. Weight on track (Insights.weightVerdict) when a target weight is set; passes if no target is set
 //  4. Blackout: not the first weekend of camp (first Sat/Sun on or after the app start date), and no weekend day
 //     within the 14 days before the fight date.

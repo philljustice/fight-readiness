@@ -1,4 +1,4 @@
-// Weight plan: one model for every division, scaled by % of target weight (see FightReady weight plan Page).
+// Weight plan: one model for every division, scaled by % of target weight (see CornerReady weight plan Page).
 // Plan line spreads the gap evenly to reach target 5 days before weigh-in; a personal fight-week allowance A covers the rest.
 (function (root) {
   const dn = s => { const [y,m,d] = s.split('-').map(Number); return Date.UTC(y,m-1,d)/864e5; };

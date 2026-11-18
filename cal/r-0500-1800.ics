@@ -1,9 +1,9 @@
 BEGIN:VCALENDAR
 VERSION:2.0
-PRODID:-//FightReady//Reminders//EN
+PRODID:-//CornerReady//Reminders//EN
 CALSCALE:GREGORIAN
 METHOD:PUBLISH
-X-WR-CALNAME:FightReady
+X-WR-CALNAME:CornerReady
 BEGIN:VEVENT
 UID:team-morning@fight-readiness
 DTSTAMP:20261020T160000Z
@@ -12,8 +12,10 @@ DURATION:PT10M
 RRULE:FREQ=DAILY
 SUMMARY:🥊 Morning log: sleep + nutrition + how you feel
 DESCRIPTION:Log last night's sleep hours\, whether you're following your nu
- trition plan today\, and how you feel (energy\, soreness\, mood\, stress 1
- -5).\nOpen app: https://philljustice.github.io/fight-readiness/
+ trition plan today\, and how you feel (energy\, soreness\, mood\, stress\,
+  sleep quality\, motivation\, appetite 1-5\; injury/illness\; resting HR i
+ f you use a watch).\nOpen app: https://philljustice.github.io/fight-readin
+ ess/
 URL:https://philljustice.github.io/fight-readiness/
 TRANSP:TRANSPARENT
 BEGIN:VALARM
@@ -65,15 +67,15 @@ DTSTAMP:20261020T160000Z
 DTSTART:20261025T180000
 DURATION:PT10M
 RRULE:FREQ=WEEKLY;BYDAY=SU
-SUMMARY:Send weekly FightReady report to Phill
-DESCRIPTION:Open the FightReady app and tap "Send weekly report to Phill" (
- then pick Mail and tap Send).\nOpen app: https://philljustice.github.io/fi
- ght-readiness/
+SUMMARY:Send weekly CornerReady report to Phill
+DESCRIPTION:Open the CornerReady app and tap "Send weekly report to Phill" 
+ (then pick Mail and tap Send).\nOpen app: https://philljustice.github.io/f
+ ight-readiness/
 URL:https://philljustice.github.io/fight-readiness/
 TRANSP:TRANSPARENT
 BEGIN:VALARM
 ACTION:DISPLAY
-DESCRIPTION:Send weekly FightReady report to Phill
+DESCRIPTION:Send weekly CornerReady report to Phill
 TRIGGER:-PT0M
 END:VALARM
 END:VEVENT

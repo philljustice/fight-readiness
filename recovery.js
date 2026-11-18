@@ -5,7 +5,7 @@
  const addDays=(d,k)=>new Date((n(d)+k)*DAY).toISOString().slice(0,10);
  const clamp=(x,lo,hi)=>Math.max(lo,Math.min(hi,x));
  function migrate(S,today){
-  if(S.schemaVersion>3)throw new Error('This backup needs a newer FightReady version. Your saved data was not changed.');
+  if(S.schemaVersion>3)throw new Error('This backup needs a newer CornerReady version. Your saved data was not changed.');
   const r=S.recovery || {};
   if(!S.recovery && dateOK(S.profile?.fightDate))r.bouts=[{id:'legacy-'+S.profile.fightDate,fightDate:S.profile.fightDate,status:'scheduled',recoveryDays:7,campStart:S.startDate||S.entries.map(e=>e.date).sort()[0]||(S.profile.fightDate<today?S.profile.fightDate:today),created:today}];
   if(r.bouts && !Array.isArray(r.bouts))throw new Error('Damaged bout history');
@@ -96,7 +96,11 @@
   const flags=entries.flatMap(e=>[e.injury&&e.injury!=='none'?e.date+': injury '+e.injury:null,e.ill?e.date+': illness reported':null,+e.mood>0&&+e.mood<=2?e.date+': low mood':null,+e.stress>=4?e.date+': higher stress':null,+e.soreness>=4?e.date+': higher soreness':null].filter(Boolean));
   return {entries,sessions: sessions.length,target,checkins,score,nudges,flags,band,hydrated,direction,restricted:restrictedNow};
  }
- function pushMetadata(S,today){const r=S.recovery,p=phase(r,today),o=r.reminders||{},past=p.past||null,revKey=past?(past.id||past.fightDate):null,rev=(revKey&&r.reviews&&r.reviews[revKey])||{};const quietOn=p.mode==='camp'?o.applyToCamp===true:true;return {version:1,mode:p.mode,asOf:today,campOptIn:S.push===true,recoveryOptIn:S.push===true&&p.mode==='recovery',fightDate:p.next?.fightDate||null,previousFightDate:past?.fightDate||null,recoveryUntil:p.end?new Date(p.end*DAY).toISOString().slice(0,10):null,recoveryDay:p.mode==='recovery'&&p.day!=null?p.day:null,restrictionPause:p.hold,paused:o.paused===true,snoozeUntil:o.snoozeUntil||null,quietStart:quietOn?(o.quietStart||null):null,quietEnd:quietOn?(o.quietEnd||null):null,reviewComplete:rev.status==='complete',reviewCompletedAt:rev.completedAt||null,reviewBoutId:revKey||null};}
+ function pushMetadata(S,today){const r=S.recovery,p=phase(r,today),o=r.reminders||{},past=p.past||null,revKey=past?(past.id||past.fightDate):null,rev=(revKey&&r.reviews&&r.reviews[revKey])||{};const quietOn=p.mode==='camp'?o.applyToCamp===true:true;return {version:1,mode:p.mode,asOf:today,campOptIn:S.push===true,recoveryOptIn:S.push===true&&p.mode==='recovery',fightDate:p.next?.fightDate||null,previousFightDate:past?.fightDate||null,recoveryUntil:p.end?new Date(p.end*DAY).toISOString().slice(0,10):null,recoveryDay:p.mode==='recovery'&&p.day!=null?p.day:null,restrictionPause:p.hold,paused:o.paused===true,snoozeUntil:o.snoozeUntil||null,quietStart:quietOn?(o.quietStart||null):null,quietEnd:quietOn?(o.quietEnd||null):null,reviewComplete:rev.status==='complete',reviewCompletedAt:rev.completedAt||null,reviewBoutId:revKey||null,weighInsPerWeek:weighInsPerWeek(r)};}
+ // Maintenance outline weigh-ins per week (0–7, default 1). Push weigh-in reminders follow it (fr-v60).
+ function weighInsPerWeek(r){const n=r&&r.maintenance&&r.maintenance.weighInsPerWeek;return Number.isInteger(+n)&&n!==''&&n!=null&&+n>=0&&+n<=7?+n:1;}
+ const WEIGH_DAYS={0:[],1:[1],2:[1,4],3:[1,3,5],4:[1,2,4,5],5:[1,2,3,4,5],6:[1,2,3,4,5,6],7:[0,1,2,3,4,5,6]};
+ function weighDays(n){return (WEIGH_DAYS[n]||WEIGH_DAYS[1]).slice();}
  function reminderAllowed(r,today,time){const o=r.reminders||{};if(!o.optIn||o.paused||o.snoozeUntil&&o.snoozeUntil>=today)return false;const a=o.quietStart||'21:00',b=o.quietEnd||'08:00';return !(a<b?time>=a&&time<b:time>=a||time<b);}
 
  const choices=['Yes','No','Not sure','N/A'];
@@ -236,5 +240,5 @@
   return (S.entries||[]).filter(e=>e.date>=week&&e.date<=today&&+e.weight>0).length;
  }
 
- const api={dateOK,addDays,migrate,sync,entryMode,scoredEntry,neverInCamp,historyLabel,campEntries,maintenanceReport,pushMetadata,reminderAllowed,isCleared,restricted,addHold,clearHolds,schedule,cancel,extend,phase,reviewBlocks,reviewHtml,daysAfterFight,summary,questions,choices,CARE,PREFER,daily,day1Welcome,applyReviewShape,requestEarlyMaint,clearEarlyMaint,weekMonday,outlineSaved,latestReviewGoals,maybeCopyReviewGoals,goalRatingsFor,goalRatingsReady,weeklyTrainingLog,weighInsThisWeek};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.Recovery=api;
+ const api={dateOK,addDays,migrate,sync,entryMode,scoredEntry,neverInCamp,historyLabel,campEntries,maintenanceReport,pushMetadata,weighInsPerWeek,weighDays,reminderAllowed,isCleared,restricted,addHold,clearHolds,schedule,cancel,extend,phase,reviewBlocks,reviewHtml,daysAfterFight,summary,questions,choices,CARE,PREFER,daily,day1Welcome,applyReviewShape,requestEarlyMaint,clearEarlyMaint,weekMonday,outlineSaved,latestReviewGoals,maybeCopyReviewGoals,goalRatingsFor,goalRatingsReady,weeklyTrainingLog,weighInsThisWeek};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.Recovery=api;
 })(typeof window==='undefined'?globalThis:window);
