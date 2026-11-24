@@ -1,0 +1,16 @@
+name = "fight-readiness-push"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+ALLOWED_ORIGIN = "https://philljustice.github.io"
+VAPID_SUBJECT = "mailto:philljustice@gmail.com"
+VAPID_PUBLIC_KEY = "BEmDoaMF8fOZOVErc87lv4SdzLAsVmQgrQFWugnlFMe2-q2pFFOfGTvhtAZ6mokkTJYtMhTND6bQzY-BUvqZFuA"
+# VAPID_PRIVATE_KEY is a secret: `wrangler secret put VAPID_PRIVATE_KEY` (value in .secrets/vapid.json, never committed)
+
+[[kv_namespaces]]
+binding = "SUBS"
+id = "caed0b06570a46ef89a4cc8dba25c6fb"   # replace with the id printed by `wrangler kv namespace create SUBS`
+
+[triggers]
+crons = ["*/15 * * * *"]

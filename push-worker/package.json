@@ -1,0 +1,20 @@
+{
+  "name": "fight-readiness-push",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "dev": "wrangler dev --test-scheduled"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "http_ece": "^1.2.1",
+    "node": "^22.23.3",
+    "puppeteer-core": "^25.15.0",
+    "wrangler": "^4.151.3"
+  }
+}
