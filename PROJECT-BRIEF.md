@@ -1,6 +1,6 @@
 # CornerReady — project brief
 
-Updated 24 Nov 2026 (America/New_York). Live app: fr-v60 (merge `5950adf`).
+Updated 24 Nov 2026 (America/New_York), after Phill approved M1 and Cloudflare. Live app: fr-v60 (merge `5950adf`).
 
 ## 1. What it is
 
@@ -64,15 +64,16 @@ Settled — do not reopen:
 - 2026-11-18: Camp weigh-ins stay Mon/Thu; Maintenance weigh-ins follow the outline.
 - 2026-11-18/19: Intro and sign-up live at the cornerready.com root; other domains redirect there; sign-up database stays under fightreadyapp.com; that domain is retired at renewal (21 Oct 2027), not deleted now.
 - 2026-11: Auto-renew is off for the old getready@fightreadyapp.com mailbox (trial ends 17 Nov 2027).
-- Phase 3 releases 3 and 4, and later work, wait for Phill's go after testing.
+- 2026-11-24: Backend hosting is Cloudflare; the website and mailbox stay on Hostinger.
+- 2026-11-24: M1 (phase 3 releases 3 and 4, plus Phill's added fight-day, Setup, log-list and Maintenance items) is approved to start 25 Nov 2026 after 5:30 PM (America/New_York). Do not start the build before then.
 
-Still open (see the milestone review list): backend hosting (Hostinger vs Cloudflare); Phill's go on phase 3 releases 3 and 4; sign-in provider; paid tiers and pricing (billing deferred until the pilot shows gyms will pay).
+Still open (see the milestone review list): sign-in provider; paid tiers and pricing (billing deferred until the pilot shows gyms will pay).
 
 ## 8. Current milestone
 
-Week 0 (through 29 Nov 2026) is paper only. Nothing is built until Phill approves M1. Review list: `/workspace/corner-phase4/milestones-for-review.md` and the Page [CornerReady milestones for review](https://cursor.com/canvas/store-4deb8101-fb16-4a8d-a8a8-fe3e3796f5f7/963e1c68-304d-4d56-90e7-7ffa16ec84d5). Plan: `/workspace/corner-phase4/plan.md`.
+Week 0 paper is done. Current milestone: M1 (finish phase 3 releases 3 and 4, plus the items Phill added on 24 Nov). Approved to start 25 Nov 2026 after 5:30 PM (America/New_York). Do not start the build before then. Review list: `/workspace/corner-phase4/milestones-for-review.md` and the Page [CornerReady milestones for review](https://cursor.com/canvas/store-4deb8101-fb16-4a8d-a8a8-fe3e3796f5f7/963e1c68-304d-4d56-90e7-7ffa16ec84d5). Plan: `/workspace/corner-phase4/plan.md`.
 
-Next, after Phill's go: M1 finish phase 3 (releases 3 and 4); M2 server + sign-in on a test site; M3 fighter sync + pilot; M4 read-only coach dashboard; M5 coach-assigned schedules; M6 alerts, auto reports, tiers and security review.
+After M1: M2 server + sign-in on a test site (Cloudflare backend; website and mailbox stay on Hostinger); M3 fighter sync + pilot; M4 read-only coach dashboard; M5 coach-assigned schedules; M6 alerts, auto reports, tiers and security review.
 
 ## 9. Secrets (names only — never print or commit values)
 
