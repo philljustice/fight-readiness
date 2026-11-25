@@ -16,7 +16,7 @@ function app(seed){
  ctx.window=ctx;ctx.globalThis=ctx;ctx.document.defaultView=ctx;ctx.HTMLElement=window.HTMLElement;ctx.Event=window.Event;ctx.CustomEvent=window.CustomEvent;
  window.HTMLElement.prototype.scrollIntoView=function(){};window.HTMLElement.prototype.focus=function(){};
  const c=vm.createContext(ctx);
- for(const f of ['recovery.js','scoring.js','reminders.js','profile.js','insights.js','weightplan.js','early.js','cheat.js','weekly.js','report.js','coachreport.js','push.js','tutorial.js','recovery-ui.js','app.js'])vm.runInContext(fs.readFileSync(f,'utf8'),c,{filename:f});
+ for(const f of ['recovery.js','scoring.js','reminders.js','profile.js','insights.js','weightplan.js','early.js','cheat.js','weekly.js','report.js','coachreport.js','push.js','tutorial.js','recovery-ui.js','fightday.js','fightweek.js','photo.js','setuphub.js','maint.js','app.js'])vm.runInContext(fs.readFileSync(f,'utf8'),c,{filename:f});
  return {c,storage,run:s=>vm.runInContext(s,c),doc:ctx.document};
 }
 

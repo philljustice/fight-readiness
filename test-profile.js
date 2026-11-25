@@ -7,7 +7,7 @@ assert.deepEqual(P.validate({name:'A', dob:'2008-05-01', startWeight:'172.8', ta
 assert.deepEqual(P.validate({name:'A', coachContact:'613-555-0100'}, T), {});
 assert.equal(P.age('2008-10-20', T), 17); assert.equal(P.age('2008-10-19', T), 18);
 assert.equal(P.countdown('2026-11-02', T).days, 14); assert.equal(P.countdown('2026-11-02', T).text, '14 days to fight (2w 0d)');
-assert.equal(P.countdown('2026-10-19', T).text, 'Fight day! 🥊'); assert.equal(P.countdown('2026-10-01', T), null);
+assert.equal(P.countdown('2026-10-19', T).text, "It's fight day! 🥊"); assert.equal(P.countdown('2026-10-01', T), null);
 assert.equal(P.weightStatus(170.4, 155).text, '15.4 lbs to cut'); assert.equal(P.weightStatus(154, 155).text, '1 lbs under target'); assert.equal(P.weightStatus('', 155), null);
 const wk = { days: [['Skill','Wrestling','Muay thai'],['Str','S&C',''],['Rest + Active Recovery','Walk','']].map(([f,a,b])=>({focus:f,s1:a,s2:b})) };
 const sc = P.scheduleFromWeek(wk); assert.deepEqual(sc.days.map(d=>d.n), [2,1,0,0,0,0,0]); assert.deepEqual(sc.days[0].labels, ['Wrestling','Muay thai']);

@@ -7,7 +7,7 @@
     ['log','#tiles','A little each morning and evening','Morning: sleep, pee colour and how you feel. Evening: nutrition, training, screen time and family. Completed tiles turn green with ✓ LOGGED. Everything saves as you go.'],
     ['plan','#view > .card:nth-child(2)','Your week, laid out','Schedule shows your planned sessions. Change your regular training week in Setup → Edit profile & training schedule.'],
     ['report','#coachReportTitle','Keep your coach in the loop','Coach Report brings your trends and check-ins together. Review it, then use the share controls when you’re ready. This tour sends nothing.'],
-    ['setup','#exportBtn','Make this phone yours','Setup holds your profile, reminders and watch choice. Export a backup regularly: your logs live on this phone. Restore a backup when you change phones.'],
+    ['setup','#setupHub','Make this phone yours','Setup is a set of boxes: tap one to open that area. Profile, reminders and your watch live here. Export a backup regularly from Backup & updates: your logs live on this phone.'],
     ['help','#replayTutorial','Help is always here','Find explanations and safety guidance here. Tap Replay tutorial any time for another quick look around.']
   ];
   const shouldStart = (profile, state, blocked) => !!profile && state === 'pending' && !blocked;

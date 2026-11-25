@@ -1,4 +1,4 @@
-const APP_VERSION='fr-v60';
+const APP_VERSION='fr-v61';
 'use strict';
 const KEY = 'fightReady.v1';
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -32,7 +32,7 @@ const inCamp = () => phaseNow().mode === 'camp';
 const res = () => {
   const maint = phaseNow().mode === 'maintenance';
   return Scoring.compute(Recovery.campEntries(S, today()), new Date(), Object.assign({}, S.params, {
-    startDate: S.startDate || null,
+    startDate: S.startDate || null, unlockDays: Maint.unlockDays(S, phaseNow().mode),
     fightDate: maint ? null : ((S.profile || {}).fightDate || null),
     trainingPlan: maint ? 'maintenance' : 'camp',
     includeToday: !!maint,
@@ -94,7 +94,7 @@ function fwTodayCard() { const s = wpStatus(); if (!s || s.daysToWeighIn == null
    ${ha?`<div class="hyd-alert ${ha.level}" id="fwHyd">${ha.stop?'🛑':ha.rehydrate?'💧':'⚠️'} ${esc(ha.text)}${ha.stop?' <a href="#" data-goto="help" data-anchor="helpStop" style="color:#ffcc80">Stop signs →</a>':''}</div>`:''}
    ${s.planToday>0?`<div class="fwt-tgt"><span class="muted">Today's target</span> <b>${s.planToday} lbs</b>${chk?` <span class="wck ${chk.level}">${esc(chk.level==='ok'?'✓ on target':chk.diff+' lbs over')}</span>`:' <span class="muted">• weigh in this morning</span>'}</div>`:''}
    ${st.map(x=>`<div class="tt-row"><span>${x.icon} ${esc(x.text)}</span></div>`).join('')}
-   <p class="muted" style="margin:8px 0 0">${s.allow.water?'Water-cut steps on (guideline only, not medical advice).':'Food-based steps only.'} <a href="#" data-goto="help" data-anchor="helpStop" style="color:#E1A42B">Stop signs →</a></p></div>`; }
+   <p class="muted" style="margin:8px 0 0">${s.allow.water?'Water-cut steps on (guideline only, not medical advice).':'Food-based steps only.'} <a href="#" data-goto="help" data-anchor="helpStop" style="color:#E1A42B">Stop signs →</a></p>${FightWeek.details(s, wpProfile(), today())}</div>`; }
 // Coach Report: plan, check-ins, status, division flag.
 function wpReportCard() { const s = wpStatus(); if (!s) return ''; const T = s.T, A = s.A, wi = s.weighIn, ck = [[30, A+5], [14, A+2], [5, A]];
   const ch = wi ? ck.map(([d, pct]) => { const x = new Date(wi+'T12:00'); x.setDate(x.getDate()-d); const ds = Scoring.ymd(x), w = S.entries.filter(e => +e.weight > 0 && e.date <= ds).sort((a,b)=>a.date<b.date?1:-1)[0], lim = Math.round(T*(1+pct/100)*10)/10, past = ds <= today();
@@ -188,7 +188,7 @@ function coachReportData() { const d = reportData(), r = res(), p = S.profile ||
     breakdown: typeof d.breakdown === 'string' ? d.breakdown : '',
     countdown: cd ? cd.text.charAt(0).toUpperCase() + cd.text.slice(1) : (mode === 'maintenance' ? 'No fight booked • Maintenance' : mode === 'recovery' ? 'Recovery after the fight' : null),
     daysLogged: d.head[0][1], weightVsTarget: d.head[2][1], flags: d.flags.filter(f => f !== load), loadAlert: load || null,
-    nutritionTitle: 'Nutrition', nutrition: d.nutrition.text, missed: d.review.missed, focus: d.review.focus }); }
+    photo: FighterPhoto.src(), nutritionTitle: 'Nutrition', nutrition: d.nutrition.text, missed: d.review.missed, focus: d.review.focus }); }
 function coachReportPanel() { try { return `<div class="cr-paper">${CoachReport.html(coachReportData(), { logo: 'brand/cr/mark.png' })}</div>`; } catch (e) { console.warn('coach report', e); return ''; } }
 async function sendWeekly() { const P = weeklyParts();
   try { const d = coachReportData(), file = new File([CoachReport.html(d, { standalone:true, logo:'https://philljustice.github.io/fight-readiness/brand/cr/mark.png' })], CoachReport.fileName(P.name, P.wk), { type:'text/html' });
@@ -270,7 +270,7 @@ function catTable(r) {
   return `<div class="cat-table">${CATS.map(([k,l,w]) => catRow(k,l,w,r.cats[k], `${r.cats[k].toFixed(0)} → ${(r.cats[k]*S.params[w]/100).toFixed(1)}`)).join('')}</div>`;
 }
 
-function todayCard(title) { const e = S.entries.find(x=>x.date===(V._date||today())), d = Early.daily(e, S.params); if (!d) return '';
+function todayCard(title) { const e = S.entries.find(x=>x.date===(V._date||today())), d = Early.daily(e, S.params); if (!d || e.fightDay) return '';
   const f = Early.feedback(d, e);
   const num = d.score == null ? '—' : d.score;
   const row = ([k,l,w]) => {
@@ -296,7 +296,7 @@ function countUp() { const n = document.querySelector('.hero-num[data-count]'); 
 // Main score hero (full or early), shared by the Score and Coach Report tabs
 const breakdown = r => r.locked || !r.daysLogged ? '' : `Base ${r.base.toFixed(1)} + consistency ${r.bonus} + momentum ${r.momentum.points}${r.momentum.streak ? ' • 🔥 ' + r.momentum.streak + '-day streak' : ''}`;
 function momLine(r) { const m = r.momentum || {}, cd = Profile.countdown((S.profile||{}).fightDate);
-  return `<div class="mom-row">${m.streak ? `<span class="mom-chip">🔥 ${m.streak}-day streak</span>` : ''}<span class="mom-chip">⚡ Momentum +${m.points}</span>${cd ? `<span class="mom-chip">🥊 ${cd.days} days to fight</span>` : ''}</div>`; }
+  return `<div class="mom-row">${m.streak ? `<span class="mom-chip">🔥 ${m.streak}-day streak</span>` : ''}<span class="mom-chip">⚡ Momentum +${m.points}</span>${cd ? `<span class="mom-chip">🥊 ${cd.days ? cd.days + ' days to fight' : "It's fight day!"}</span>` : ''}</div>`; }
 function momCard(r) { const m = r.momentum || {}; return `<div class="card"><h3>⚡ Camp momentum</h3>
   <div class="row"><span>Momentum bonus</span><b>+${m.points} / 5</b></div>
   <div class="row"><span>Weighted camp consistency</span><b>${m.weighted.toFixed(0)}% → +${m.wPts.toFixed(1)}</b></div>
@@ -329,7 +329,7 @@ function todayTrainCard() {
 function scoreHero(r) { const camp = inCamp();
   return r.locked ? earlyCard(r) : heroCard({ score: r.scorable ? r.score : null, badge: r.scorable ? r.verdict.split(' — ')[0] : (r.daysLogged ? 'NO SCORE YET' : 'NO DATA YET'), verdict: r.scorable ? r.verdict.split(' — ').slice(1).join(' — ') : 'No scored days in the last 3 weeks yet.',
     extra: camp ? momLine(r) : '', foot: camp ? `Base ${r.base.toFixed(1)} + consistency ${r.bonus} + momentum ${r.momentum.points} • ${r.daysLogged} days logged • ${esc(r.dataQuality.split(' — ')[0])} data` : `Base ${r.base.toFixed(1)} + consistency ${r.bonus} • ${r.daysLogged} days logged • ${esc(r.dataQuality.split(' — ')[0])} data` }); }
-function earlyCard(r) { const pr = Early.progress(r, S.params.unlockDays||7), v = r.scorable ? Math.round(r.base) : null;
+function earlyCard(r) { const pr = Early.progress(r, Maint.unlockDays(S, phaseNow().mode)), v = r.scorable ? Math.round(r.base) : null;
   return heroCard({ score: v, badge: 'EARLY SCORE • ' + r.daysLogged + ' DAY' + (r.daysLogged == 1 ? '' : 'S'), verdict: '',
     extra: `<div class="bar hero-bar"><i style="width:${pr.pct}%"></i></div>`,
     foot: `Full score unlocks in ${pr.unlockIn} day${pr.unlockIn==1?'':'s'}. Same weights as the full score, it just firms up as you log more days.` }); }
@@ -356,6 +356,8 @@ function spark(vals, opts = {}) { const v = vals.filter(x => x.y != null); if (v
 function miniCharts() { const es = S.entries.slice().sort((a,b)=>a.date<b.date?-1:1).slice(-21);
   return `<div class="card"><h3>📈 Daily score</h3>${spark(Early.series(S.entries, S.params).map(x=>({date:x.date,y:x.score})),{min:0,max:100,label:'Daily score'})}
    <h3>😴 Sleep hours</h3>${spark(es.map(e=>({date:e.date,y:e.sleep===''||e.sleep==null?null:+e.sleep})),{ref:S.params.idealSleep||8,unit:'h',label:'Sleep hours'})}</div>`; }
+// M1: once today's log is complete, the previous-days list shortens to about a week (Show all still lists everything).
+const recentLimit = () => { const t = S.entries.find(x => x.date === today()); return t && (Insights.isComplete(t) || (Recovery.entryMode(S, today()) !== 'camp' && hasData(t))) ? 7 : 21; };
 const V = {
  dash(o) {
   const r = res(), lw = r.latestWeight, camp = inCamp();
@@ -367,19 +369,20 @@ const V = {
   const inMaint = !camp && typeof Recovery!=='undefined' && Recovery.phase(S.recovery,today()).mode==='maintenance';
   const maintWeighNag = inMaint && weighTarget>0 && weekWeighs < weighTarget;
   const dueNow = camp ? Reminders.due(S.entries.find(e=>e.date===today()), new Date(), S.reminders.morning, S.reminders.evening) : [];
-  const top = scoreHero(r) + ((o && o.afterHero) || '') + todayTrainCard() + (camp?fwTodayCard():'') + minorHydCard();
+  const fday = camp && FightDay.isFightDay(); // M1 fight-day score page: own card, no streak/momentum/today's training
+  const top = (fday ? FightDay.hero(r) : scoreHero(r)) + ((o && o.afterHero) || '') + (camp ? FightDay.checklistCard() : '') + (fday ? FightDay.checkinCard() : todayTrainCard()) + (camp?fwTodayCard():'') + minorHydCard();
   const rs = V._restored; V._restored = null;
-  return `${rs?`<div class="card hint" id="restoredNote">✅ Restored <b>${esc(rs.name)}</b> with ${rs.days} logged day${rs.days===1?'':'s'}. 🔔 Notifications aren't restored: turn them on again in <a href="#" data-goto="setup">Setup</a>.</div>`:''}${top}${camp?otCard():''}${camp?day1Banner(false):''}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning check-in not done: '+esc(Insights.morningMissing(S.entries.find(e=>e.date===today())).map(x=>x.replace(/^[^:]*: /,'')).join('; ')||'sleep, hydration, how you feel')+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: nutrition, each training session (effort + minutes), screen hours, family/friends'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${camp?weeklyCard():''}${camp?fightCard():''}${camp?cheatCard():''}${camp?streakCard():''}${nutCard()}
-  ${isWeighDay?'<div class="card hint">⚖️ It\'s a weigh-in day (Mon/Thu). Weigh in this morning, fasted, and log it.</div>':''}${maintWeighNag?'<div class="card hint" id="maintWeighNag">⚖️ Weigh-in reminder: your outline asks for '+weighTarget+' weigh-in'+(weighTarget===1?'':'s')+' this week ('+weekWeighs+' logged so far). Reminder only — it does not change your score.</div>':''}
+  return `${rs?`<div class="card hint" id="restoredNote">✅ Restored <b>${esc(rs.name)}</b> with ${rs.days} logged day${rs.days===1?'':'s'}. 🔔 Notifications aren't restored: turn them on again in <a href="#" data-goto="setup">Setup</a>.</div>`:''}${top}${camp&&!fday?otCard():''}${camp?day1Banner(false):''}${dueNow.map(k=>`<div class="card hint">⏰ ${k==='morning'?'Morning check-in not done: '+esc(Insights.morningMissing(S.entries.find(e=>e.date===today())).map(x=>x.replace(/^[^:]*: /,'')).join('; ')||'sleep, hydration, how you feel')+([1,4].includes(new Date().getDay())?' + weigh-in before eating':''):'Evening log not done: nutrition, each training session (effort + minutes), screen hours, family/friends'}. <a href="#" data-goto="log" style="color:#ffb74d">Log now →</a></div>`).join('')}${camp?weeklyCard():''}${camp&&!fday?fightCard():''}${camp&&!fday?cheatCard():''}${camp&&!fday?streakCard():''}${fday?'':nutCard()}
+  ${isWeighDay&&!fday?'<div class="card hint">⚖️ It\'s a weigh-in day (Mon/Thu). Weigh in this morning, fasted, and log it.</div>':''}${maintWeighNag?'<div class="card hint" id="maintWeighNag">⚖️ Weigh-in reminder: your outline asks for '+weighTarget+' weigh-in'+(weighTarget===1?'':'s')+' this week ('+weekWeighs+' logged so far). Reminder only — it does not change your score.</div>':''}
   ${r.locked?`${todayCard()}<div class="card"><h3>Categories so far (${r.daysLogged} day${r.daysLogged==1?'':'s'})</h3>${catTable(r)}<p class="muted">Consistency bonus: 🔒 unlocks in ${r.unlockIn} day${r.unlockIn==1?'':'s'}.</p></div>`:`${todayCard()}
   <div class="card"><h3>Categories (last 3 weeks)</h3>${catTable(r)}
-  <p>Core consistency (Nutrition hit + all Training done${(S.params.nutMode||'yn')==='yn'?'':'; goal days count at 80+'}): <b>${r.consistency.toFixed(0)}%</b> → ${r.bonus?'+'+r.bonus+' pts for daily discipline!':'Build streaks on both key plans'}</p>
+  <p>Core consistency (Nutrition hit + all Training done${(S.params.nutMode||'yn')==='yn'?'':'; goal days count at 80+'}): <b>${r.consistency.toFixed(0)}%</b> → ${r.bonus?'+'+r.bonus+' pts for daily discipline!':fday?'no bonus in this window':'Build streaks on both key plans'}</p>
   <p class="muted">Bonus: +5 at ≥90%, +3 at ≥75%, +1 at ≥60%.</p></div>`}
   <div class="card"><h3>🥊 Weight</h3>${verdictLine()}<p>Latest: <b>${lw?lw.weight+' lbs':'—'}</b> ${lw?'<span class="muted">('+lw.date+')</span>':''}${+S.targetWeight?` • Target ${esc(S.targetWeight)} lbs`:''}</p>
   ${r.locked?`<p>7-day trend: ${lockMsg(r)}</p>`:`<p>7-day trend: <b>${r.delta==null?'—':(r.delta>0?'+':'')+r.delta+' lbs/wk'}</b></p><p>${r.trend.emoji} ${esc((!camp && r.trend.key==='none')?'Log at least 2 weigh-ins in the last 14 days to see your trend':r.trend.label)}</p>`}${cutWarn()}${weightChart()}</div>${miniCharts()}${hydrationCard()}${wellCard(false)}`;
  },
  log() {
-  const d = V._date || today(), optional = Recovery.entryMode(S,d) !== 'camp', ex = S.entries.find(x=>x.date===d), e = blankOr(ex, d);
+  const d = V._date || today(), fdayD = FightDay.isFightDay(d), optional = Recovery.entryMode(S,d) !== 'camp', ex = S.entries.find(x=>x.date===d), e = blankOr(ex, d);
   const legacy = ex && !Array.isArray(ex.sessions) && ex.v !== 2;
   const opt10 = (v) => `<option value="">—</option>${[1,2,3,4,5,6,7,8,9,10].map(n=>`<option ${+v===n?'selected':''}>${n}</option>`).join('')}`;
   const yn = (k,l) => `<label>${l}</label><div class="yn" data-k="${k}"><button class="y ${e[k]===true?'on':''}" data-val="1">✅ Yes</button><button class="n ${e[k]===false?'on':''}" data-val="0">❌ No</button></div>`;
@@ -415,27 +418,28 @@ const V = {
    ${well3Html(e)}
    </div>`,
    nutrition: `<div class="card" id="sec_nutrition">${head('nutrition','🍽️ Nutrition')}${optional?optionalNutritionHtml(e):nutLogHtml(e)}</div>`,
-   training: `<div class="card" id="sec_training">${head('training','🥊 Training')}${optional?optionalTrainingHtml(e):sessCard()}</div>`,
+   training: `<div class="card" id="sec_training">${head('training','🥊 Training')}${optional?optionalTrainingHtml(e):FightDay.schedBox(d)+sessCard()}</div>`,
    evening: `<div class="card" id="sec_evening">${head('evening','🌙 Evening')}
    ${step('screen','Recreational screen time (hours) *',0.5)}${chips('screen',[0,1,2,3,4])}
    ${yn('family','Quality time with family/friends? *')}
    <label>Notes (injuries, illness, soreness, energy, mood)</label><textarea id="f_notes" rows="3">${esc(e.notes)}</textarea>
    </div>` };
+  if (fdayD && !optional) { ['nutrition','training','evening'].forEach(k=>cards[k]=cards[k].replace(/ \*/g,' (optional)')); cards.morning = cards.morning.replace('Sleep last night (hours) *','Sleep last night (hours) (optional)').replace(/(<\/div>\s*)$/, '<div class="fd-inlog">' + FightDay.checkinHtml(d) + '</div>$1'); }
   if(optional)Object.keys(cards).forEach(k=>cards[k]=cards[k].replace(/ \*/g,' (optional)').replace(/✓ Done/g,'Saved').replace(/— weigh-in day!.*?before eating\./g,''));
   if (V._sec && cards[V._sec]) return sectionView(V._sec, cards[V._sec], d, e);
   if(optional)return optionalLogMenu(d,e,ex);
   const info = Insights.sectionInfo(e), nDoneM = info.filter(x => x.done).length, all = nDoneM === info.length, dl = Early.daily(e, S.params);
-  return `${d===today()?day1Banner(true):''}<div class="card" id="menuTop"><div class="row" style="margin:0"><div style="flex:1;min-width:0"><p id="progress" style="margin:0;font-weight:700;font-size:1.1rem">${all?'✅ ':''}${nDoneM} of ${info.length} sections done</p>
+  return `${fdayD?FightDay.logBanner():''}${d===today()?day1Banner(true):''}<div class="card" id="menuTop"><div class="row" style="margin:0"><div style="flex:1;min-width:0"><p id="progress" style="margin:0;font-weight:700;font-size:1.1rem">${all?'✅ ':''}${nDoneM} of ${info.length} sections done</p>
    <p class="muted" id="stillToLog" style="margin:4px 0 0">${left.length?'Still to log: '+left.join(', '):'All done for this day 🎉'}</p></div>
-   ${dl?`<div style="text-align:center;flex:none"><div class="muted" style="font-size:.75rem">${d===today()?'Today':'Day'}'s score</div><b id="topScore" style="font-size:2rem;line-height:1">${dl.score}</b></div>`:''}</div>
+   ${dl&&!e.fightDay?`<div style="text-align:center;flex:none"><div class="muted" style="font-size:.75rem">${d===today()?'Today':'Day'}'s score</div><b id="topScore" style="font-size:2rem;line-height:1">${dl.score}</b></div>`:''}</div>
    <label for="f_date" style="margin-top:12px">Date</label><input id="f_date" type="date" value="${d}" max="${today()}"></div>
   <div id="tiles" role="list">${info.map(x => tileHtml(x, e)).join('')}</div>
   <p class="muted" style="margin:-2px 4px 14px">Tap a section to log it, then tap <b>Done</b> (or go back) to return here. Everything saves automatically on this phone.</p>
   <div class="card" id="saveCard"><button class="btn big-save" id="saveDay">${all?'✅':'💾'} Save ${d===today()?"today's":"this day's"} log</button><div id="saveResult" aria-live="polite">${all?allDoneHtml(d):''}</div>${ex?'<button class="btn alt" id="delLog">Delete this day</button>':''}</div>
   <div id="todayWrap">${todayCard(d===today()?"Today's score":'Score for '+d)}</div>
   <div class="card"><h3>Recent entries</h3><table><tr><th>Date</th><th>N</th><th>T</th><th>Sl</th><th>Sc</th><th>F</th><th>Wt</th><th>✓</th></tr>
-  ${S.entries.slice().sort((a,b)=>a.date<b.date?1:-1).slice(0,V._all?1e9:21).map(x=>`<tr data-date="${x.date}"><td><a href="#" data-edit="${x.date}">${x.date.slice(5)}</a></td><td>${nutText(x,true)}</td><td>${trainTxt(x)}</td><td>${x.sleep??''}</td><td>${x.screen??''}</td><td>${x.family==null?'—':x.family?'Y':'N'}</td><td>${x.weight||''}</td><td>${Insights.isComplete(x)?'✅':'…'}</td></tr>`).join('')}</table>
-  <p class="muted">Tap a date to view or edit that day.</p>${S.entries.length>21&&!V._all?`<button class="btn alt" id="showAll">Show all ${S.entries.length} days</button>`:''}</div>`;
+  ${S.entries.slice().sort((a,b)=>a.date<b.date?1:-1).slice(0,V._all?1e9:recentLimit()).map(x=>`<tr data-date="${x.date}"><td><a href="#" data-edit="${x.date}">${x.date.slice(5)}</a></td><td>${nutText(x,true)}</td><td>${trainTxt(x)}</td><td>${x.sleep??''}</td><td>${x.screen??''}</td><td>${x.family==null?'—':x.family?'Y':'N'}</td><td>${x.weight||''}</td><td>${Insights.isComplete(x)?'✅':'…'}</td></tr>`).join('')}</table>
+  <p class="muted">Tap a date to view or edit that day.</p>${S.entries.length>recentLimit()&&!V._all?`<button class="btn alt" id="showAll">Show all ${S.entries.length} days</button>`:''}</div>`;
 
  },
  plan() {
@@ -469,7 +473,7 @@ const V = {
   <div class="card"><h3>Category performance</h3><table><tr><th>Category</th><th>Score</th><th>Weight</th><th>Contribution</th></tr>
    ${CATS.map(([k,l,w])=>`<tr><td>${l}</td><td>${r.cats[k].toFixed(0)}</td><td>${S.params[w]}%</td><td>${(r.cats[k]*S.params[w]/100).toFixed(1)}</td></tr>`).join('')}
    ${r.locked?`<tr><td colspan="4">Base score & consistency bonus: ${lockMsg(r)}</td></tr>`:`<tr><th>Base score</th><td></td><td></td><th>${r.base.toFixed(1)}</th></tr><tr><td>Consistency bonus</td><td>${r.consistency.toFixed(0)}%</td><td></td><td>+${r.bonus}</td></tr>`}</table></div>
-  <div class="card"><h3>Recent injury / illness notes (last 14 days)</h3>${notes.length?notes.slice(0,6).map(n=>`<p><b>${n.date}:</b> ${esc(n.notes)}</p>`).join(''):'<p>No notes logged in the last 14 days.</p>'}</div></details>
+  <div class="card"><h3>Recent injury / illness notes (last 14 days)</h3>${notes.length?notes.slice(0,6).map(n=>`<p><b>${n.date}:</b> ${esc(n.notes)}</p>`).join(''):'<p>No notes logged in the last 14 days.</p>'}</div>${FightDay.checkReportCard()}</details>
   <div class="card noprint"><h3>Other ways to share</h3><button class="btn alt" id="shareBtn">📤 Share text summary</button><button class="btn alt" id="csvBtn">📊 Export log as CSV (for coach / Excel)</button><button class="btn alt" data-sharefile="1">📎 Share full log file (CSV)</button></div>`;
  },
  profile() {
@@ -511,7 +515,7 @@ const V = {
   return deviceCard() + `<div class="card camp"><h3>🥊 Fight camp</h3><p class="muted">Set these at the start of camp. Momentum and the countdown are weighted by days to fight.</p>
    <label for="c_start">Camp start date</label><input id="c_start" type="date" value="${esc(S.startDate||'')}">
    <label for="c_fight">Fight date</label><input id="c_fight" type="date" value="${esc(pr.fightDate||'')}">
-   ${cd?`<p class="camp-count">🥊 <b>${cd.days}</b> days to fight</p>`:'<p class="muted">No fight date yet: momentum assumes a 10-week camp.</p>'}
+   ${cd?`<p class="camp-count">🥊 ${cd.days?`<b>${cd.days}</b> days to fight`:"<b>It's fight day!</b>"}</p>`:'<p class="muted">No fight date yet: momentum assumes a 10-week camp.</p>'}
    <button class="btn" id="saveCamp">💾 Save camp dates</button></div>
   <div class="card"><h3>Fighter profile</h3><p><b>${esc(pr.name||'—')}</b>${pr.nickname?' “'+esc(pr.nickname)+'”':''}<br><span class="muted">${[pr.gym,pr.coach&&'Coach '+pr.coach,pr.weightClass,pr.discipline].filter(Boolean).map(esc).join(' • ')||'No details yet'}</span></p>
    <p class="muted">Schedule: ${pr.schedule?Profile.DAYS.map((dn,i)=>dn.slice(0,3)+' '+(pr.schedule.days[i].n?pr.schedule.days[i].n+'×':'rest')).join(' • '):'—'}</p>
@@ -615,11 +619,14 @@ function well3Summary() { const t = Scoring.dayNum(today()), wk = S.entries.filt
 function blankOr(ex, d) { const e = JSON.parse(JSON.stringify(ex || {date:d, v:2, nutrition:null, training:null, family:null, sleep:'', screen:'', weight:'', notes:''}));
   if (!(ex && !Array.isArray(ex.sessions) && ex.v !== 2) && !Array.isArray(e.sessions)) { e.sessions = Recovery.entryMode(S,d)==='camp' ? Profile.sessionsFor(S.profile && S.profile.schedule, d) || [] : []; e.v = 2; }
   if(!ex)e.context={mode:Recovery.entryMode(S,d),boutId:Recovery.phase(S.recovery,d).next?.id||Recovery.phase(S.recovery,d).past?.id||null};
+  if (FightDay.isFightDay(d) && Recovery.entryMode(S,d)==='camp') { e.fightDay = true; if (!ex) e.sessions = []; } else delete e.fightDay; // M1: fight day needs wellness + hydration + check-in only
   if (e.sleepDevice == null) e.sleepDevice = devOf();
   if (d >= Scoring.WELL3_FROM && e.v >= 2) { if (e.injury == null) e.injury = 'none'; if (e.ill == null) e.ill = false; }
   return e; }
 // ---- Log menu: one tile per section; tapping opens that section full-screen, Done / back returns to the menu ----
 function tileSummary(x, e) { const has = k => x.items.some(i => k.test(i.key));
+  if (e.fightDay && x.key !== 'morning' && x.done && !(x.key === 'nutrition' ? Scoring.nutritionDone(e) : x.key === 'training' ? (e.sessions || []).some(s => s.done != null) || (e.extra && e.extra.label) : e.screen !== '' && e.screen != null || e.family != null)) return 'Not needed on fight day';
+  if (e.fightDay && x.key === 'morning' && !x.done) return 'To log: ' + x.items.map(i => /^well-/.test(i.key) ? 'how you feel' : i.key === 'hydration' ? 'hydration' : 'fight-day check-in').filter((v, i, a) => a.indexOf(v) === i).join(' + ');
   if (x.key === 'morning') { if (x.done) { const w = Insights.dayWellness(e); const hs = Insights.hydrationStatus(e.hydration); return [e.sleep + 'h sleep', hs ? '💧 ' + hs.label : '', +e.weight > 0 ? e.weight + ' lbs' : '', w != null ? 'feel ' + w.toFixed(1) + '/5' : ''].filter(Boolean).join(' · '); }
     return 'To log: ' + [has(/^sleep$/) ? 'sleep' : '', has(/^hydration$/) ? 'hydration' : '', has(/^well-/) ? 'how you feel' : ''].filter(Boolean).join(' + '); }
   if (x.key === 'nutrition') { const m = entryNutMode(e); return x.done ? nutText(e) : m === 'kcal' ? 'Enter calories eaten' : m === 'macros' ? 'Enter protein, carbs & fat' : 'Tap Yes or No'; }
@@ -671,7 +678,8 @@ function readDraft() { const u = V._e; if (!u) return null;
     else if (Recovery.entryMode(S,d) !== 'camp') b.extra = { label: xl || 'Activity note', rpe: +xr > 0 ? +xr : null, mins: +xm > 0 ? +xm : null, soft: true };
     else { /* camp: keep stored extra until RPE+mins complete; do not wipe on partial type */ } }
   if (document.getElementById('maintSessions')) {
-    const n = document.querySelectorAll('#maintSessions [data-mi]').length;
+    if (u.trained !== undefined) b.trained = u.trained; if (has('#f_restNote')) b.restNote = $('#f_restNote').value;
+    const n = b.trained === false ? 0 : document.querySelectorAll('#maintSessions [data-mi]').length;
     b.sessions = Array.from({length:n}, (_,i) => {
       const lab = (document.querySelector(`[data-mlabel="${i}"]`)||{}).value;
       const rpe = (document.querySelector(`[data-mrpe="${i}"]`)||{}).value;
@@ -701,7 +709,7 @@ function fieldFor(key) { const q = s => document.querySelector(s);
   if (key.startsWith('sessfx-')) { const i = key.slice(7), r = q(`[data-srpe="${i}"]`); return r && r.value === '' ? r : q(`[data-smin="${i}"]`); }
   if (key.startsWith('sess-')) return q('#' + key.replace('-', '_'));
   if (key.startsWith('well-')) return q(`.sc[data-k="${key.slice(5)}"]`);
-  if (key === 'hydration') return q('.hyd');
+  if (key === 'hydration') return q('.hyd'); if (key === 'fightcheck') return q('#fdCheck');
   if (key === 'extra') return q('#f_xrpe');
   if (key === 'nutrition') return q('.yn[data-k="nutrition"]') || ['f_kcal','f_protein','f_carbs','f_fat'].map(i => q('#' + i)).find(x => x && x.value === '') || q('#f_kcal,#f_protein');
   return q({ nutrition:'.yn[data-k="nutrition"]', training:'.yn[data-k="training"]', family:'.yn[data-k="family"]', sleep:'#f_sleep', screen:'#f_screen', weight:'#f_weight' }[key]); }
@@ -941,7 +949,8 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   window.addEventListener('load', () => Promise.race([window.__frSplashDone || Promise.resolve(), new Promise(r => setTimeout(r, 12000))]).then(regSW));
 }
 if (!S.profile && S.fighter) S.profile = { name:S.fighter, coach:S.coach||'', targetWeight:S.targetWeight||'', startWeight:'' }; // migrate older installs
-RC.install();
+RC.install(); SetupHub.install(); FightDay.install(); FighterPhoto.install(); Maint.install(); // M1 (fr-v61)
+{ const p0 = V.plan; V.plan = () => (Recovery.phase(S.recovery, today()).mode === 'camp' ? FightWeek.card(wpStatus(), wpProfile(), today()) : '') + p0(); }
 { const q = new URLSearchParams(location.search).get('tab'); show(['dash','log','plan','report','setup','help'].includes(q) ? q : 'dash'); }
 if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.tab) { V._date = null; V._sec = null; show(e.data.tab); } });
 if (S.push) Push.update(S.reminders, (S.profile&&S.profile.name)||S.fighter, Recovery.pushMetadata(S,today())).then(sendStatusNow).catch(()=>{});
@@ -980,20 +989,20 @@ function optionalTrainingHtml(e) {
   const restNote = hold
     ? `<p class="muted" id="maintRestNote">Rest is fine — nothing is required today. A care note is on file, so this log will not suggest physical activity. Follow your care plan and your coach.</p>`
     : `<p class="muted" id="maintRestNote">Rest is fine if you need it. If you feel like moving, you can log light work such as stretching, mobility, or an easy walk.</p>`;
-  return `<p id="maintTrainIntro">Log each session you did: what you trained and an estimated intensity. Minutes are optional. Rest days need nothing — there is no required schedule. Sessions with both a comment and intensity count toward your CornerReady training score (4 a week = 100, 3 = 90).</p>
+  return `${Maint.trainedHtml(e)}<div id="maintTrainedBox" ${e.trained===false?'hidden':''}><p id="maintTrainIntro">Log each session you did: what you trained and an estimated intensity. Minutes are optional. Rest days need nothing — there is no required schedule. Sessions with both a comment and intensity count toward your CornerReady training score (4 a week = 100, 3 = 90).</p>
    ${restNote}
    <div id="maintSessions">${rows}</div>
    <button type="button" class="btn alt" id="addMaintSession">Add another session</button>
-   <p class="muted">RPE: 1 very easy, 3 moderate, 5 hard, 7 very hard, 10 max. Intensity is recorded for you and your coach; going harder does not add extra points.</p>`;
+   <p class="muted">RPE: 1 very easy, 3 moderate, 5 hard, 7 very hard, 10 max. Intensity is recorded for you and your coach; going harder does not add extra points.</p></div>`;
 }
 function optionalLogMenu(d,e,ex) {
  const meta=Insights.SECTION_META;
  const fields={morning:['sleep','hydration','energy','soreness','stress','mood','sleepq','motivation','appetite','rhr'],nutrition:['nutrition','nutritionNote'],training:['extra'],evening:['screen','family','notes']};
  const rec=Recovery.entryMode(S,d)==='recovery';
- const trainSaved=rec?!!(e.extra&&e.extra.label):(Array.isArray(e.sessions)&&e.sessions.some(Scoring.qualifyingSession))||!!(e.extra&&Scoring.qualifyingSession(Object.assign({done:true},e.extra)));
+ const trainSaved=rec?!!(e.extra&&e.extra.label):e.trained===false||(Array.isArray(e.sessions)&&e.sessions.some(Scoring.qualifyingSession))||!!(e.extra&&Scoring.qualifyingSession(Object.assign({done:true},e.extra)));
  const saved=k=>k==='nutrition'?(e.nutrition===true||e.nutrition===false||!!(e.nutritionNote&&String(e.nutritionNote).trim())):k==='training'?trainSaved:fields[k].some(f=>e[f]!==undefined&&e[f]!==null&&e[f]!=='');
  const intro=rec
   ? 'Choose any fields you want. Nothing is missing or overdue; optional recovery check-ins do not change your CornerReady score.'
   : 'Log what you did today. Everyday Maintenance logs count toward your CornerReady score. There is no required schedule and nothing is overdue.';
- return `<div class="card"><h2>${rec?'Recovery':'Maintenance'} · log</h2><p>${intro}</p><label>Date<input id="f_date" type="date" value="${d}" max="${today()}"></label></div><div id="tiles" class="rc-check-grid" role="list">${meta.map(([k,icon,t])=>`<button class="tile rc-check-tile ${saved(k)?'done':'todo'}" data-sec="${k}" role="listitem" aria-label="${esc(t)}"><span class="ti">${icon}</span><span class="tt"><b>${esc(t.split(' ')[0])}</b></span><span class="tk">${saved(k)?'✓':'›'}</span></button>`).join('')}</div><div class="card"><button class="btn" id="saveDay">Save chosen entries</button><div id="saveResult" aria-live="polite"></div>${ex?'<button class="btn alt" id="delLog">Delete this day</button>':''}</div><div class="card"><h3>Log history</h3>${S.entries.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,21).map(x=>`<p><a href="#" data-edit="${x.date}">${esc(x.date)}</a> · ${esc(Recovery.historyLabel(S,x))} · ${esc(x.notes||'')}</p>`).join('')||'<p>No entries yet.</p>'}</div>`;
+ return `<div class="card"><h2>${rec?'Recovery':'Maintenance'} · log</h2><p>${intro}</p><label>Date<input id="f_date" type="date" value="${d}" max="${today()}"></label></div><div id="tiles" class="rc-check-grid" role="list">${meta.map(([k,icon,t])=>`<button class="tile rc-check-tile ${saved(k)?'done':'todo'}" data-sec="${k}" role="listitem" aria-label="${esc(t)}"><span class="ti">${icon}</span><span class="tt"><b>${esc(t.split(' ')[0])}</b></span><span class="tk">${saved(k)?'✓':'›'}</span></button>`).join('')}</div><div class="card"><button class="btn" id="saveDay">Save chosen entries</button><div id="saveResult" aria-live="polite"></div>${ex?'<button class="btn alt" id="delLog">Delete this day</button>':''}</div><div class="card"><h3>Log history</h3>${S.entries.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,V._all?1e9:recentLimit()).map(x=>`<p><a href="#" data-edit="${x.date}">${esc(x.date)}</a> · ${esc(Recovery.historyLabel(S,x))} · ${esc(x.notes||'')}</p>`).join('')||'<p>No entries yet.</p>'}${S.entries.length>recentLimit()&&!V._all?`<button class="btn alt" id="showAll">Show all ${S.entries.length} days</button>`:''}</div>`;
 }
