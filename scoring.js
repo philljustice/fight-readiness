@@ -192,9 +192,9 @@
     out.campLength = fd - st; out.daysToFight = fightDate ? fd - t : null;
     const by = {}; entries.forEach(e => by[e.date] = e);
     let sw = 0, sc = 0;
-    for (let d = st; d < t && d <= fd; d++) { const w = 1 + Math.min(1, (d - st) / L), key = new Date(d * 864e5).toISOString().slice(0,10), c = isConsistent(by[key]);
+    for (let d = st; d < t && d <= fd; d++) { const w = 1 + Math.min(1, (d - st) / L), key = new Date(d * 864e5).toISOString().slice(0,10); if (by[key] && by[key].fightDay) continue; const c = isConsistent(by[key]);
       sw += w; if (c) { sc += w; out.consistentDays++; } out.campDays++; }
-    for (let d = t - 1; d >= st; d--) { const key = new Date(d * 864e5).toISOString().slice(0,10); if (isConsistent(by[key])) out.streak++; else break; }
+    for (let d = t - 1; d >= st; d--) { const key = new Date(d * 864e5).toISOString().slice(0,10); if (by[key] && by[key].fightDay) continue; if (isConsistent(by[key])) out.streak++; else break; }
     if (out.campDays < MOM.MIN_DAYS) return out;
     out.weighted = sw ? sc / sw * 100 : 0;
     out.wPts = MOM.WMAX * Math.max(0, Math.min(1, (out.weighted - MOM.LO) / (MOM.HI - MOM.LO)));
@@ -214,19 +214,22 @@
     const unlockIn = st == null ? (p.unlockDays ?? 7) : Math.max(0, (p.unlockDays ?? 7) - daysSinceStart);
     const w = entries.filter(e => { const n = dayNum(e.date); return n >= t - p.windowDays && (p.includeToday ? n <= t : n < t); }); // today counts only once closed out (from tomorrow)
     const N = w.length;
-    const pctY = k => N ? w.filter(e => e[k] === true).length / N * 100 : 0; // blank counts as N, like COUNTIFS/N4
+    // Fight day (e.fightDay): training and food are skipped, so only wellness + sleep count that day (M1).
+    const wc = w.filter(e => !e.fightDay), Nc = wc.length, fdOnly = N > 0 && Nc === 0;
+    const pctY = k => Nc ? wc.filter(e => e[k] === true).length / Nc * 100 : 0; // blank counts as N, like COUNTIFS/N4
     const maint = p.trainingPlan === 'maintenance';
     const cats = {
-      nutrition: N ? avg(w.map(e => nutritionScore(e) ?? 0)) : 0,
-      training: maint ? maintenanceTrainingScore(entries, today, p) : (N ? avg(w.map(trainingPct)) : 0),
+      nutrition: Nc ? avg(wc.map(e => nutritionScore(e) ?? 0)) : 0,
+      training: maint ? maintenanceTrainingScore(entries, today, p) : (Nc ? avg(wc.map(trainingPct)) : 0),
       family: pctY('family'),
       wellness: N ? (avg(w.map(e => wellnessScore(e, rhrBaseline(entries, e.date))).filter(v => v != null)) || 0) : 0,
       sleep: N ? (avg(w.filter(e => num(e.sleep)).map(e => sleepScore(+e.sleep, p))) || 0) : 0,
-      screen: N ? (avg(w.filter(e => num(e.screen)).map(e => screenScore(+e.screen, p))) || 0) : 0,
+      screen: Nc ? (avg(wc.filter(e => num(e.screen)).map(e => screenScore(+e.screen, p))) || 0) : 0,
     };
     const wt = { nutrition:p.wNutrition, training:p.wTraining, sleep:p.wSleep, wellness:p.wWellness||0, screen:p.wScreen, family:p.wFamily };
     let base = 0; for (const k in cats) base += cats[k] * wt[k] / 100;
-    const consistency = N ? w.filter(e => nutritionHit(e) && (maint ? weekSessionCount(entries, e.date) >= 3 : trainingPct(e) === 100)).length / N * 100 : 0;
+    if (fdOnly) { const dw = (+wt.sleep || 0) + (+wt.wellness || 0); base = dw > 0 ? (cats.sleep * wt.sleep + cats.wellness * wt.wellness) / dw : 0; }
+    const consistency = Nc ? wc.filter(e => nutritionHit(e) && (maint ? weekSessionCount(entries, e.date) >= 3 : trainingPct(e) === 100)).length / Nc * 100 : 0;
     const bonus = bonusFor(consistency, p);
     const mom = p.noMomentum ? { points:0, weighted:0, streak:0, campDays:0, consistentDays:0, wPts:0, sPts:0, daysToFight:null, campLength:null } : momentum(entries, today, p.startDate, p.fightDate);
     const final = Math.min(100, base + bonus + mom.points);

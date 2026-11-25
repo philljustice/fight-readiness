@@ -123,8 +123,10 @@
   return {mode:next?'camp':'maintenance',past,next,day:days,duration,end,hold:false,remaining:0};
  }
  function questions(discipline){return CORE.concat((BANK[discipline]||[]).map((q,i)=>['skill'+i,q]));}
+ const RESULTS=[['won','Won'],['lost','Lost'],['draw','Draw / no contest']];
  function reviewBlocks(review,discipline){
   const used=new Set(), blocks=[];
+  { const res=RESULTS.find(([k])=>k===review.result); if(res)blocks.push({q:'Fight result',a:'',note:res[1],kind:'result'}); }
   const push=(q,a,note)=>{const n=String(note||'').trim(); if(choices.includes(a)||n)blocks.push({q,a:choices.includes(a)?a:'',note:n});};
   CARE.concat(PREFER).concat(questions(discipline)).forEach(([k,q])=>{used.add(k);push(q,(review.answers||{})[k],(review.notes||{})[k]);});
   Object.entries(review.notes||{}).forEach(([k,v])=>{if(!used.has(k)&&String(v).trim())blocks.push({q:k,a:'',note:String(v).trim()});});
@@ -240,5 +242,5 @@
   return (S.entries||[]).filter(e=>e.date>=week&&e.date<=today&&+e.weight>0).length;
  }
 
- const api={dateOK,addDays,migrate,sync,entryMode,scoredEntry,neverInCamp,historyLabel,campEntries,maintenanceReport,pushMetadata,weighInsPerWeek,weighDays,reminderAllowed,isCleared,restricted,addHold,clearHolds,schedule,cancel,extend,phase,reviewBlocks,reviewHtml,daysAfterFight,summary,questions,choices,CARE,PREFER,daily,day1Welcome,applyReviewShape,requestEarlyMaint,clearEarlyMaint,weekMonday,outlineSaved,latestReviewGoals,maybeCopyReviewGoals,goalRatingsFor,goalRatingsReady,weeklyTrainingLog,weighInsThisWeek};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.Recovery=api;
+ const api={RESULTS,dateOK,addDays,migrate,sync,entryMode,scoredEntry,neverInCamp,historyLabel,campEntries,maintenanceReport,pushMetadata,weighInsPerWeek,weighDays,reminderAllowed,isCleared,restricted,addHold,clearHolds,schedule,cancel,extend,phase,reviewBlocks,reviewHtml,daysAfterFight,summary,questions,choices,CARE,PREFER,daily,day1Welcome,applyReviewShape,requestEarlyMaint,clearEarlyMaint,weekMonday,outlineSaved,latestReviewGoals,maybeCopyReviewGoals,goalRatingsFor,goalRatingsReady,weeklyTrainingLog,weighInsThisWeek};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.Recovery=api;
 })(typeof window==='undefined'?globalThis:window);

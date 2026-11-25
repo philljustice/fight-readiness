@@ -282,3 +282,25 @@ details.cr-more>summary{cursor:pointer;list-style:none;padding:2px 0}details.cr-
   #rcGoalRatingsCard,#rcRatingsReady{display:none!important}
 }
 header h1{font-size:clamp(1rem,4.7vw,1.25rem);line-height:1.15}
+/* M1 fr-v61: Setup boxes, fight-day score card, fight checklist / check-in, fight-week plan, fighter photo */
+#setupPage [data-sarea][hidden]{display:none!important}
+.sh-grid{display:flex;flex-direction:column;gap:10px;margin:0 0 14px}
+.sh-box{display:flex;align-items:center;gap:14px;width:100%;min-height:76px;padding:14px 16px;border-radius:14px;border:1.5px solid #3a3a3a;border-left:4px solid #E1A42B;background:linear-gradient(180deg,#1c1c1c,#121212);color:#DEDEDE;text-align:left;font:inherit;cursor:pointer}
+.sh-box:active{transform:scale(.99)}.sh-ic{font-size:1.8rem;flex:none}.sh-tt{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0}
+.sh-tt b{font-family:'Exo2';font-style:italic;font-size:1.1rem;color:#fff}.sh-d{font-size:.88rem;color:#b9b9b9;line-height:1.3}.sh-go{flex:none;font-size:1.7rem;font-weight:800;color:#E1A42B}
+.sh-flag{align-self:flex-start;background:#E1A42B;color:#000;font-size:.7rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;border-radius:10px;padding:1px 8px}
+.sh-title{font-family:'Exo2';font-style:italic;color:#E1A42B;margin:4px 4px 12px}
+.card.hero.fightday{border:3px solid #E1A42B;background:repeating-linear-gradient(135deg,rgba(225,164,43,.10) 0 14px,rgba(0,0,0,0) 14px 28px),radial-gradient(circle at 50% 0%,#3a2a08 0%,#120d05 55%,#000 100%);box-shadow:0 0 0 1px #000,0 10px 36px rgba(225,164,43,.45)}
+.fd-banner{display:flex;align-items:center;gap:12px;margin:-4px -4px 10px;padding:12px 14px;border-radius:12px;background:#E1A42B;color:#000;text-align:left}
+.fd-eyebrow{font-size:.75rem;font-weight:800;letter-spacing:.1em}.fd-title{font-family:'Exo2';font-style:italic;font-weight:900;font-size:2rem;line-height:1.05;text-transform:uppercase}
+.fd-name{font-weight:700;font-size:.95rem}.fd-photo{width:58px;height:58px;border-radius:50%;object-fit:cover;border:2px solid #000;flex:none}
+.fd-note{margin:0 0 10px;color:#DEDEDE;font-size:.95rem}.fd-note a{color:#E1A42B}
+.fd-check{border:1.5px solid #E1A42B}.fd-item{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #2a2a2a;font-size:1.02rem}
+.fd-checkin{border:1.5px solid #E1A42B}.fd-inlog{margin-top:14px;padding-top:10px;border-top:1px solid #333}
+.fd-sched{margin:6px 0 10px;border-left:4px solid #E1A42B}.fd-logbanner{border:1.5px solid #E1A42B}
+.fw-plan{display:flex;flex-direction:column;gap:8px;margin-top:8px}.fw-day{padding:8px 10px;border:1px solid #333;border-radius:10px;background:#141414}
+.fw-day.on{border-color:#E1A42B;background:#211a0b}.fw-day.fight{border-color:#E1A42B}.fw-h{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.fw-t{margin-left:auto;color:#E1A42B;font-weight:800}
+.fw-s{font-size:.9rem;margin-top:3px}.fw-details summary{cursor:pointer;margin-top:10px;color:#E1A42B}
+.fr-photo.big{width:84px;height:84px;border-radius:50%;object-fit:cover;border:2px solid #E1A42B;flex:none;display:flex;align-items:center;justify-content:center;font-size:2.4rem;background:#1a1a1a}
+.ynx{display:flex;gap:8px}.ynx button{flex:1;padding:16px;font-size:1.1rem;border-radius:10px;border:2px solid #444;background:#222;color:#eee}
+.ynx button.y.on{background:#E1A42B;border-color:#E1A42B;color:#000}.ynx button.n.on{background:#B0101A;border-color:#B0101A}

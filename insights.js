@@ -14,7 +14,15 @@
   const ok15 = v => num(v) && +v >= 1 && +v <= 5;
   const well3Missing = e => !e || !(e.v >= 2) || String(e.date || '') < S.WELL3_FROM ? [] : WELL3.filter(([k]) => k === 'sleepq' ? !S.usesWatch(e.sleepDevice) && !ok15(e.sleepq) : !ok15(e[k])).map(([k, l]) => [k, l.split(' / ')[0].toLowerCase()]);
   // What's still missing for a complete day. v2 (current) entries need wellness + every scheduled session answered (with RPE + minutes if done).
-  function missing(e) { const m = [];
+  // Fight day (e.fightDay, set by the app on the camp fight date): only wellness + hydration + the injury/pain/illness check-in are required.
+  const FD_Q = [['injury','Any injury?'],['pain','Any pain?'],['ill','Feeling ill?']];
+  const fightCheckMissing = e => { const c = (e && e.fightCheck) || {}; return FD_Q.some(([k]) => typeof c[k] !== 'boolean' || (c[k] === true && String(c[k + 'Note'] || '').trim().length < 3)); };
+  function missingFightDay(e) { const m = [];
+    if (S.wellnessScore(e) == null) m.push('wellness (energy, soreness, mood, stress)'); else if (well3Missing(e).length) m.push('wellness (' + well3Missing(e).map(x => x[1]).join(', ') + ')');
+    if (!S.hydrationOK(e)) m.push('hydration (first pee colour)');
+    if (fightCheckMissing(e)) m.push('fight-day check-in (injury, pain, illness)');
+    return m; }
+  function missing(e) { if (e && e.fightDay) return missingFightDay(e); const m = [];
     if (!S.nutritionDone(e)) m.push('nutrition');
     if (!e || (e.v >= 2 ? !Array.isArray(e.sessions) || e.sessions.some(x => x.done == null) : e.training == null)) m.push('training');
     if (e && e.v >= 2 && Array.isArray(e.sessions) && e.sessions.some(x => x.done === true && !(num(x.rpe) && num(x.mins) && +x.mins > 0))) m.push('session effort + minutes');
@@ -25,15 +33,20 @@
     return m; }
   // Log-screen sections. All four true <=> isComplete for current (v2) days.
   function sections(e) { const ms = missing(e);
-    return { morning: !ms.includes('sleep') && !ms.some(m => m.startsWith('wellness') || m.startsWith('hydration')), nutrition: !ms.includes('nutrition'),
+    return { morning: !ms.includes('sleep') && !ms.some(m => m.startsWith('wellness') || m.startsWith('hydration') || m.startsWith('fight-day')), nutrition: !ms.includes('nutrition'),
       training: !ms.includes('training') && !ms.includes('session effort + minutes'), evening: !ms.includes('screen time') && !ms.includes('family/friends') }; }
   // Log menu: which section each checklist item belongs to, and one tile per section (done <=> sections(e)[key]).
   const SECTION_META = [['morning','🌅','Morning check-in','Sleep, hydration, weight & how you feel'],['nutrition','🍽️','Nutrition','Your plan or goal for the day'],['training','🥊','Training','Sessions, effort & minutes'],['evening','🌙','Evening','Screen time, family & notes']];
-  const sectionOf = k => /^(sleep|well-|hydration)/.test(k) ? 'morning' : k === 'nutrition' ? 'nutrition' : /^(training|sess)/.test(k) ? 'training' : 'evening';
+  const sectionOf = k => /^(sleep|well-|hydration|fightcheck)/.test(k) ? 'morning' : k === 'nutrition' ? 'nutrition' : /^(training|sess)/.test(k) ? 'training' : 'evening';
   function sectionInfo(e) { const items = checklist(e), st = sections(e);
     return SECTION_META.map(([key, icon, title, sub]) => ({ key, icon, title, sub, done: !!st[key], items: items.filter(i => sectionOf(i.key) === key) })); }
   // Same rules as missing(), but one entry per field the fighter must fill, with a key the Log screen maps to an input (tap to jump).
   function checklist(e) { const c = [], v2 = !!e && e.v >= 2, ss = e && Array.isArray(e.sessions) ? e.sessions : [];
+    if (e && e.fightDay) { WELL.forEach(([k, l]) => { if (!(num(e[k]) && +e[k] >= 1)) c.push({ key:'well-' + k, label:`How you feel: rate ${l.split(' / ')[0].toLowerCase()} (1–5)` }); });
+      well3Missing(e).forEach(([k, l]) => c.push({ key:'well-' + k, label:`How you feel: rate ${l} (1–5)` }));
+      if (!S.hydrationOK(e)) c.push({ key:'hydration', label:'Hydration: tap the colour of your first pee this morning' });
+      if (fightCheckMissing(e)) c.push({ key:'fightcheck', label:'Fight-day check-in: answer injury, pain and illness (a yes needs details)' });
+      return c; }
     if (!S.nutritionDone(e)) { const m = S.nutMode(e); c.push({ key:'nutrition', label: m === 'kcal' ? 'Nutrition: enter calories eaten today' : m === 'macros' ? 'Nutrition: enter protein, carbs and fat (g)' : 'Nutrition plan: tap Yes or No' }); }
     if (!e || (v2 ? !Array.isArray(e.sessions) : e.training == null)) c.push({ key:'training', label:'Training: tap Yes or No' });
     else if (v2) ss.forEach((x, i) => { if (x.done == null) c.push({ key:'sess-' + i, label:`Session ${i+1}: tap Yes or No` });
@@ -268,6 +281,6 @@
       return [e.date,e.nutrition,S.trainingPct(e)===100,e.sleep,e.screen,e.family,e.weight,e.notes,e.energy,e.soreness,e.mood,e.stress,ws==null?'':ws,Array.isArray(e.sessions)?ss.length:'',ss.filter(s=>s.done===true).length,Math.round(S.trainingPct(e)),...sc(0),...sc(1),x.label,x.rpe,x.mins,sessionLoad(e),isComplete(e)?'Y':'N',S.hydrationOK(e)?+e.hydration:'',S.hydrationOK(e)?hydrationStatus(e.hydration).label:'',S.nutMode(e),e.kcal??'',e.protein??'',e.carbs??'',e.fat??'',S.nutritionScore(e)==null?'':Math.round(S.nutritionScore(e)),S.WELL_SCALE,e.sleepq??'',e.sleepDevice??'',e.sleepDev??'',e.motivation??'',e.appetite??'',e.injury??'',e.injuryArea??'',e.ill==null?'':e.ill,e.rhr??''].map(csvCell).join(','); });
     return [CSV_COLS.join(',')].concat(rows).join('\r\n') + '\r\n';
   }
-  const api = { morningDone, eveningDone, morningMissing, WELL3, well3Missing, HYD_COLORS, hydrationStatus, hydrationWeek, hydrationFlags, sectionInfo, sectionOf, SECTION_META, checklist, dayStatus, sections, cutPlan, weightVerdict, fightWeek, weekReview, reviewText, WELL, missing, isComplete, isPartial, streak, grid, dayWellness, sessionLoad, wellness, load, cutSafety, overtraining, loadContext, OT, toCSV, CSV_COLS };
+  const api = { FD_Q, fightCheckMissing, morningDone, eveningDone, morningMissing, WELL3, well3Missing, HYD_COLORS, hydrationStatus, hydrationWeek, hydrationFlags, sectionInfo, sectionOf, SECTION_META, checklist, dayStatus, sections, cutPlan, weightVerdict, fightWeek, weekReview, reviewText, WELL, missing, isComplete, isPartial, streak, grid, dayWellness, sessionLoad, wellness, load, cutSafety, overtraining, loadContext, OT, toCSV, CSV_COLS };
   if (typeof module !== 'undefined') module.exports = api; else root.Insights = api;
 })(this);

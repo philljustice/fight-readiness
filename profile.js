@@ -32,7 +32,7 @@
     return { current:+current, target:+target, diff, text: diff > 0 ? `${diff} lbs to cut` : diff < 0 ? `${-diff} lbs under target` : 'On target' };
   }
   function countdown(fightDate, today = new Date()) { const d = daysTo(fightDate, today); if (d == null || d < 0) return null;
-    return { days:d, weeks:Math.floor(d/7), text: d === 0 ? 'Fight day! 🥊' : `${d} day${d===1?'':'s'} to fight (${Math.floor(d/7)}w ${d%7}d)` }; }
+    return { days:d, weeks:Math.floor(d/7), text: d === 0 ? "It's fight day! 🥊" : `${d} day${d===1?'':'s'} to fight (${Math.floor(d/7)}w ${d%7}d)` }; }
   // Training schedule: days[0..6] = Mon..Sun, each { n:0|1|2, labels:[s1,s2] }. perDay = default sessions on training days.
   const REST = /rest|recovery|off/i;
   function scheduleFromWeek(week) { const days = (week && week.days || []).slice(0,7).map(d => { const labels = [d.s1, d.s2].map(x => String(x||'').trim());
