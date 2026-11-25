@@ -1,6 +1,6 @@
 # CornerReady — project brief
 
-Updated 24 Nov 2026 (America/New_York), after Phill approved M1 and Cloudflare. Live app: fr-v60 (merge `5950adf`).
+Updated 25 Nov 2026 (America/New_York), after M1 shipped. Live app: fr-v61 (merge `31094ec`, PR #4). Restore point: `savepoint-before-m1-2026-11-25` (fr-v60, `5950adf`).
 
 ## 1. What it is
 
@@ -26,6 +26,11 @@ Open only the file that owns the work. `app.js` is the 160 KB core — targeted 
 - `reminders.js` / `build-ics.js` — ICS helpers; builds `cal/` for Pages.
 - `push.js` — Web Push client (completion flags only, never log data).
 - `coachreport.js` / `report.js` — weekly coach report HTML and share image.
+- `fightday.js` — fight-day score card, check-in, fanfare, fight checklist (from 7 days out), scheduled training on the log.
+- `fightweek.js` — day-by-day fight-week plan (uses `weightplan.js`).
+- `photo.js` — fighter photo (resized data URL in `S.photo`), shown in Setup, fight day and coach report.
+- `setuphub.js` — Setup as area boxes; tapping a box shows that area's cards.
+- `maint.js` — Maintenance 14-day baseline for fresh starts and yes/no training toggle.
 - `cheat.js` / `early.js` / `weekly.js` — cheat-day rules; day-one score; testing-phase weekly report config (recipient: Phill).
 - `tutorial.js` / `splash.js` / `splash.css` — tour and cold-open splash.
 - `sw.js` — service worker; `CACHE` must match `APP_VERSION`.
@@ -35,11 +40,11 @@ Open only the file that owns the work. `app.js` is the 160 KB core — targeted 
 
 ## 4. How to check
 
-App: `npm ci && npm test`. Planned smoke script (not written yet): `node /workspace/fr-tools/smoke.js <url> <outdir>`. Do not add new per-release screenshot scripts. Worker: `cd push-worker && npm test` (ephemeral test keys only; never send real pushes or change live subscriptions). Backend must-pass tests will be added with M2–M6.
+App: `npm ci && npm test`. Smoke: `node /workspace/fr-tools/smoke.js <url> <outdir>` (outside the repo; needs puppeteer-core from `/workspace/fight-readiness-push/node_modules` and `/usr/bin/google-chrome`; scenarios camp, fight day, recovery, maintenance; prints `SMOKE OK`). Extend it rather than writing new scripts. `test-m1.js` covers the M1 items. Do not add new per-release screenshot scripts. Worker: `cd push-worker && npm test` (ephemeral test keys only; never send real pushes or change live subscriptions). Backend must-pass tests will be added with M2–M6.
 
 ## 5. How to deploy and roll back
 
-**App** (Pages serves `main`): bump `APP_VERSION` in `app.js` and `CACHE` in `sw.js` to the same marker (next: `fr-v61`). Before a live deploy, annotate tag `savepoint-before-<name>-YYYY-MM-DD` on the current production SHA and write a one-line restore note. Do not force-move tags or make new tarball archives unless Phill asks. Commit on a branch, `gh pr create --base main`, merge after checks. One live deploy per milestone. Roll back by reverting that merge PR (preferred). Resetting `main` and force-pushing needs Phill's explicit OK. If phones must refetch, bump `CACHE` higher. Pre-CornerReady savepoint: `savepoint-before-cornerready-2026-11-18` (fr-v59, `50e888c`).
+**App** (Pages serves `main`): bump `APP_VERSION` in `app.js` and `CACHE` in `sw.js` to the same marker (next: `fr-v62`). Before a live deploy, annotate tag `savepoint-before-<name>-YYYY-MM-DD` on the current production SHA and write a one-line restore note. Do not force-move tags or make new tarball archives unless Phill asks. Commit on a branch, `gh pr create --base main`, merge after checks. One live deploy per milestone. Roll back by reverting that merge PR (preferred). Resetting `main` and force-pushing needs Phill's explicit OK. If phones must refetch, bump `CACHE` higher. M1 savepoint: `savepoint-before-m1-2026-11-25` (fr-v60, `5950adf`); restore by reverting PR #4. Pre-CornerReady savepoint: `savepoint-before-cornerready-2026-11-18` (fr-v59, `50e888c`).
 
 **Worker:** `cd push-worker && wrangler deploy` (or from `/workspace/fight-readiness-push`). Do not overwrite or print secrets. Confirm `GET https://fight-readiness-push.philljustice.workers.dev/` shows the expected `phasePolicy`. Roll back by deploying the previous source (fr-v60 is `ff2c9f3`; previous live was `6fcf973`). An app rollback does not roll back the worker, and vice versa.
 
@@ -66,12 +71,13 @@ Settled — do not reopen:
 - 2026-11: Auto-renew is off for the old getready@fightreadyapp.com mailbox (trial ends 17 Nov 2027).
 - 2026-11-24: Backend hosting is Cloudflare; the website and mailbox stay on Hostinger.
 - 2026-11-24: M1 (phase 3 releases 3 and 4, plus Phill's added fight-day, Setup, log-list and Maintenance items) is approved to start 25 Nov 2026 after 5:30 PM (America/New_York). Do not start the build before then.
+- 2026-11-25: M1 shipped as fr-v61. Fight-day check-in answers do not create care holds automatically (an auto hold would turn fight day into a recovery day); a yes asks for details and tells the fighter to tell the coach and event doctor. Won/lost question also offers Draw / no contest (confirm with Phill). Fight day counts as complete with wellness, hydration and the check-in; fight days are left out of nutrition/training/streak/momentum maths.
 
 Still open (see the milestone review list): sign-in provider; paid tiers and pricing (billing deferred until the pilot shows gyms will pay).
 
 ## 8. Current milestone
 
-Week 0 paper is done. Current milestone: M1 (finish phase 3 releases 3 and 4, plus the items Phill added on 24 Nov). Approved to start 25 Nov 2026 after 5:30 PM (America/New_York). Do not start the build before then. Review list: `/workspace/corner-phase4/milestones-for-review.md` and the Page [CornerReady milestones for review](https://cursor.com/canvas/store-4deb8101-fb16-4a8d-a8a8-fe3e3796f5f7/963e1c68-304d-4d56-90e7-7ffa16ec84d5). Plan: `/workspace/corner-phase4/plan.md`.
+M1 is live (fr-v61, 25 Nov 2026). Waiting on Phill's phone review and answers to the open questions (Draw / no contest option; fresh Maintenance users under 14 days see the score relock until the baseline is built; fight-day check-in is not in the camp-mode coach report HTML, only in "More detail" and the recovery text). For-M2 list and review list: `/workspace/corner-phase4/milestones-for-review.md`. Plan: `/workspace/corner-phase4/plan.md`.
 
 After M1: M2 server + sign-in on a test site (Cloudflare backend; website and mailbox stay on Hostinger); M3 fighter sync + pilot; M4 read-only coach dashboard; M5 coach-assigned schedules; M6 alerts, auto reports, tiers and security review.
 
